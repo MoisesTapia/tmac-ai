@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Testing & coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.hypothesis/
+
+# Type checkers
+.mypy_cache/
+.pyre/
+.pyre_configuration
+
+# IDE
+.vscode/
+.idea/
+
+# Reports (generated output)
+tmac-report.html
+tmac-report.json
+tmac-report.md
+
+# Misc
+*.log
+mypy_errors.txt
+debug.py

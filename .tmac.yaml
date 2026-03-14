@@ -1,0 +1,8 @@
+scan:
+  dir: ./infrastructure
+  exclude: [".terraform", "modules/deprecated"]
+  rules_dir: null
+report:
+  format: html
+  fail_on: critical
+  severity: all

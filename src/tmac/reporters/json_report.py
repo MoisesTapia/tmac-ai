@@ -1,0 +1,65 @@
+import json
+from tmac.reporters.base import BaseReporter
+from tmac.models.finding import ScanResult
+
+SARIF_SEVERITY_MAP = {
+    "critical": "error",
+    "high": "error",
+    "medium": "warning",
+    "low": "note",
+    "info": "none",
+}
+
+
+class JSONReporter(BaseReporter):
+    """Generates a SARIF 2.1.0 compliant JSON report of scan results."""
+
+    def generate(self, result: ScanResult) -> str:
+        # Build unique rules from findings
+        seen_rule_ids: set = set()
+        rules = []
+        for finding in result.findings:
+            if finding.rule_id not in seen_rule_ids:
+                seen_rule_ids.add(finding.rule_id)
+                rule_entry = {
+                    "id": finding.rule_id,
+                    "name": finding.rule_name,
+                    "shortDescription": {"text": finding.description},
+                }
+                if finding.references:
+                    rule_entry["helpUri"] = finding.references[0]
+                rules.append(rule_entry)
+
+        # Build results array
+        results = []
+        for finding in result.findings:
+            level = SARIF_SEVERITY_MAP.get(finding.severity.lower(), "warning")
+            results.append({
+                "ruleId": finding.rule_id,
+                "level": level,
+                "message": {"text": finding.description},
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": finding.file_path},
+                        "region": {"startLine": finding.line_number},
+                    }
+                }],
+            })
+
+        sarif = {
+            "version": "2.1.0",
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "runs": [{
+                "tool": {
+                    "driver": {
+                        "name": result.metadata.tool_name,
+                        "version": result.metadata.version,
+                        "informationUri": "https://github.com/tmac-security/tmac",
+                        "rules": rules,
+                    }
+                },
+                "results": results,
+            }],
+        }
+
+        return json.dumps(sarif, indent=2)

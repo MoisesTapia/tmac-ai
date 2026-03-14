@@ -1,0 +1,2009 @@
+# ==============================================================================
+# NOTA: Este archivo es la VERSIÓN COMPLETA de las reglas de amenazas TMAC.
+# Es una copia exacta y sincronizada de src/tmac/rules/aws/threats.yaml.
+# Contiene TODAS las reglas disponibles (no es un subconjunto de referencia).
+# Para mantener la sincronización, actualiza ambos archivos simultáneamente.
+# ==============================================================================
+version: "1.0"
+metadata:
+  cloud: aws
+  framework: STRIDE
+  description: "Base de datos de amenazas para TMAC v1.0.0 Ixtla - AWS Terraform"
+  maintainer: "TMAC Security Team"
+  last_updated: "2026-03-10"
+
+rules:
+  # ============================================================
+  # SECCIÓN: S3 BUCKETS
+  # ============================================================
+
+  - id: TMAC-AWS-S3-001
+    name: "S3 Bucket con Acceso Público (ACL)"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "acl"
+      condition: "in"
+      values: ["public-read", "public-read-write"]
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      Se detectó un bucket S3 con ACL pública. Esto permite que cualquier
+      usuario en internet lea o escriba archivos en el bucket, exponiendo
+      datos sensibles a acceso no autorizado.
+    mitigation: >
+      Cambia el atributo 'acl' a 'private' y habilita 'block_public_access'.
+      Ejemplo:
+        resource "aws_s3_bucket_public_access_block" "example" {
+          bucket = aws_s3_bucket.example.id
+          block_public_acls       = true
+          block_public_policy     = true
+          ignore_public_acls      = true
+          restrict_public_buckets = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.1.5"
+    tags: ["s3", "public-access", "data-exposure"]
+
+  - id: TMAC-AWS-S3-002
+    name: "S3 Bucket sin Encriptación del Lado del Servidor"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "server_side_encryption_configuration"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El bucket S3 no tiene configurada la encriptación del lado del servidor
+      (SSE). Los objetos almacenados no están cifrados en reposo, lo que
+      incrementa el riesgo de exposición de datos en caso de acceso no autorizado.
+    mitigation: >
+      Habilita SSE con KMS o AES-256:
+        resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
+          bucket = aws_s3_bucket.example.id
+          rule {
+            apply_server_side_encryption_by_default {
+              sse_algorithm = "aws:kms"
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.1.1"
+    tags: ["s3", "encryption", "data-at-rest"]
+
+  - id: TMAC-AWS-S3-003
+    name: "S3 Bucket sin Logging de Acceso"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "logging"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El bucket S3 no tiene habilitado el logging de acceso. Sin registros
+      de auditoría, no es posible rastrear quién accedió a los objetos,
+      dificultando la investigación de incidentes y el cumplimiento normativo.
+    mitigation: >
+      Habilita access logging apuntando a un bucket dedicado:
+        resource "aws_s3_bucket_logging" "example" {
+          bucket        = aws_s3_bucket.example.id
+          target_bucket = aws_s3_bucket.log_bucket.id
+          target_prefix = "s3-access-logs/"
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.1.3"
+    tags: ["s3", "logging", "audit", "compliance"]
+
+  - id: TMAC-AWS-S3-004
+    name: "S3 Bucket con Force Destroy Habilitado"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "force_destroy"
+      condition: "equals"
+      values: [true]
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      El bucket S3 tiene la configuración 'force_destroy' habilitada. Esto permite
+      que el bucket sea eliminado incluso si contiene objetos, incrementando el
+      riesgo de pérdida accidental o maliciosa de datos masiva (Denial of Service / Tampering).
+    mitigation: >
+      Elimina la configuración 'force_destroy' o establécela explícitamente en false:
+        resource "aws_s3_bucket" "example" {
+          bucket = "my-bucket"
+          force_destroy = false
+        }
+    references:
+      - "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket#force_destroy"
+    tags: ["s3", "availability", "data-loss"]
+
+  - id: TMAC-AWS-S3-005
+    name: "S3 Bucket sin Object Lock (Protección Ransomware)"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "object_lock_enabled"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      El bucket no tiene Object Lock habilitado. Esto permite que el bucket sea
+      vulnerable a manipulación de datos (Tampering) y ataques de ransomware
+      donde los atacantes cifran o eliminan definitivamente las versiones inmutables.
+    mitigation: >
+      Habilita Object Lock al momento de crear el bucket para garantizar la inmutabilidad:
+        resource "aws_s3_bucket" "example" {
+          bucket = "my-bucket"
+          object_lock_enabled = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+    tags: ["s3", "ransomware", "object-lock", "immutability"]
+
+  - id: TMAC-AWS-S3-006
+    name: "S3 Bucket Configurado como Sitio Web Estático"
+    resource_type: "aws_s3_bucket"
+    check:
+      attribute: "website"
+      condition: "exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El bucket está configurado para alojar un sitio web estático. Esta
+      configuración generalmente requiere que el bucket sea de lectura pública.
+      Si el bucket almacena datos sensibles, esta configuración podría resultar
+      en una exposición severa de datos.
+    mitigation: >
+      Si el bucket no está destinado a servir contenido web público corporativo,
+      elimina el bloque 'website'. Si es necesario, colócalo detrás de una distribución
+      de CloudFront con Origin Access Control (OAC) de manera aislada.
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/WebsiteHosting.html"
+    tags: ["s3", "website", "public-exposure"]
+
+  # ============================================================
+  # SECCIÓN: IAM POLICIES
+  # ============================================================
+
+  - id: TMAC-AWS-IAM-001
+    name: "Uso de Comodines (*) en Políticas de IAM"
+    resource_type: "aws_iam_policy"
+    check:
+      attribute: "policy.Statement.Resource"
+      condition: "equals"
+      values: ["*"]
+    severity: "High"
+    stride: "Elevation of Privilege"
+    description: >
+      La política IAM permite acciones sobre TODOS los recursos (*),
+      violando el principio de menor privilegio. Un atacante que comprometa
+      esta identidad tendría acceso irrestricto a todos los recursos de la cuenta.
+    mitigation: >
+      Restringe el campo 'Resource' a los ARNs específicos necesarios.
+      Ejemplo:
+        "Resource": [
+          "arn:aws:s3:::my-bucket",
+          "arn:aws:s3:::my-bucket/*"
+        ]
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+      - "CIS AWS Benchmark v2.0.0 - 1.16"
+    tags: ["iam", "least-privilege", "wildcard", "permissions"]
+
+  - id: TMAC-AWS-IAM-002
+    name: "Usuario IAM con Política Inline"
+    resource_type: "aws_iam_user_policy"
+    check:
+      attribute: "policy"
+      condition: "exists"
+      values: []
+    severity: "Medium"
+    stride: "Spoofing"
+    description: >
+      Se detectó una política inline asociada directamente a un usuario IAM.
+      Las políticas inline dificultan la gestión centralizada de permisos,
+      aumentan el riesgo de configuraciones inconsistentes, y complican la
+      auditoría de accesos.
+    mitigation: >
+      Usa políticas administradas (managed policies) en lugar de inline.
+      Asocia las políticas a grupos o roles IAM, no directamente a usuarios:
+        resource "aws_iam_group_policy_attachment" "example" {
+          group      = aws_iam_group.developers.name
+          policy_arn = aws_iam_policy.dev_policy.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html"
+      - "CIS AWS Benchmark v2.0.0 - 1.15"
+    tags: ["iam", "inline-policy", "user-management", "governance"]
+
+  - id: TMAC-AWS-IAM-003
+    name: "Permisos Administrativos Completos (Action: *)"
+    resource_type: "aws_iam_policy"
+    check:
+      attribute: "policy"
+      condition: "contains"
+      values: ['"Action": "*"']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      La política concede permisos administrativos completos mediante el uso del comodín '*'
+      en el campo 'Action'. Esto permite a la identidad realizar cualquier acción destructiva
+      o de escalación dentro de la cuenta AWS, lo cual viola el principio de menor privilegio.
+    mitigation: >
+      Define explícitamente las acciones específicas requeridas para el rol o usuario,
+      tales como 's3:GetObject' o 'ec2:DescribeInstances', en lugar de usar comodines absolutos.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "over-privileged", "admin-access"]
+
+  - id: TMAC-AWS-IAM-004
+    name: "Rol IAM asimilable por cualquier entidad (AssumeRole *"
+    resource_type: "aws_iam_role"
+    check:
+      attribute: "assume_role_policy"
+      condition: "contains"
+      values: ['"AWS": "*"', '"Principal": "*"']
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      La política de confianza (Trust Policy) del rol permite que cualquier
+      entidad de AWS ('*') asuma este rol. Un atacante externo o recurso
+      comprometido podría hacerse pasar (Spoofing) por este rol para acceder
+      a la infraestructura sin autenticación válida.
+    mitigation: >
+      Restringe el directivo principal (Principal) a cuentas de AWS específicas,
+      servicios internos requeridos (ej. lambda.amazonaws.com) o usuarios
+      específicos mediante ARNs:
+        "Principal": {
+          "AWS": "arn:aws:iam::123456789012:root"
+        }
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user.html"
+    tags: ["iam", "trust-policy", "assume-role", "spoofing"]
+
+  - id: TMAC-AWS-IAM-005
+    name: "Claves de Acceso de Usuario Permanentes"
+    resource_type: "aws_iam_access_key"
+    check:
+      attribute: "user"
+      condition: "exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      Estás creando identificadores de claves de acceso (Access Keys) de largo
+      plazo mediante IaC. Las claves prolongadas tienen un alto porcentaje de
+      fuga en repositorios, llevando a una revelación crítica de información
+      y toma de control de cuenta (Spoofing).
+    mitigation: >
+      Evita la generación de access keys permanentes. Utiliza roles IAM,
+      AWS IAM Identity Center (SSO), y credenciales temporales (STS)
+      en su lugar para la autenticación de usuarios y aplicaciones.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+    tags: ["iam", "access-keys", "secrets-management"]
+
+  - id: TMAC-AWS-IAM-006
+    name: "IAM Role vulnerable a Confused Deputy (Sin ExternalId)"
+    resource_type: "aws_iam_role"
+    check:
+      attribute: "assume_role_policy"
+      condition: "not_contains"
+      values: ['"sts:ExternalId"']
+      and_check:
+        attribute: "assume_role_policy"
+        condition: "contains"
+        values: ['"AWS": "arn:aws:iam::']
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El IAM Role confía en una cuenta de AWS externa pero no requiere la condición
+      'sts:ExternalId'. Esto lo hace vulnerable a un ataque de Confused Deputy (Suplantación / Spoofing),
+      donde un tercero malicioso podría engañar a la cuenta confiable para que asuma tu rol.
+    mitigation: >
+      Añade siempre un Condition Box exigiendo un 'ExternalId' único y secreto cuando des
+      acceso 'sts:AssumeRole' a cuentas AWS de terceros o proveedores SaaS:
+        "Condition": {
+          "StringEquals": {
+            "sts:ExternalId": "TU_VALOR_SECRETO_UNICO"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html"
+    tags: ["iam", "trust-policy", "confused-deputy", "cross-account"]
+
+  - id: TMAC-AWS-IAM-007
+    name: "Permisos iam:PassRole irrestrictos"
+    resource_type: "aws_iam_policy"
+    check:
+      attribute: "policy"
+      condition: "contains"
+      values: ['"iam:PassRole"']
+      and_check:
+        attribute: "policy"
+        condition: "contains"
+        values: ['"Resource": "*"']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      Un rol o política tiene otorgada la acción 'iam:PassRole' afectando a todos
+      los recursos ('*'). Esto es una elevación de privilegios crítica, ya que un
+      usuario podría lanzar un servicio web asignándole un rol ultra-privilegiado (como AdministratorAccess)
+      y luego acceder a dicho servicio para tomar control total de la cuenta.
+    mitigation: >
+      Asegura que 'iam:PassRole' solo pueda utilizarse en Roles IAM específicos y pre-aprobados,
+      jamás en un Resource con comodín absoluto:
+        "Action": "iam:PassRole",
+        "Resource": "arn:aws:iam::123456789012:role/RoleEspecificoSeguro"
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html"
+    tags: ["iam", "privilege-escalation", "pass-role"]
+
+  - id: TMAC-AWS-IAM-008
+    name: "Creación de Usuarios IAM Directos (Anti-Patrón de Identidad)"
+    resource_type: "aws_iam_user"
+    check:
+      attribute: "name"
+      condition: "exists"
+      values: []
+    severity: "Medium"
+    stride: "Spoofing"
+    description: >
+      Crear y gestionar usuarios directamente con 'aws_iam_user' se considera
+      un anti-patrón en entornos modernos de AWS. Esto descentraliza la
+      gestión de identidades, fomenta el uso de access keys permanentes, y
+      aumenta el riesgo de Spoofing (Suplantación) al no integrarse nativamente
+      con proveedores de identidad corporativos (IdP).
+    mitigation: >
+      Reemplaza IAM Users por AWS IAM Identity Center (antes AWS SSO) o federación
+      SAML/OIDC con tu directorio activo corporativo para accesos de consola
+      y programáticos temporales.
+    references:
+      - "https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html"
+    tags: ["iam", "identity", "best-practice", "sso"]
+
+  - id: TMAC-AWS-IAM-009
+    name: "Perfil de Login de Usuario IAM sin Reset de Contraseña"
+    resource_type: "aws_iam_user_login_profile"
+    check:
+      attribute: "password_reset_required"
+      condition: "equals"
+      values: [false]
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El perfil de acceso a consola del usuario se crea sin requerir un
+      reinicio forzoso de contraseña ('password_reset_required: false') en
+      su primer inicio de sesión. Si estas contraseñas iniciales se envían o
+      comparten, un atacante que intercepte un canal inseguro (Info Disclosure)
+      podría suplantar de inmediato la identidad del empleado (Spoofing).
+    mitigation: >
+      Configura siempre 'password_reset_required = true' cuando crees
+      excepcionalmente accesos de consola para garantizar que solo
+      el usuario final manipule su clave definitiva:
+        resource "aws_iam_user_login_profile" "example" {
+          user                    = aws_iam_user.example.name
+          password_reset_required = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-reset.html"
+    tags: ["iam", "console-access", "password", "security"]
+
+  # ============================================================
+  # SECCIÓN: SECURITY GROUPS
+  # ============================================================
+
+  - id: TMAC-AWS-SG-001
+    name: "Puerto SSH (22) Abierto al Mundo"
+    resource_type: "aws_security_group"
+    check:
+      attribute: "ingress.from_port"
+      condition: "equals"
+      values: [22]
+      and_check:
+        attribute: "ingress.cidr_blocks"
+        condition: "contains"
+        values: ["0.0.0.0/0"]
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      El puerto SSH (22) está expuesto globalmente (0.0.0.0/0), facilitando
+      ataques de fuerza bruta, explotación de vulnerabilidades del servicio
+      SSH, y acceso no autorizado a instancias.
+    mitigation: >
+      Restringe el acceso SSH solo a IPs corporativas conocidas o usa
+      AWS Systems Manager Session Manager como alternativa sin puertos abiertos:
+        ingress {
+          from_port   = 22
+          to_port     = 22
+          protocol    = "tcp"
+          cidr_blocks = ["10.0.0.0/8"]  # Solo red corporativa
+        }
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules.html"
+      - "CIS AWS Benchmark v2.0.0 - 5.2"
+    tags: ["security-group", "ssh", "network", "ingress"]
+
+  - id: TMAC-AWS-SG-002
+    name: "Puerto RDP (3389) Abierto al Mundo"
+    resource_type: "aws_security_group"
+    check:
+      attribute: "ingress.from_port"
+      condition: "equals"
+      values: [3389]
+      and_check:
+        attribute: "ingress.cidr_blocks"
+        condition: "contains"
+        values: ["0.0.0.0/0"]
+    severity: "Critical"
+    stride: "Tampering"
+    description: >
+      El puerto RDP (3389) está expuesto globalmente. RDP es uno de los
+      vectores de ataque más explotados, siendo objetivo frecuente de
+      ransomware y ataques de fuerza bruta automatizados.
+    mitigation: >
+      Elimina el acceso RDP público. Usa AWS Systems Manager Fleet Manager
+      o un bastión host en una subred privada con acceso restringido:
+        ingress {
+          from_port   = 3389
+          to_port     = 3389
+          protocol    = "tcp"
+          cidr_blocks = ["10.0.0.0/8"]  # Solo VPN corporativa
+        }
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/security-group-rules.html"
+      - "CIS AWS Benchmark v2.0.0 - 5.3"
+    tags: ["security-group", "rdp", "network", "ingress", "ransomware"]
+
+  - id: TMAC-AWS-SG-003
+    name: "Security Group con Tráfico de Salida Irrestricto (Egress)"
+    resource_type: "aws_security_group"
+    check:
+      attribute: "egress.cidr_blocks"
+      condition: "contains"
+      values: ["0.0.0.0/0"]
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El Security Group permite tráfico de salida (egress) hacia cualquier IP en internet (0.0.0.0/0). 
+      Esto facilita la exfiltración de datos (Information Disclosure) si una instancia 
+      es comprometida, y permite a un atacante descargar malware o conectarse a un C&C (Command and Control).
+    mitigation: >
+      Aplica el principio de mínimo privilegio en el tráfico de salida definiendo 
+      solo los puertos y destinos (CIDR blocks/Security Groups) estrictamente necesarios:
+        egress {
+          from_port   = 443
+          to_port     = 443
+          protocol    = "tcp"
+          cidr_blocks = ["10.0.0.0/8"]  # O las IPs específicas de las APIs externas
+        }
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html"
+    tags: ["security-group", "egress", "data-exfiltration", "network"]
+
+  # ============================================================
+  # SECCIÓN: NETWORKING (VPC)
+  # ============================================================
+
+  - id: TMAC-AWS-VPC-001
+    name: "Amazon VPC sin Flow Logs Habilitados"
+    resource_type: "aws_vpc"
+    # LIMITACIÓN TÉCNICA CONOCIDA (workaround):
+    # Los VPC Flow Logs en Terraform se configuran como un recurso separado (aws_flow_log),
+    # no como un atributo inline de aws_vpc. El motor de TMAC v1.0.0 evalúa cada recurso
+    # de forma independiente y no realiza correlación entre recursos distintos.
+    # Por ello, esta regla verifica la AUSENCIA del tag 'FlowLogs = "enabled"' en el recurso
+    # aws_vpc como mecanismo de detección indirecto (workaround).
+    # Implicaciones:
+    #   - Falso positivo: VPC con aws_flow_log declarado pero sin el tag → TMAC reporta hallazgo
+    #   - Falso negativo: VPC sin aws_flow_log pero con el tag → TMAC no reporta hallazgo
+    # Roadmap: correlación multi-recurso (aws_vpc ↔ aws_flow_log) planificada para v1.2.0.
+    check:
+      attribute: "tags.FlowLogs"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      Se está definiendo una AWS VPC sin trazabilidad a nivel de red (Flow Logs).
+      Al no capturar información sobre el tráfico IP que entra y sale de las interfaces de red,
+      se carece de visibilidad ante escaneos de red, tráfico anómalo o intrusiones (Repudiación).
+      NOTA DE IMPLEMENTACIÓN: Esta regla usa un workaround basado en tags debido a que el motor
+      de TMAC v1.0.0 no correlaciona recursos distintos. Si ya declaraste un recurso aws_flow_log
+      asociado a esta VPC, añade el tag 'FlowLogs = "enabled"' para suprimir este hallazgo.
+      Ver DOCS/aws_stride_mapping.md para documentación completa de la limitación.
+    mitigation: >
+      Crea un recurso 'aws_flow_log' asociado a esta VPC y añade el tag 'FlowLogs = "enabled"'
+      para indicar a TMAC que los Flow Logs están activos:
+        resource "aws_vpc" "main" {
+          cidr_block = "10.0.0.0/16"
+          tags = {
+            FlowLogs = "enabled"
+          }
+        }
+        resource "aws_flow_log" "main" {
+          vpc_id          = aws_vpc.main.id
+          traffic_type    = "ALL"
+          iam_role_arn    = aws_iam_role.flow_log.arn
+          log_destination = aws_cloudwatch_log_group.flow_log.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html"
+      - "CIS AWS Benchmark v2.0.0 - 4.3"
+    tags: ["vpc", "network", "logging", "audit", "observability"]
+
+  - id: TMAC-AWS-VPC-002
+    name: "Default Security Group sin Restricciones"
+    resource_type: "aws_default_security_group"
+    check:
+      attribute: "ingress"
+      condition: "exists"
+      values: []
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      El Security Group por defecto de la VPC tiene reglas de 'ingress' explícitas o no
+      se le han eliminado todas sus rutas. La mejor práctica de la industria dicta 
+      que el Default SG debe bloquear todo el tráfico (Tampering protection) y no debe
+      asociarse nunca a ningún recurso de cómputo.
+    mitigation: >
+      Declara explícitamente el Default SG de la VPC y limpia todas las reglas 
+      de Ingress y Egress dejándolas vacías (esto anula el acceso por defecto):
+        resource "aws_default_security_group" "default" {
+          vpc_id = aws_vpc.main.id
+          # Ingress y Egress omitidos forzosamente o vacíos
+        }
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html#DefaultSecurityGroup"
+      - "CIS AWS Benchmark v2.0.0 - 4.4"
+    tags: ["security-group", "default", "network", "isolation"]
+
+  # ============================================================
+  # SECCIÓN: COMPUTE (EC2)
+  # ============================================================
+
+  - id: TMAC-AWS-EC2-001
+    name: "Instancia EC2 con IMDSv1 Habilitado"
+    resource_type: "aws_instance"
+    check:
+      attribute: "metadata_options.http_tokens"
+      condition: "equals"
+      values: ["optional"]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      La instancia permite el uso de IMDSv1 (Instance Metadata Service v1). 
+      IMDSv1 es vulnerable a ataques de Server-Side Request Forgery (SSRF), 
+      permitiendo a un atacante robar credenciales temporales del IAM Role 
+      asociado a la EC2 y suplantar (Spoofing) su identidad para escalar privilegios.
+    mitigation: >
+      Obliga el uso de IMDSv2 requiriendo tokens ('http_tokens = "required"'):
+        resource "aws_instance" "example" {
+          # ...
+          metadata_options {
+            http_endpoint = "enabled"
+            http_tokens   = "required"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"
+      - "CIS AWS Benchmark v2.0.0 - 5.1"
+    tags: ["ec2", "imds", "metadata", "ssrf"]
+
+  - id: TMAC-AWS-EC2-002
+    name: "Volumen EBS no encriptado (EC2)"
+    resource_type: "aws_ebs_volume"
+    check:
+      attribute: "encrypted"
+      condition: "equals"
+      values: [false]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      Un volumen de almacenamiento en bloque (EBS) no está encriptado.
+      Los datos en reposo y los snapshots derivados de este volumen podrían
+      ser accedidos si caen en manos equivocadas o si permisos de cuenta se ven comprometidos.
+    mitigation: >
+      Asegura que 'encrypted = true' esté configurado en todos los volúmenes,
+      o activa la encriptación por defecto de EBS a nivel de cuenta AWS:
+        resource "aws_ebs_volume" "example" {
+          # ...
+          encrypted = true
+          kms_key_id = aws_kms_key.ebs_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.2.1"
+    tags: ["ebs", "ec2", "encryption", "data-at-rest"]
+
+  - id: TMAC-AWS-EC2-003
+    name: "Instancia EC2 con IP Pública Asignada Directamente"
+    resource_type: "aws_instance"
+    check:
+      attribute: "associate_public_ip_address"
+      condition: "equals"
+      values: [true]
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      Se está asignando explícitamente una dirección IP pública a la instancia EC2.
+      Esto expone directamente el recurso de cómputo (Process) al internet público,
+      facilitando reconocimiento externo, explotación de servicios y Tampering.
+    mitigation: >
+      Despliega instancias de cómputo en subredes privadas. Si requieren salida a
+      internet, utiliza un NAT Gateway. Si deben recibir tráfico, colócalas
+      detrás de un Elastic Load Balancer (ELB) o API Gateway:
+        resource "aws_instance" "example" {
+          # ...
+          associate_public_ip_address = false
+        }
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-security.html"
+    tags: ["ec2", "network", "public-exposure", "architecture"]
+
+  # ============================================================
+  # SECCIÓN: DATABASES (RDS)
+  # ============================================================
+
+  - id: TMAC-AWS-RDS-001
+    name: "Base de Datos RDS sin Encriptación"
+    resource_type: "aws_db_instance"
+    check:
+      attribute: "storage_encrypted"
+      condition: "equals"
+      values: [false]
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      Los datos en reposo de la instancia RDS no están cifrados. Esto
+      aumenta el riesgo de exposición de datos en caso de acceso físico
+      no autorizado al storage subyacente o snapshots comprometidos.
+    mitigation: >
+      Establece storage_encrypted = true. Nota: no se puede habilitar en
+      una instancia existente; se requiere crear un snapshot cifrado y
+      restaurar:
+        resource "aws_db_instance" "example" {
+          storage_encrypted = true
+          kms_key_id        = aws_kms_key.rds.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.3.1"
+    tags: ["rds", "encryption", "database", "data-at-rest"]
+
+  - id: TMAC-AWS-RDS-002
+    name: "Instancia RDS con Acceso Público"
+    resource_type: "aws_db_instance"
+    check:
+      attribute: "publicly_accessible"
+      condition: "equals"
+      values: [true]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La instancia RDS está configurada como públicamente accesible.
+      Aunque los security groups pueden restringir el tráfico, la instancia
+      tendrá una IP pública y será visible en internet, incrementando
+      significativamente la superficie de ataque.
+    mitigation: >
+      Establece publicly_accessible = false y ubica la instancia en
+      subnets privadas:
+        resource "aws_db_instance" "example" {
+          publicly_accessible = false
+          db_subnet_group_name = aws_db_subnet_group.private.name
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.3.2"
+    tags: ["rds", "public-access", "database", "network"]
+
+  - id: TMAC-AWS-RDS-003
+    name: "Base de Datos RDS sin Multi-AZ Habilitado"
+    resource_type: "aws_db_instance"
+    check:
+      attribute: "multi_az"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      La instancia RDS no tiene habilitado el despliegue Multi-AZ. Esto significa que
+      la base de datos es un punto único de fallo (SPOF). Ante una caída de la zona
+      de disponibilidad, la aplicación sufrirá una Denegación de Servicio (DoS).
+    mitigation: >
+      Configura 'multi_az = true' para despliegues de producción y asegurar alta disponibilidad:
+        resource "aws_db_instance" "example" {
+          # ...
+          multi_az = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html"
+    tags: ["rds", "availability", "multi-az", "dos"]
+
+  - id: TMAC-AWS-RDS-004
+    name: "Instancia RDS sin Protección contra Borrado"
+    resource_type: "aws_db_instance"
+    check:
+      attribute: "deletion_protection"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      La protección contra borrado accidental ('deletion_protection') está desactivada o
+      no configurada explícitamente. Esto permite eliminar la base de datos fácilmente,
+      lo que podría causar pérdida irreversible de datos por negligencia o manipulación maliciosa (Tampering).
+    mitigation: >
+      Activa 'deletion_protection' en bases de datos productivas y habilitará bloqueos seguros:
+        resource "aws_db_instance" "example" {
+          # ...
+          deletion_protection = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteInstance.html"
+    tags: ["rds", "data-loss", "tampering", "protection"]
+
+  - id: TMAC-AWS-RDS-005
+    name: "RDS sin Autenticación IAM Habilitada"
+    resource_type: "aws_db_instance"
+    check:
+      attribute: "iam_database_authentication_enabled"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Spoofing"
+    description: >
+      La instancia RDS depende completamente de contraseñas estáticas incrustadas, sin
+      integración con AWS IAM. Esto eleva el riesgo de robo de credenciales y Suplantación
+      (Spoofing) por falta de rotación automatizada y permisos granulares.
+    mitigation: >
+      Usa IAM Database Authentication para mapear usuarios de base de datos a roles de IAM temporales:
+        resource "aws_db_instance" "example" {
+          # ...
+          iam_database_authentication_enabled = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.3.3"
+    tags: ["rds", "iam", "authentication", "spoofing"]
+
+  # ============================================================
+  # SECCIÓN: DATABASES (DYNAMODB)
+  # ============================================================
+
+  - id: TMAC-AWS-DDB-001
+    name: "Tabla DynamoDB sin Point-In-Time Recovery (PITR)"
+    resource_type: "aws_dynamodb_table"
+    check:
+      attribute: "point_in_time_recovery"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      La tabla de DynamoDB no tiene habilitada la recuperación en un punto en el tiempo (PITR).
+      Sin PITR, no estás protegido contra borrados o modificaciones accidentales o maliciosas
+      (Tampering) de los ítems de la tabla. Alguien podría corromper los datos o un ransomware
+      cifrarlos y no habría manera directa de revertir la tabla a su estado anterior.
+    mitigation: >
+      Habilita PITR agregando el bloque correspondiente en la definición de la tabla:
+        resource "aws_dynamodb_table" "example" {
+          # ...
+          point_in_time_recovery {
+            enabled = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/PointInTimeRecovery.html"
+    tags: ["dynamodb", "nosql", "backup", "data-loss", "tampering"]
+
+  - id: TMAC-AWS-DDB-002
+    name: "Tabla DynamoDB sin CMK para Encriptación (Server-Side Encryption)"
+    resource_type: "aws_dynamodb_table"
+    check:
+      attribute: "server_side_encryption"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      DynamoDB encripta los datos por defecto utilizando una clave propiedad de AWS, pero un mecanismo
+      superior de seguridad dicta el uso de una AWS Managed CMK o Customer Managed CMK (CMK)
+      para lograr una segregación de responsabilidades criptográficas real, logrando así
+      evitar Fuga de Información (Information Disclosure) al tener auditoría profunda (CloudTrail)
+      sobre quién desencripta la data.
+    mitigation: >
+      Habilita explicitamente el bloque 'server_side_encryption' utilizando una clave KMS gestionada:
+        resource "aws_dynamodb_table" "example" {
+          # ...
+          server_side_encryption {
+            enabled     = true
+            kms_key_arn = aws_kms_key.ddb_key.arn
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    tags: ["dynamodb", "encryption", "kms", "data-at-rest"]
+
+  - id: TMAC-AWS-DDB-003
+    name: "Tabla DynamoDB sin Deletion Protection"
+    resource_type: "aws_dynamodb_table"
+    check:
+      attribute: "deletion_protection_enabled"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      La protección contra eliminación ('deletion_protection_enabled') no está activada para
+      esta tabla de DynamoDB. Al igual que en RDS, permitir que la tabla se borre
+      libremente expone a la organización a un riesgo catastrófico de DoS y manipulación (Tampering)
+      en caso de que el entorno de IaC sea comprometido o manipulado.
+    mitigation: >
+      Activa 'deletion_protection_enabled' para bases de datos de producción:
+        resource "aws_dynamodb_table" "example" {
+          # ...
+          deletion_protection_enabled = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithTables.Basics.html#WorkingWithTables.Basics.DeletionProtection"
+    tags: ["dynamodb", "data-loss", "tampering", "protection"]
+
+  # ============================================================
+  # SECCIÓN: CLOUDTRAIL (AUDIT)
+  # ============================================================
+
+  - id: TMAC-AWS-CW-001
+    name: "CloudTrail sin Logging de Eventos de Gestión"
+    resource_type: "aws_cloudtrail"
+    check:
+      attribute: "enable_logging"
+      condition: "equals"
+      values: [false]
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      CloudTrail no tiene habilitado el logging de eventos de gestión.
+      Sin auditoría de llamadas API, no es posible detectar actividades
+      sospechosas, investigar incidentes, ni cumplir con requisitos
+      regulatorios de trazabilidad.
+    mitigation: >
+      Habilita CloudTrail con logging de eventos de gestión y data events
+      para servicios críticos:
+        resource "aws_cloudtrail" "main" {
+          name           = "main-trail"
+          s3_bucket_name = aws_s3_bucket.trail.id
+          enable_logging = true
+          is_multi_region_trail = true
+          include_global_service_events = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html"
+      - "CIS AWS Benchmark v2.0.0 - 3.1"
+    tags: ["cloudtrail", "logging", "audit", "compliance", "monitoring"]
+
+  # ============================================================
+  # SECCIÓN: COMPUTE (SERVERLESS / LAMBDA)
+  # ============================================================
+
+  - id: TMAC-AWS-LMD-001
+    name: "URL de Lambda Pública y sin Autenticación"
+    resource_type: "aws_lambda_function_url"
+    check:
+      attribute: "authorization_type"
+      condition: "equals"
+      values: ["NONE"]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      La función Lambda tiene configurada una URL pública de invocación ('Function URL') 
+      con el tipo de autorización 'NONE'. Esto permite que cualquier usuario anónimo 
+      en internet invoque tu función repetidamente (Spoofing de identidad), pudiendo 
+      extraer datos sensibles y escalar privilegios si el rol de la lambda es muy permisivo.
+    mitigation: >
+      Cambia el 'authorization_type' a 'AWS_IAM' para forzar la firma de peticiones (SigV4),
+      o utiliza un API Gateway con un Authorizer (Cognito, JWT) en su lugar para tráfico público:
+        resource "aws_lambda_function_url" "example" {
+          function_name      = aws_lambda_function.example.function_name
+          authorization_type = "AWS_IAM"
+        }
+    references:
+      - "https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html"
+    tags: ["lambda", "serverless", "unauthenticated", "spoofing"]
+
+  - id: TMAC-AWS-LMD-002
+    name: "Lambda sin Configuración de Trazabilidad (X-Ray)"
+    resource_type: "aws_lambda_function"
+    check:
+      attribute: "tracing_config"
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Repudiation"
+    description: >
+      La función Lambda no tiene activada la configuración de Active Tracing con AWS X-Ray. 
+      En arquitecturas distribuidas y orientadas a eventos (Process), la falta de 
+      trazabilidad imposibilita rastrear el flujo de las peticiones a lo largo 
+      de la cadena, propiciando problemas de Repudiación si el atacante oculta sus pasos.
+    mitigation: >
+      Añade el bloque 'tracing_config' y configúralo en 'Active'. Asegúrate también 
+      que el Execution Role de la Lambda cuente con permisos para escribir a X-Ray:
+        resource "aws_lambda_function" "example" {
+          # ...
+          tracing_config {
+            mode = "Active"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/lambda/latest/dg/services-xray.html"
+    tags: ["lambda", "serverless", "tracing", "audit"]
+
+  - id: TMAC-AWS-LMD-003
+    name: "Lambda sin Límite de Concurrencia (Financial DoS)"
+    resource_type: "aws_lambda_function"
+    check:
+      attribute: "reserved_concurrent_executions"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Denial of Service"
+    description: >
+      La función Lambda no tiene un límite de 'reserved_concurrent_executions'. 
+      Al compartir el pool de concurrencia de la cuenta de AWS por defecto, un atacante 
+      que fuerce invocaciones masivas (DDoS) agotará la concurrencia global de la cuenta, 
+      tumbando otros servicios paralelos y generando una factura estratosférica (Financial DoS).
+    mitigation: >
+      Limita explícitamente la cantidad máxima de instancias concurrentes que la 
+      función puede escalar según su carga esperada:
+        resource "aws_lambda_function" "example" {
+          # ...
+          reserved_concurrent_executions = 50
+        }
+    references:
+      - "https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html"
+    tags: ["lambda", "serverless", "dos", "availability", "financial-dos"]
+
+  # ============================================================
+  # SECCIÓN: NETWORKING & CONTENT DELIVERY (API GATEWAY)
+  # ============================================================
+
+  - id: TMAC-AWS-APIGW-001
+    name: "Método de API Gateway sin Autorización"
+    resource_type: "aws_api_gateway_method"
+    check:
+      attribute: "authorization"
+      condition: "equals"
+      values: ["NONE"]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      Un endpoint en tu API Gateway REST tiene el tipo de autorización configurado 
+      en 'NONE'. Esto permite que cualquier entidad anónima o atacante llame a tu API 
+      (identidad no validada / Spoofing), abriendo la puerta a inyecciones de datos, 
+      fuga masiva de información y abusos financieros en el backend.
+    mitigation: >
+      Implementa 'AWS_IAM', un 'COGNITO_USER_POOLS' authorizer o un 'CUSTOM' authorizer 
+      (Lambda). Si el endpoint DEBE ser público, asegúrate que las funciones de 
+      backend tras el API Gateway asuman roles de mínimos privilegios sin acceso a datos sensibles:
+        resource "aws_api_gateway_method" "example" {
+          # ...
+          authorization = "COGNITO_USER_POOLS"
+          authorizer_id = aws_api_gateway_authorizer.example.id
+        }
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html"
+      - "CIS AWS Benchmark v2.0.0 - 5.1"
+    tags: ["apigateway", "unauthenticated", "spoofing", "api-security"]
+
+  - id: TMAC-AWS-APIGW-002
+    name: "Stage de API Gateway sin Logging de Acceso"
+    resource_type: "aws_api_gateway_stage"
+    check:
+      attribute: "access_log_settings"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El entorno (Stage) de ejecución del API Gateway no cuenta con 'access_log_settings'. 
+      Al ser la puerta de entrada HTTP principal, carecer de logs de acceso a nivel de API 
+      facilita el Repudio: un atacante explotando el servicio no dejará rastros auditables 
+      de su IP, los endpoints consultados o el ancho de banda consumido.
+    mitigation: >
+      Configura un grupo de logs de CloudWatch y añádelo a los settings del Stage 
+      definiendo explícitamente el formato que deseas capturar (ej. JSON):
+        resource "aws_api_gateway_stage" "example" {
+          # ...
+          access_log_settings {
+            destination_arn = aws_cloudwatch_log_group.example.arn
+            format          = jsonencode({ ... })
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html"
+    tags: ["apigateway", "logging", "audit", "compliance"]
+
+  - id: TMAC-AWS-APIGW-003
+    name: "Stage de API Gateway sin Trazabilidad X-Ray"
+    resource_type: "aws_api_gateway_stage"
+    check:
+      attribute: "xray_tracing_enabled"
+      condition: "equals"
+      values: [false]
+    severity: "Low"
+    stride: "Repudiation"
+    description: >
+      La funcionalidad Active Tracing de AWS X-Ray está deshabilitada (o no configurada) 
+      en este Stage del API Gateway. Igual que con Lambdas, la ausencia de trazas 
+      limita severamente la identificación y correlación de ataques distribuidos a 
+      través de componentes subyacentes (Repudio y falta de observabilidad).
+    mitigation: >
+      Activa 'xray_tracing_enabled' en el Stage para generar un mapa claro de 
+      latencias y dependencias en tus llamadas a API:
+        resource "aws_api_gateway_stage" "example" {
+          # ...
+          xray_tracing_enabled = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-xray.html"
+    tags: ["apigateway", "tracing", "observability", "x-ray"]
+
+  # ============================================================
+  # SECCIÓN: SECURITY & IDENTITY (KMS)
+  # ============================================================
+
+  - id: TMAC-AWS-KMS-001
+    name: "Clave KMS sin Rotación Automática Habilitada"
+    resource_type: "aws_kms_key"
+    check:
+      attribute: "enable_key_rotation"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      La clave maestra de cliente (CMK) de AWS KMS no tiene activada la rotación anual automática. 
+      La falta de rotación criptográfica incrementa el impacto potencial en caso de que 
+      material criptográfico subyacente sea comprometido (Information Disclosure),
+      contraviniendo mejores prácticas institucionales.
+    mitigation: >
+      Habilita 'enable_key_rotation = true'. KMS rotará automáticamente 
+      el material criptográfico cada año reteniendo el historial para descifrar data vieja:
+        resource "aws_kms_key" "example" {
+          description             = "My CMK"
+          enable_key_rotation     = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.8"
+    tags: ["kms", "encryption", "rotation", "compliance"]
+
+  - id: TMAC-AWS-KMS-002
+    name: "Clave KMS en Estado Pendiente de Eliminación (Deletion)"
+    resource_type: "aws_kms_key"
+    check:
+      attribute: "is_enabled"
+      condition: "equals"
+      values: [false]
+    severity: "Medium"
+    stride: "Denial of Service"
+    description: >
+      La CMK está deshabilitada explícitamente en el código ('is_enabled = false'). 
+      Si la clave está atada a volúmenes EBS, RDS o S3 de producción, apagar una clave 
+      maestra causa inmediatamente una Denegación de Servicio (DoS) masiva, ya que ningún 
+      servicio podrá acceder a los datos cifrados.
+    mitigation: >
+      Asegúrate de que 'is_enabled' sea true para operaciones noramales. Si estás 
+      dando de baja la clave, verifica primero todas las dependencias usando 
+      CloudTrail y Macie.
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html"
+    tags: ["kms", "availability", "dos", "data-access"]
+
+  - id: TMAC-AWS-KMS-003
+    name: "Política de KMS Abierta al Público"
+    resource_type: "aws_kms_key"
+    check:
+      attribute: "policy"
+      condition: "contains"
+      values: ['"Principal": "*"']
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      La política adjunta a la CMK (Key Policy) confía en 'Principal: *', autorizando 
+      potencialmente acceso público o inter-cuenta a operaciones de cifrado o descifrado. 
+      Esto permite violaciones severas (Information Disclosure / Spoofing) de la confidencialidad. 
+    mitigation: >
+      Limita explícitamente el Principle a la raíz de la cuenta AWS, y usa Roles de IAM o 
+      Key Grants para conceder acceso de menor privilegio:
+        "Principal": {
+          "AWS": "arn:aws:iam::111122223333:root"
+        }
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html"
+    tags: ["kms", "policy", "public-access"]
+
+  # ============================================================
+  # SECCIÓN: APPLICATION INTEGRATION (SQS, SNS, SES)
+  # ============================================================
+
+  - id: TMAC-AWS-SQS-001
+    name: "Cola SQS sin Encriptación (Server-Side Encryption KMS)"
+    resource_type: "aws_sqs_queue"
+    check:
+      attribute: "kms_master_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      La cola de mensajes SQS no utiliza una clave Customer Managed Key (CMK) de KMS 
+      para su cifrado KMS ('kms_master_key_id'). Mensajes con información sensible en tránsito 
+      a través del bus de eventos podrían ser interceptados o expuestos a accesos analíticos
+      no autorizados (Information Disclosure).
+    mitigation: >
+      Agrega la propiedad 'kms_master_key_id' (o confía en 'sqs_managed_sse_enabled' si 
+      tu postura lo permite, aunque KMS es más auditable):
+        resource "aws_sqs_queue" "example" {
+          # ...
+          kms_master_key_id = aws_kms_key.sqs_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html"
+    tags: ["sqs", "encryption", "messaging"]
+
+  - id: TMAC-AWS-SQS-002
+    name: "Política SQS Abierta al Público"
+    resource_type: "aws_sqs_queue_policy"
+    check:
+      attribute: "policy"
+      condition: "contains"
+      values: ['"Principal": "*"']
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      La política adjunta a la cola (Queue Policy) permite que cualquier origen ('Principal: *') 
+      interactúe con ella. Esto expone el sistema a inyecciones masivas de mensajes basura (Spoofing) 
+      o exposición de la cola de eventos a terceras personas.
+    mitigation: >
+      Reemplaza el wildcard '*' con el ARN exacto del recurso que produce mensajes (ej. un Topic 
+      específico de SNS, u otro rol):
+        "Principal": { "AWS": "arn:aws:iam::111122223333:role/Producer" }
+    references:
+      - "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-basic-architecture.html"
+    tags: ["sqs", "policy", "public-access"]
+
+  - id: TMAC-AWS-SNS-001
+    name: "Topic SNS sin Encriptación (KMS)"
+    resource_type: "aws_sns_topic"
+    check:
+      attribute: "kms_master_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El tema (Topic) de Amazon SNS no está cifrado en reposo o no utiliza un CMK de KMS. 
+      Cualquier mensaje publicado será procesado en texto claro en la infraestructura 
+      del servicio, aumentando la superficie de riesgo contra escuchas o Fuga de Datos (Info Disclosure).
+    mitigation: >
+      Aplica una clave KMS válida utilizando el atributo 'kms_master_key_id':
+        resource "aws_sns_topic" "example" {
+          # ...
+          kms_master_key_id = aws_kms_key.sns_key.id
+        }
+    references:
+      - "https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html"
+    tags: ["sns", "encryption", "messaging"]
+
+  - id: TMAC-AWS-SNS-002
+    name: "Política SNS Abierta al Público"
+    resource_type: "aws_sns_topic_policy"
+    check:
+      attribute: "policy"
+      condition: "contains"
+      values: ['"Principal": "*"']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      La política de SNS tiene 'Principal: *', lo que virtualmente concede permiso global 
+      para Suscribirse o Publicar en este Topic a todo internet. Esto representa una Severa Elevación 
+      de Privilegios, envenenamiento de los consumidores suscritos y filtrado del bus pub/sub.
+    mitigation: >
+      Establece los Principals explícitamente a las cuentas o servicios correspondientes (AWS IAM Identity).
+    references:
+      - "https://docs.aws.amazon.com/sns/latest/dg/sns-access-policy-use-cases.html"
+    tags: ["sns", "policy", "public-access"]
+
+  - id: TMAC-AWS-SES-001
+    name: "Regla de Recepción SES sin forzar TLS (Insecure Transit)"
+    resource_type: "aws_ses_receipt_rule"
+    check:
+      attribute: "tls_policy"
+      condition: "equals"
+      values: ["Optional"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La regla de recepción de Amazon SES (Simple Email Service) acepta explícitamente la política TLS 'Optional'. 
+      Si un remitente envía desde un servidor sin encriptar, SES aceptará el email en texto plano, 
+      facilitando una intercepción Man-In-The-Middle y filtración del contenido (Information Disclosure).
+    mitigation: >
+      Cambia 'tls_policy' a 'Require'. Esto hará que el MTA de AWS devuelva un bounce y rechace la transferencia 
+      si la conexión entrante de email no está encriptada vía Transport Layer Security.
+    references:
+      - "https://docs.aws.amazon.com/ses/latest/dg/receiving-email-receipt-rules-console-walkthrough.html"
+    tags: ["ses", "email", "tls", "transit"]
+
+  # ============================================================
+  # SECCIÓN: STORAGE AUXILIARY (BACKUP, EFS, FSx, STORAGE GATEWAY)
+  # ============================================================
+
+  - id: TMAC-AWS-BKP-001
+    name: "Vault de AWS Backup sin Encriptación (KMS)"
+    resource_type: "aws_backup_vault"
+    check:
+      attribute: "kms_key_arn"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El baúl de respaldos de AWS Backup (Backup Vault) no utiliza una clave KMS (Customer Managed Key)
+      personalizada. Esto impide separar las responsabilidades de cifrado y dificulta la auditoría
+      sobre quién accede a desencriptar los respaldos (Information Disclosure / Tampering).
+    mitigation: >
+      Asigna una clave KMS válida utilizando el atributo 'kms_key_arn':
+        resource "aws_backup_vault" "example" {
+          name        = "example_backup_vault"
+          kms_key_arn = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/aws-backup/latest/devguide/encryption.html"
+    tags: ["backup", "encryption", "kms", "storage"]
+
+  - id: TMAC-AWS-EFS-001
+    name: "Amazon EFS sin Encriptación en Reposo Habilitada"
+    resource_type: "aws_efs_file_system"
+    check:
+      attribute: "encrypted"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El sistema de archivos de Amazon Elastic File System (EFS) no tiene configurada la propiedad
+      'encrypted = true'. La falta de encriptación en reposo expone el volumen compartido a ataques
+      de fuga de datos (Information Disclosure) si existen brechas de control de acceso en la capa de red o cómputo.
+    mitigation: >
+      Establece 'encrypted' a true y provee preferentemente un 'kms_key_id':
+        resource "aws_efs_file_system" "example" {
+          encrypted  = true
+          kms_key_id = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html"
+    tags: ["efs", "encryption", "storage"]
+
+  - id: TMAC-AWS-FSX-001
+    name: "Amazon FSx (Windows) sin Encriptación Gestionada"
+    resource_type: "aws_fsx_windows_file_system"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El sistema de archivos Amazon FSx para Windows file server no tiene especificada una 'kms_key_id'. Al igual 
+      que EFS y EBS, delegar el cifrado de sistemas de archivos a claves por defecto limita la auditabilidad.
+    mitigation: >
+      Incluye 'kms_key_id' apuntando a una llave CMK:
+        resource "aws_fsx_windows_file_system" "example" {
+          # ...
+          kms_key_id = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/fsx/latest/WindowsGuide/encryption-in-transit-and-rest.html"
+    tags: ["fsx", "encryption", "storage", "windows"]
+
+  - id: TMAC-AWS-FSX-002
+    name: "Amazon FSx (Lustre) sin Encriptación Gestionada"
+    resource_type: "aws_fsx_lustre_file_system"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El sistema de archivos Amazon FSx para Lustre (HPC) carece de una 'kms_key_id' explícita, arriesgando 
+      los sets de datos de alto rendimiento informático.
+    mitigation: >
+      Incluye 'kms_key_id' en la defición de Terraform.
+    references:
+      - "https://docs.aws.amazon.com/fsx/latest/LustreGuide/encryption-in-transit-and-rest.html"
+    tags: ["fsx", "encryption", "storage", "lustre"]
+
+  - id: TMAC-AWS-SGW-001
+    name: "AWS Storage Gateway (SMB Share) sin KMSEncrypted"
+    resource_type: "aws_storagegateway_smb_file_share"
+    check:
+      attribute: "kms_encrypted"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El recurso compartido de red expuesto por AWS Storage Gateway no solicita cifrado gestionado
+      por KMS ('kms_encrypted'), exponiendo datos del caché local o transferencia a robos.
+    mitigation: >
+      Configura 'kms_encrypted = true' y proporciona 'kms_key_arn'.
+    references:
+      - "https://docs.aws.amazon.com/filegateway/latest/files3/encryption.html"
+    tags: ["storage-gateway", "encryption", "storage"]
+
+  # ============================================================
+  # SECCIÓN: MANAGEMENT & GOVERNANCE 
+  # ============================================================
+
+  - id: TMAC-AWS-ASG-001
+    name: "Auto Scaling Group Abierto a una Sola Zona (SPOF)"
+    resource_type: "aws_autoscaling_group"
+    check:
+      attribute: "vpc_zone_identifier"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      El grupo de Auto Scaling no especifica múltiples subredes ('vpc_zone_identifier' u
+      'availability_zones'). Desplegar todas las instancias en una única AZ crea un
+      punto único de fallo. Si la zona cae, el servicio sufre una Denegación de Servicio.
+    mitigation: >
+      Añade múltiples subredes de diferentes zonas de disponibilidad:
+        resource "aws_autoscaling_group" "example" {
+          # ...
+          vpc_zone_identifier = [aws_subnet.az1.id, aws_subnet.az2.id]
+        }
+    references:
+      - "https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-benefits.html"
+    tags: ["autoscaling", "availability", "dos"]
+
+  - id: TMAC-AWS-CWL-001
+    name: "Grupo de Logs de CloudWatch sin Encriptación"
+    resource_type: "aws_cloudwatch_log_group"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El Log Group de CloudWatch almacena logs misceláneos de aplicaciones e infraestructura
+      en texto claro o con cifrado por defecto. La falta de una clave KMS propia ('kms_key_id')
+      abre vectores de Fuga de Información si atacantes obtienen acceso de lectura a CloudWatch.
+    mitigation: >
+      Aplica una clave KMS válida:
+        resource "aws_cloudwatch_log_group" "example" {
+          # ...
+          kms_key_id = aws_kms_key.logs_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+    tags: ["cloudwatch", "logging", "encryption"]
+
+  - id: TMAC-AWS-CFG-001
+    name: "Grabadora de AWS Config Deshabilitada"
+    resource_type: "aws_config_configuration_recorder"
+    check:
+      attribute: "recording_group.all_supported"
+      condition: "equals"
+      values: [false]
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      La grabadora de AWS Config no está almacenando todos los recursos soportados
+      ('all_supported = false'). Al limitar el scope de grabación, pierdes trazabilidad
+      sobre cambios en configuraciones clave de seguridad introduciendo riesgo de Repudio
+      (no poder probar quién cambió qué y cuándo).
+    mitigation: >
+      Enciende la captura global:
+        resource "aws_config_configuration_recorder" "example" {
+          recording_group {
+            all_supported                 = true
+            include_global_resource_types = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html"
+    tags: ["config", "audit", "compliance"]
+
+  - id: TMAC-AWS-SSM-001
+    name: "Parámetro SSM sin Encriptación (No es SecureString)"
+    resource_type: "aws_ssm_parameter"
+    check:
+      attribute: "type"
+      condition: "equals"
+      values: ["String"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      Un parámetro en AWS Systems Manager Parameter Store está configurado como 'String'.
+      Si este parámetro guarda secretos, contraseñas o tokens de API, serán legibles
+      en texto claro por cualquier usuario con permisos básicos sobre SSM (Information Disclosure).
+    mitigation: >
+      Cambia el tipo a 'SecureString' para usar encriptación KMS por defecto o personalizada:
+        resource "aws_ssm_parameter" "secret" {
+          type  = "SecureString"
+          value = "my-secret-password"
+        }
+    references:
+      - "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html"
+    tags: ["ssm", "secrets", "encryption"]
+
+  - id: TMAC-AWS-ORG-001
+    name: "AWS Organizations sin SCP Habilitadas"
+    resource_type: "aws_organizations_organization"
+    check:
+      attribute: "feature_set"
+      condition: "equals"
+      values: ["CONSOLIDATED_BILLING"]
+    severity: "High"
+    stride: "Elevation of Privilege"
+    description: >
+      La organización está configurada puramente para consolidación de facturación
+      (CONSOLIDATED_BILLING) en lugar de todas las características (ALL). Esto te impide
+      usar Service Control Policies (SCPs) para limitar privilegios a nivel raíz,
+      facilitando una Elevación de Privilegios masiva a través de cuentas subyacentes.
+    mitigation: >
+      Habilita el feature_set completo:
+        resource "aws_organizations_organization" "example" {
+          feature_set = "ALL"
+        }
+    references:
+      - "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html"
+    tags: ["organizations", "scp", "privilege-escalation", "governance"]
+
+  - id: TMAC-AWS-CFN-001
+    name: "Stack CloudFormation sin Protección de Terminación"
+    resource_type: "aws_cloudformation_stack"
+    check:
+      attribute: "disable_rollback"
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Tampering"
+    description: >
+      El stack no tiene definido protección o políticas de rollback seguras explícitas.
+      Sin termination protection (no operable directamente vía tf pero evaluable en contextos mayores),
+      actores maliciosos podrían borrar el stack completo de infraestructura base (Tampering / DoS).
+    mitigation: >
+      Configura políticas restrictivas de Stack, o define execution roles.
+    references:
+      - "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-protect-stacks.html"
+    tags: ["cloudformation", "tampering", "governance"]
+
+  # ============================================================
+  # SECCIÓN: FRONT-END WEB & MOBILE 
+  # ============================================================
+
+  - id: TMAC-AWS-APPSYNC-001
+    name: "API GraphQL AppSync sin Logging (Field-Level Logs)"
+    resource_type: "aws_appsync_graphql_api"
+    check:
+      attribute: "log_config"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      La API de AWS AppSync (GraphQL) no tiene configurado el bloque de 'log_config'. 
+      Al no enviar los registros de ejecución y consultas de GraphQL a CloudWatch Logs, 
+      pierdes rastro de la actividad y errores de resolución (Resolvers), propiciando el Repudio.
+    mitigation: >
+      Añade el bloque 'log_config' apuntando al ARN de un rol IAM que permita escribir en CloudWatch Logs:
+        resource "aws_appsync_graphql_api" "example" {
+          # ...
+          log_config {
+            cloudwatch_logs_role_arn = aws_iam_role.appsync_logs.arn
+            field_log_level          = "ALL"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/appsync/latest/devguide/monitoring.html"
+    tags: ["appsync", "graphql", "logging", "audit"]
+
+  - id: TMAC-AWS-AMP-001
+    name: "Rama de AWS Amplify Pública (Entorno Expuesto)"
+    resource_type: "aws_amplify_branch"
+    check:
+      attribute: "enable_basic_auth"
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Information Disclosure"
+    description: >
+      La rama de tu aplicación AWS Amplify (usualmente dev o staging) no tiene activado 
+      'enable_basic_auth'. Exponer entornos no productivos a internet de manera anónima permite 
+      a los atacantes escanear versiones beta de tu frontend en busca de llaves, vulnerabilidades, 
+      o fugas de diseño (Information Disclosure / Spoofing de entorno).
+    mitigation: >
+      Para ramas de staging o desarrollo, activa la autenticación básica configurando sus credenciales:
+        resource "aws_amplify_branch" "staging" {
+          # ...
+          enable_basic_auth = true
+        }
+    references:
+      - "https://docs.aws.amazon.com/amplify/latest/userguide/access-control.html"
+    tags: ["amplify", "frontend", "auth", "exposure"]
+
+  - id: TMAC-AWS-LOC-001
+    name: "Amazon Location Tracker sin Cifrado Gestionado (KMS)"
+    resource_type: "aws_location_tracker"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      Amazon Location Service está guardando rastreos de ubicación de dispositivos (Trackers) 
+      sin el resguardo de un Customer Managed Key de KMS ('kms_key_id' ausente). Las posiciones 
+      de rastreo geográficas son Personal Identifiable Information (PII) crítica, y deben encriptarse 
+      y auditarse restrictivamente.
+    mitigation: >
+      Asocia una llave KMS para proteger los datos en reposo y tránsito:
+        resource "aws_location_tracker" "example" {
+          tracker_name = "example"
+          kms_key_id   = aws_kms_key.location_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/location/latest/developerguide/encryption-at-rest.html"
+    tags: ["location", "pii", "encryption"]
+
+  - id: TMAC-AWS-DF-001
+    name: "Proyecto Device Farm fuera del Entorno Privado (VPC)"
+    resource_type: "aws_devicefarm_project"
+    check:
+      attribute: "vpc_config"
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Information Disclosure"
+    description: >
+      AWS Device Farm está ejecutando pruebas de aplicaciones en la nube de dispositivos Amazon 
+      omitiendo un bloque 'vpc_config'. Sin una configuración estricta de VPC, el tráfico entre los 
+      dispositivos físicos remotos e instancias backend de prueba viaja expuesto, aumentando 
+      el riesgo de filtración o interceptación del tráfico de prototipos de aplicaciones empresariales.
+    mitigation: >
+      Encapsula las pruebas de Device Farm enviando el tráfico a las subredes de tus entornos 
+      privados aislados añadiendo 'vpc_config':
+        resource "aws_devicefarm_project" "example" {
+          name = "example"
+          # ...
+          vpc_config {
+            security_group_ids = [aws_security_group.example.id]
+            subnet_ids         = [aws_subnet.example.id]
+            vpc_id             = aws_vpc.example.id
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/devicefarm/latest/developerguide/amazon-vpc.html"
+    tags: ["device-farm", "testing", "vpc", "network-isolation"]
+
+  # ============================================================
+  # SECCIÓN: DATABASES (SPECIALIZED & IN-MEMORY)
+  # ============================================================
+
+  - id: TMAC-AWS-AURORA-001
+    name: "Clúster Amazon Aurora sin Encriptación"
+    resource_type: "aws_rds_cluster"
+    check:
+      attribute: "storage_encrypted"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de Amazon Aurora no tiene habilitado el cifrado en reposo ('storage_encrypted').
+      Dejar la información de la base de datos relacional distribuida en texto claro permite el
+      robo de los datos subyacentes en caso de brechas operacionales o snapshots expuestos.
+    mitigation: >
+      Activa 'storage_encrypted = true' y define el 'kms_key_id':
+        resource "aws_rds_cluster" "example" {
+          storage_encrypted = true
+          kms_key_id        = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html"
+    tags: ["aurora", "rds", "encryption", "database"]
+
+  - id: TMAC-AWS-DOCDB-001
+    name: "Amazon DocumentDB Clúster sin Encriptación"
+    resource_type: "aws_docdb_cluster"
+    check:
+      attribute: "storage_encrypted"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de base de datos NoSQL Amazon DocumentDB (compatibilidad MongoDB) carece 
+      de la propiedad 'storage_encrypted = true'. La colección de documentos JSON permanece 
+      sin resguardo criptográfico frente a exfiltraciones.
+    mitigation: >
+      Aplica cifrado estático al clúster:
+        resource "aws_docdb_cluster" "example" {
+          storage_encrypted = true
+          kms_key_id        = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/documentdb/latest/developerguide/encryption-at-rest.html"
+    tags: ["documentdb", "mongodb", "encryption"]
+
+  - id: TMAC-AWS-NEPTUNE-001
+    name: "Amazon Neptune Clúster sin Encriptación"
+    resource_type: "aws_neptune_cluster"
+    check:
+      attribute: "storage_encrypted"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de base de datos orientada a grafos Amazon Neptune no cuenta con cifrado en reposo. 
+      Las relaciones lógicas (edges/nodes) del grafo empresarial son información patentada crucial que 
+      se encuentra vulnerable (Info Disclosure).
+    mitigation: >
+      Establece 'storage_encrypted' a true para Amazon Neptune.
+    references:
+      - "https://docs.aws.amazon.com/neptune/latest/userguide/encrypt-at-rest.html"
+    tags: ["neptune", "graph", "encryption"]
+
+  - id: TMAC-AWS-ELASTI-001
+    name: "ElastiCache (Redis) sin Encriptación en Reposo y Tránsito"
+    resource_type: "aws_elasticache_replication_group"
+    check:
+      attribute: "at_rest_encryption_enabled"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El grupo de replicación de Amazon ElastiCache (usualmente Redis o Memcached) no tiene configurado 
+      cifrado ('at_rest_encryption_enabled' y 'transit_encryption_enabled'). Los volcados de memoria y backlogs 
+      pueden ser capturados en crudo si un atacante irrumpe en la red.
+    mitigation: >
+      Habilita el cifrado completo para salvaguardar sesiones de caché:
+        resource "aws_elasticache_replication_group" "example" {
+          # ...
+          at_rest_encryption_enabled = true
+          transit_encryption_enabled = true
+          kms_key_id                 = aws_kms_key.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/at-rest-encryption.html"
+    tags: ["elasticache", "redis", "encryption", "in-memory"]
+
+  - id: TMAC-AWS-MEMDB-001
+    name: "Amazon MemoryDB sin Encriptación"
+    resource_type: "aws_memorydb_cluster"
+    check:
+      attribute: "tls_enabled"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de Amazon MemoryDB for Redis no cuenta con cifrado en tránsito.
+    mitigation: >
+      Configura 'tls_enabled = true' y asocia un parámetro de KMS.
+    references:
+      - "https://docs.aws.amazon.com/memorydb/latest/devguide/encryption.html"
+    tags: ["memorydb", "redis", "encryption"]
+
+  - id: TMAC-AWS-TIME-001
+    name: "Amazon Timestream Base de Datos sin Clave CMK"
+    resource_type: "aws_timestreamwrite_database"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      La base de datos de series temporales (IoT/Analytics) Amazon Timestream no ha designado explícitamente 
+      una clave KMS CMK de cliente para su resguardo.
+    mitigation: >
+      Especifica la propiedad 'kms_key_id' en la base de datos de Timestream.
+    references:
+      - "https://docs.aws.amazon.com/timestream/latest/developerguide/encryption-at-rest.html"
+    tags: ["timestream", "time-series", "encryption"]
+
+  - id: TMAC-AWS-KEYS-001
+    name: "Amazon Keyspaces (Cassandra) sin Encriptación"
+    resource_type: "aws_keyspaces_keyspace"
+    check:
+      attribute: "tags" # Frecuentemente el cifrado se maneja en las Tablas, no en el Keyspace directo (KMS default)
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Information Disclosure"
+    description: >
+      [Aviso Informativo] Amazon Keyspaces cifra su data en reposo de manera nativa sin 
+      posibilidad de desactivarse. Sin embargo, en el entorno IaC es crucial verificar la encriptación
+      a nivel tabla/columna. Falta configuración extendida en los atributos IaC.
+    mitigation: >
+      Aplica Resource tags y verifica las Tablas específicas de Keyspace.
+    references:
+      - "https://docs.aws.amazon.com/keyspaces/latest/devguide/EncryptionAtRest.html"
+    tags: ["keyspaces", "cassandra", "encryption"]
+
+  # ============================================================
+  # SECCIÓN: CONTAINERS (ECR, ECS, EKS)
+  # ============================================================
+
+  - id: TMAC-AWS-ECR-001
+    name: "Repositorio ECR sin Escaneo Automático de Vulnerabilidades"
+    resource_type: "aws_ecr_repository"
+    check:
+      attribute: "image_scanning_configuration"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      El repositorio de Amazon ECR no tiene configurado el escaneo de imágenes ('image_scanning_configuration'). 
+      Esto permite que contenedores con paquetes vulnerables o troyanizados (Tampering/EoP) se 
+      desplieguen directamente a producción sin validación.
+    mitigation: >
+      Habilita el escaneo al momento de empujar (push) la imagen:
+        resource "aws_ecr_repository" "example" {
+          # ...
+          image_scanning_configuration {
+            scan_on_push = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html"
+    tags: ["ecr", "containers", "scanning", "vulnerabilities"]
+
+  - id: TMAC-AWS-ECR-002
+    name: "Repositorio ECR con Etiquetas de Imagen Mutables"
+    resource_type: "aws_ecr_repository"
+    check:
+      attribute: "image_tag_mutability"
+      condition: "equals"
+      values: ["MUTABLE"]
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      Las etiquetas (tags) de imágenes en ECR permiten mutabilidad ('MUTABLE'). Esto significa 
+      que un atacante podría sobrescribir la imagen de producción 'v1.0' con una imagen maliciosa 
+      bajo el mismo tag exacto, logrando ejecutar código arbitrario a espaldas del repositorio Git.
+    mitigation: >
+      Cambia 'image_tag_mutability' a 'IMMUTABLE':
+        resource "aws_ecr_repository" "example" {
+          # ...
+          image_tag_mutability = "IMMUTABLE"
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-tag-mutability.html"
+    tags: ["ecr", "containers", "tampering", "immutability"]
+
+  - id: TMAC-AWS-EKS-001
+    name: "Clúster EKS con Endpoint Abierto al Público"
+    resource_type: "aws_eks_cluster"
+    check:
+      attribute: "vpc_config.endpoint_public_access"
+      condition: "equals"
+      values: [true]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      El clúster de Kubernetes (AWS EKS) expone su Endpoint de la API ('endpoint_public_access = true') 
+      a todo internet. Esto provee un punto de ataque directo contra el control plane (Spoofing / DoS / EoP).
+    mitigation: >
+      Apaga el acceso público o restringe 'public_access_cidrs' fuertemente. Es aconsejable 
+      usar 'endpoint_private_access = true' y acceder vía VPN/Bastión:
+        resource "aws_eks_cluster" "example" {
+          # ...
+          vpc_config {
+            endpoint_public_access  = false
+            endpoint_private_access = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html"
+    tags: ["eks", "kubernetes", "public-access", "network"]
+
+  - id: TMAC-AWS-EKS-002
+    name: "Clúster EKS sin Cifrado de Secretos (KMS)"
+    resource_type: "aws_eks_cluster"
+    check:
+      attribute: "encryption_config"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El sistema EKS guarda los recursos tipo Secretos ('secrets') nativos de Kubernetes en etcd 
+      en texto claro dentro del almacén EBS de AWS. Si se carece de 'encryption_config', una brecha 
+      física en etcd expondrá credenciales de pods directamente (Info Disclosure).
+    mitigation: >
+      Configura un proveedor de encriptación conectado a AWS KMS:
+        resource "aws_eks_cluster" "example" {
+          # ...
+          encryption_config {
+            resources = ["secrets"]
+            provider {
+              key_arn = aws_kms_key.eks_key.arn
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html"
+    tags: ["eks", "kubernetes", "encryption", "secrets"]
+
+  - id: TMAC-AWS-EKS-003
+    name: "Clúster EKS sin Logging de Componentes (Control Plane)"
+    resource_type: "aws_eks_cluster"
+    check:
+      attribute: "enabled_cluster_log_types"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El logging para la API, auditoría y autenticador del Control Plane de EKS está deshabilitado. 
+      Resulta imposible detectar operaciones de clúster sospechosas o investigar si un atacante 
+      tomó el control de etcd o del scheduler.
+    mitigation: >
+      Añade 'enabled_cluster_log_types':
+        resource "aws_eks_cluster" "example" {
+          # ...
+          enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+        }
+    references:
+      - "https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html"
+    tags: ["eks", "kubernetes", "logging", "audit"]
+
+  - id: TMAC-AWS-ECS-001
+    name: "Clúster ECS sin Container Insights"
+    resource_type: "aws_ecs_cluster"
+    check:
+      attribute: "setting"
+      condition: "not_exists"
+      values: []
+    severity: "Low"
+    stride: "Repudiation"
+    description: >
+      El clúster de Amazon ECS (Elastic Container Service) no utiliza CloudWatch Container Insights 
+      ('setting' ausente). Causa pérdida de observabilidad de red y métricas en Fargate o EC2, 
+      afectando diagnósticos forenses relacionados con DoS o intrusiones de red.
+    mitigation: >
+      Agrega la configuración Container Insights:
+        resource "aws_ecs_cluster" "example" {
+          name = "example-cluster"
+          setting {
+            name  = "containerInsights"
+            value = "enabled"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights.html"
+    tags: ["ecs", "containers", "observability", "metrics"]
+
+  # ============================================================
+  # SECCIÓN: COMPUTE (APP RUNNER, BATCH, ELASTIC BEANSTALK)
+  # ============================================================
+
+  - id: TMAC-AWS-APPR-001
+    name: "Servicio App Runner Expuesto Públicamente (Sin Ingress VPC)"
+    resource_type: "aws_apprunner_service"
+    check:
+      attribute: "network_configuration.ingress_configuration"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      AWS App Runner expone por defecto todas las aplicaciones web a internet de manera pública. 
+      Carecer de un 'ingress_configuration' significa que la aplicación no está restringida a un 
+      VPC Endpoint interno, abriendo vectores directos de Spoofing (suplantación) e inyecciones a tu front-end/API.
+    mitigation: >
+      Restringe el acceso ingresante usando configuraciones de VPC:
+        resource "aws_apprunner_service" "example" {
+          # ...
+          network_configuration {
+            ingress_configuration {
+              is_publicly_accessible = false
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/apprunner/latest/dg/network-vpc.html"
+    tags: ["apprunner", "compute", "networking", "exposure"]
+
+  - id: TMAC-AWS-BCH-001
+    name: "AWS Batch Compute con Asignación de IPs Públicas"
+    resource_type: "aws_batch_compute_environment"
+    check:
+      attribute: "compute_resources.subnets" # Generalmente validamos esto o la visibilidad, pero la falta de SG también aplica. Usaremos un chequeo representativo.
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El entorno computacional de AWS Batch no tiene asignaciones explícitas de subredes aisladas 
+      o grupos de seguridad ('compute_resources'). El lanzamiento de instancias de procesamiento 
+      por lotes en redes inseguras arriesga la fuga de resultados matemáticos y científicos (Info Disclosure).
+    mitigation: >
+      Aplica una configuración estricta de subredes privadas:
+        resource "aws_batch_compute_environment" "example" {
+          compute_resources {
+            subnets = [aws_subnet.private.id]
+            security_group_ids = [aws_security_group.batch.id]
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/batch/latest/userguide/compute_environments.html"
+    tags: ["batch", "compute", "network", "isolation"]
+
+  - id: TMAC-AWS-EB-001
+    name: "Elastic Beanstalk sin Actualizaciones Gestionadas"
+    resource_type: "aws_elastic_beanstalk_environment"
+    check:
+      attribute: "setting"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      El entorno de AWS Elastic Beanstalk no requiere explícitamente la habilitación de parches 
+      y actualizaciones de seguridad del SO gestionado (Managed Updates). Quedarse en versiones de 
+      plataforma antiguas permite que atacantes exploten CVEs en EC2 subyacentes (Tampering / EoP).
+    mitigation: >
+      Agrega bloques 'setting' que fuercen ManagedActionsEnabled:
+        resource "aws_elastic_beanstalk_environment" "example" {
+          setting {
+            namespace = "aws:elasticbeanstalk:managedactions"
+            name      = "ManagedActionsEnabled"
+            value     = "true"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-mgmt-managed-updates.html"
+    tags: ["elastic-beanstalk", "compute", "patching", "vulnerabilities"]
+
+  - id: TMAC-AWS-IB-001
+    name: "EC2 Image Builder sin Clave de Encriptación de AMI"
+    resource_type: "aws_imagebuilder_distribution_configuration"
+    check:
+      attribute: "distribution.ami_distribution_configuration.kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      La configuración de distribución de EC2 Image Builder está empaquetando y desplegando AMIs 
+      sin resguardarlas con una Customer Managed Key (CMK). Exponer el sistema de archivos del sistema 
+      operativo base podría facilitar la ingeniería inversa (Info Disclosure).
+    mitigation: >
+      Proporciona un 'kms_key_id' válido en la configuración de AMI:
+        resource "aws_imagebuilder_distribution_configuration" "example" {
+          distribution {
+            ami_distribution_configuration {
+              kms_key_id = aws_kms_key.example.arn
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/imagebuilder/latest/userguide/manage-cmk.html"
+    tags: ["ec2", "image-builder", "encryption", "amis"]

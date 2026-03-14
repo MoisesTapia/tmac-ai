@@ -1,0 +1,41 @@
+# 🛡️ TMAC Security Report
+
+**Generated on:** {{ result.metadata.timestamp }}  
+**Scanned Directory:** `{{ result.metadata.scanned_directory }}`  
+**Execution Time:** {{ "%.2f"|format(result.metadata.execution_time_seconds) }}s
+
+## 📊 Summary
+
+| Metric | Count |
+|--------|-------|
+| 📦 Total Resources | **{{ result.statistics.total_resources }}** |
+| 🚫 Total Findings | **{{ result.statistics.total_findings }}** |
+| 🔴 **Critical** | {{ result.statistics.critical }} |
+| 🟠 **High** | {{ result.statistics.high }} |
+| 🟡 **Medium** | {{ result.statistics.medium }} |
+
+---
+
+## 🔍 Findings
+
+{% if result.findings %}
+{% for finding in result.findings %}
+### [{% if finding.severity == 'Critical' %}🔴{% elif finding.severity == 'High' %}🟠{% elif finding.severity == 'Medium' %}🟡{% elif finding.severity == 'Low' %}🟢{% else %}🔵{% endif %} {{ finding.severity }}] {{ finding.rule_name }}
+
+- **Rule ID:** `{{ finding.rule_id }}`
+- **Resource:** `{{ finding.resource_type }}.{{ finding.resource_name }}`
+- **File:** `{{ finding.file_path }}`
+- **STRIDE Category:** {{ finding.stride }}
+
+**Description:**
+{{ finding.description }}
+
+**Mitigation:**
+```terraform
+{{ finding.mitigation }}
+```
+---
+{% endfor %}
+{% else %}
+✅ **Excellent work! No security findings detected.**
+{% endif %}
