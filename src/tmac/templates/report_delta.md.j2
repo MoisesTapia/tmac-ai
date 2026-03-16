@@ -1,0 +1,41 @@
+# 🛡️ TMAC Delta Risk Report
+
+**Generated on:** {{ result.metadata.timestamp }}
+**Plan file:** `{{ result.plan_file }}`
+**Execution Time:** {{ "%.2f"|format(result.metadata.execution_time_seconds) }}s
+
+---
+
+> Este plan introduce {{ result.findings_introduced }} amenazas nuevas y resuelve {{ result.findings_resolved }}.
+
+## 📊 Delta Summary
+
+| Métrica | Valor |
+|---------|-------|
+| ⬆ Amenazas introducidas | **{{ result.findings_introduced }}** |
+| ⬇ Amenazas resueltas | **{{ result.findings_resolved }}** |
+| ⚖ RiskDelta neto | **{{ result.findings_introduced - result.findings_resolved }}** |
+| ✚ Recursos creados | {{ result.resources_created }} |
+| ✎ Recursos modificados | {{ result.resources_updated }} |
+| ✖ Recursos eliminados | {{ result.resources_deleted }} |
+
+---
+
+## 🔍 Delta Findings
+
+{% if result.findings %}
+| Acción | Recurso | Regla | Severidad | STRIDE | Descripción del cambio |
+|--------|---------|-------|-----------|--------|------------------------|
+{% for finding in result.findings %}
+{% if finding.change_action.value == 'create' %}{% set accion = 'NUEVO' %}{% elif finding.change_action.value in ('update', 'replace') %}{% set accion = 'MODIFICADO' %}{% else %}{% set accion = 'ELIMINADO' %}{% endif %}
+{% if finding.severity == 'Critical' %}{% set sev_emoji = '🔴' %}{% elif finding.severity == 'High' %}{% set sev_emoji = '🟠' %}{% elif finding.severity == 'Medium' %}{% set sev_emoji = '🟡' %}{% elif finding.severity == 'Low' %}{% set sev_emoji = '🟢' %}{% else %}{% set sev_emoji = '🔵' %}{% endif %}
+{% set stride_str = finding.stride if finding.stride is string else finding.stride | join(', ') %}
+{% if finding.value_before is not none and finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → ' ~ finding.value_after %}{% elif finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': → ' ~ finding.value_after %}{% elif finding.value_before is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → (eliminado)' %}{% else %}{% set cambio = finding.changed_attribute %}{% endif %}
+| {{ accion }} | `{{ finding.resource_type }}.{{ finding.resource_name }}` | `{{ finding.rule_id }}` | {{ sev_emoji }} {{ finding.severity }} | {{ stride_str }} | {{ cambio }} |
+{% endfor %}
+{% else %}
+✅ **Este plan no introduce ninguna amenaza nueva.**
+{% if result.findings_resolved > 0 %}
+Resuelve {{ result.findings_resolved }} amenaza(s) existente(s).
+{% endif %}
+{% endif %}

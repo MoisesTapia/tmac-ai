@@ -1,6 +1,7 @@
 import json
 from tmac.reporters.base import BaseReporter
 from tmac.models.finding import ScanResult
+from tmac.delta.models import DeltaFinding
 
 SARIF_SEVERITY_MAP = {
     "critical": "error",
@@ -34,7 +35,7 @@ class JSONReporter(BaseReporter):
         results = []
         for finding in result.findings:
             level = SARIF_SEVERITY_MAP.get(finding.severity.lower(), "warning")
-            results.append({
+            result_entry: dict = {
                 "ruleId": finding.rule_id,
                 "level": level,
                 "message": {"text": finding.description},
@@ -44,7 +45,14 @@ class JSONReporter(BaseReporter):
                         "region": {"startLine": finding.line_number},
                     }
                 }],
-            })
+            }
+            if isinstance(finding, DeltaFinding):
+                result_entry["properties"] = {
+                    "changeAction": finding.change_action.value,
+                    "valueBefore": finding.value_before,
+                    "valueAfter": finding.value_after,
+                }
+            results.append(result_entry)
 
         sarif = {
             "version": "2.1.0",

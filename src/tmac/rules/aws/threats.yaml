@@ -4,7 +4,7 @@ metadata:
   framework: STRIDE
   description: "Base de datos de amenazas para TMAC v1.0.0 Ixtla - AWS Terraform"
   maintainer: "TMAC Security Team"
-  last_updated: "2026-03-10"
+  last_updated: "2026-03-16"
 
 rules:
   # ============================================================
@@ -2001,3 +2001,642 @@ rules:
     references:
       - "https://docs.aws.amazon.com/imagebuilder/latest/userguide/manage-cmk.html"
     tags: ["ec2", "image-builder", "encryption", "amis"]
+
+  # ============================================================
+  # SECCIÓN: NETWORKING (WAF, ALB, CLOUDFRONT) — v1.2.0
+  # ============================================================
+
+  - id: TMAC-AWS-WAF-001
+    name: "Web ACL de WAFv2 sin Regla de Rate Limiting"
+    resource_type: "aws_wafv2_web_acl"
+    check:
+      attribute: "rule"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      La Web ACL de AWS WAFv2 no tiene ninguna regla configurada ('rule' ausente).
+      Sin reglas de rate limiting ni managed rule groups, el WAF no protege contra
+      ataques de fuerza bruta, DDoS de capa 7 ni inyecciones (SQLi/XSS), dejando
+      la aplicación completamente expuesta (Denial of Service / Tampering).
+    mitigation: >
+      Añade al menos una regla de rate limiting y los AWS Managed Rule Groups básicos:
+        resource "aws_wafv2_web_acl" "example" {
+          rule {
+            name     = "RateLimit"
+            priority = 1
+            action { block {} }
+            statement {
+              rate_based_statement {
+                limit              = 2000
+                aggregate_key_type = "IP"
+              }
+            }
+            visibility_config {
+              cloudwatch_metrics_enabled = true
+              metric_name                = "RateLimit"
+              sampled_requests_enabled   = true
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statements-list.html"
+      - "CIS AWS Benchmark v2.0.0 - 6.1"
+    tags: ["waf", "ddos", "rate-limiting", "network"]
+
+  - id: TMAC-AWS-WAF-002
+    name: "Web ACL de WAFv2 sin Logging Habilitado"
+    resource_type: "aws_wafv2_web_acl_logging_configuration"
+    check:
+      attribute: "log_destination_configs"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      La configuración de logging del WAFv2 no tiene destinos definidos. Sin logs de
+      las peticiones bloqueadas y permitidas, no es posible auditar ataques ni
+      investigar incidentes (Repudiation). Un atacante puede operar sin dejar rastro.
+    mitigation: >
+      Configura un destino de logs (Kinesis Firehose, S3 o CloudWatch):
+        resource "aws_wafv2_web_acl_logging_configuration" "example" {
+          log_destination_configs = [aws_kinesis_firehose_delivery_stream.example.arn]
+          resource_arn            = aws_wafv2_web_acl.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/waf/latest/developerguide/logging.html"
+    tags: ["waf", "logging", "audit", "repudiation"]
+
+  - id: TMAC-AWS-ALB-001
+    name: "Application Load Balancer sin Access Logs"
+    resource_type: "aws_lb"
+    check:
+      attribute: "access_logs.enabled"
+      condition: "equals"
+      values: [false]
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El Application Load Balancer (ALB) no tiene habilitados los access logs
+      ('access_logs.enabled = false'). Sin registros de las peticiones HTTP/S
+      entrantes, no es posible rastrear el origen de ataques, investigar
+      incidentes ni cumplir con requisitos de auditoría (Repudiation).
+    mitigation: >
+      Habilita access logs apuntando a un bucket S3 dedicado:
+        resource "aws_lb" "example" {
+          access_logs {
+            bucket  = aws_s3_bucket.alb_logs.id
+            prefix  = "alb"
+            enabled = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html"
+      - "CIS AWS Benchmark v2.0.0 - 3.9"
+    tags: ["alb", "load-balancer", "logging", "audit"]
+
+  - id: TMAC-AWS-ALB-002
+    name: "Listener de ALB sin Redirección HTTP→HTTPS"
+    resource_type: "aws_lb_listener"
+    check:
+      attribute: "protocol"
+      condition: "equals"
+      values: ["HTTP"]
+      and_check:
+        attribute: "default_action.type"
+        condition: "equals"
+        values: ["forward"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El listener del ALB acepta tráfico HTTP plano y lo reenvía directamente al
+      backend sin redirigir a HTTPS. Esto expone credenciales, tokens de sesión y
+      datos sensibles a ataques Man-in-the-Middle (Information Disclosure).
+    mitigation: >
+      Cambia el default_action a 'redirect' con protocolo HTTPS:
+        resource "aws_lb_listener" "http" {
+          protocol = "HTTP"
+          default_action {
+            type = "redirect"
+            redirect {
+              protocol    = "HTTPS"
+              status_code = "HTTP_301"
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html"
+    tags: ["alb", "load-balancer", "tls", "https", "transit"]
+
+  - id: TMAC-AWS-CF-001
+    name: "Distribución CloudFront sin WAF Asociado"
+    resource_type: "aws_cloudfront_distribution"
+    check:
+      attribute: "web_acl_id"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      La distribución de Amazon CloudFront no tiene asociada una Web ACL de WAFv2
+      ('web_acl_id' ausente). Sin WAF en el edge, la distribución es vulnerable a
+      ataques de inyección (SQLi, XSS), scraping masivo y DDoS de capa 7 (Tampering / DoS).
+    mitigation: >
+      Asocia una Web ACL de WAFv2 (scope CLOUDFRONT, región us-east-1):
+        resource "aws_cloudfront_distribution" "example" {
+          web_acl_id = aws_wafv2_web_acl.example.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-awswaf.html"
+    tags: ["cloudfront", "cdn", "waf", "edge-security"]
+
+  - id: TMAC-AWS-CF-002
+    name: "Distribución CloudFront con Política de Caché que Permite HTTP"
+    resource_type: "aws_cloudfront_distribution"
+    check:
+      attribute: "default_cache_behavior.viewer_protocol_policy"
+      condition: "equals"
+      values: ["allow-all"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La política de protocolo del viewer en CloudFront está configurada como 'allow-all',
+      permitiendo conexiones HTTP no cifradas desde los usuarios finales al edge.
+      Esto expone el tráfico a interceptación Man-in-the-Middle (Information Disclosure).
+    mitigation: >
+      Cambia 'viewer_protocol_policy' a 'redirect-to-https' o 'https-only':
+        resource "aws_cloudfront_distribution" "example" {
+          default_cache_behavior {
+            viewer_protocol_policy = "redirect-to-https"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https.html"
+    tags: ["cloudfront", "cdn", "tls", "https", "transit"]
+
+  # ============================================================
+  # SECCIÓN: IDENTITY (COGNITO, SECRETS MANAGER) — v1.2.0
+  # ============================================================
+
+  - id: TMAC-AWS-COGNITO-001
+    name: "User Pool de Cognito sin MFA Obligatorio"
+    resource_type: "aws_cognito_user_pool"
+    check:
+      attribute: "mfa_configuration"
+      condition: "equals"
+      values: ["OFF"]
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El User Pool de Amazon Cognito tiene el MFA desactivado ('mfa_configuration = OFF').
+      Sin un segundo factor de autenticación, las cuentas de usuario son vulnerables a
+      ataques de credential stuffing y phishing, permitiendo la suplantación de identidad
+      (Spoofing) con solo comprometer la contraseña.
+    mitigation: >
+      Habilita MFA obligatorio o al menos opcional con TOTP/SMS:
+        resource "aws_cognito_user_pool" "example" {
+          mfa_configuration = "ON"
+          software_token_mfa_configuration {
+            enabled = true
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-mfa.html"
+      - "CIS AWS Benchmark v2.0.0 - 1.10"
+    tags: ["cognito", "mfa", "authentication", "identity"]
+
+  - id: TMAC-AWS-COGNITO-002
+    name: "User Pool de Cognito sin Política de Contraseña Fuerte"
+    resource_type: "aws_cognito_user_pool"
+    check:
+      attribute: "password_policy"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Spoofing"
+    description: >
+      El User Pool de Cognito no tiene definida una política de contraseñas explícita.
+      Sin requisitos mínimos de longitud, complejidad y rotación, los usuarios pueden
+      establecer contraseñas débiles que facilitan ataques de fuerza bruta (Spoofing).
+    mitigation: >
+      Define una política de contraseñas robusta:
+        resource "aws_cognito_user_pool" "example" {
+          password_policy {
+            minimum_length                   = 14
+            require_lowercase                = true
+            require_numbers                  = true
+            require_symbols                  = true
+            require_uppercase                = true
+            temporary_password_validity_days = 1
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html"
+    tags: ["cognito", "password-policy", "authentication", "identity"]
+
+  - id: TMAC-AWS-COGNITO-003
+    name: "User Pool de Cognito sin Logging de Eventos de Riesgo"
+    resource_type: "aws_cognito_user_pool"
+    check:
+      attribute: "user_pool_add_ons"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El User Pool no tiene habilitado Advanced Security Mode ('user_pool_add_ons').
+      Sin detección de riesgo adaptativa (logins desde IPs anómalas, credential stuffing),
+      los intentos de suplantación no quedan registrados ni bloqueados (Repudiation).
+    mitigation: >
+      Habilita Advanced Security para detección de amenazas en tiempo real:
+        resource "aws_cognito_user_pool" "example" {
+          user_pool_add_ons {
+            advanced_security_mode = "ENFORCED"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html"
+    tags: ["cognito", "advanced-security", "threat-detection", "audit"]
+
+  - id: TMAC-AWS-SM-001
+    name: "Secret de Secrets Manager sin Rotación Automática"
+    resource_type: "aws_secretsmanager_secret"
+    check:
+      attribute: "rotation_lambda_arn"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El secreto en AWS Secrets Manager no tiene configurada la rotación automática
+      ('rotation_lambda_arn' ausente). Los secretos estáticos de larga duración
+      (contraseñas de BD, API keys) incrementan drásticamente el impacto de una
+      filtración, ya que el secreto comprometido permanece válido indefinidamente
+      (Information Disclosure).
+    mitigation: >
+      Configura rotación automática con una Lambda de rotación:
+        resource "aws_secretsmanager_secret_rotation" "example" {
+          secret_id           = aws_secretsmanager_secret.example.id
+          rotation_lambda_arn = aws_lambda_function.rotation.arn
+          rotation_rules {
+            automatically_after_days = 30
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html"
+      - "CIS AWS Benchmark v2.0.0 - 1.19"
+    tags: ["secrets-manager", "rotation", "credentials", "secrets"]
+
+  - id: TMAC-AWS-SM-002
+    name: "Secret de Secrets Manager sin CMK de KMS"
+    resource_type: "aws_secretsmanager_secret"
+    check:
+      attribute: "kms_key_id"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El secreto usa la clave por defecto de AWS en lugar de una Customer Managed Key (CMK).
+      Sin una CMK propia, no tienes control granular sobre quién puede descifrar el secreto
+      ni auditoría detallada de accesos criptográficos en CloudTrail (Information Disclosure).
+    mitigation: >
+      Asocia una CMK de KMS al secreto:
+        resource "aws_secretsmanager_secret" "example" {
+          kms_key_id = aws_kms_key.secrets_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/secretsmanager/latest/userguide/security-encryption.html"
+    tags: ["secrets-manager", "kms", "encryption", "secrets"]
+
+  # ============================================================
+  # SECCIÓN: ANALYTICS (REDSHIFT, OPENSEARCH, KINESIS) — v1.2.0
+  # ============================================================
+
+  - id: TMAC-AWS-RS-001
+    name: "Clúster Redshift sin Encriptación en Reposo"
+    resource_type: "aws_redshift_cluster"
+    check:
+      attribute: "encrypted"
+      condition: "equals"
+      values: [false]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de Amazon Redshift (Data Warehouse) no tiene habilitado el cifrado
+      en reposo ('encrypted = false'). Los petabytes de datos analíticos almacenados
+      quedan expuestos a acceso no autorizado si los volúmenes subyacentes son
+      comprometidos (Information Disclosure).
+    mitigation: >
+      Habilita el cifrado con una CMK de KMS:
+        resource "aws_redshift_cluster" "example" {
+          encrypted  = true
+          kms_key_id = aws_kms_key.redshift_key.arn
+        }
+    references:
+      - "https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-db-encryption.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.4.1"
+    tags: ["redshift", "data-warehouse", "encryption", "analytics"]
+
+  - id: TMAC-AWS-RS-002
+    name: "Clúster Redshift con Acceso Público"
+    resource_type: "aws_redshift_cluster"
+    check:
+      attribute: "publicly_accessible"
+      condition: "equals"
+      values: [true]
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de Redshift está configurado como públicamente accesible
+      ('publicly_accessible = true'). Exponer un Data Warehouse directamente a
+      internet es una de las causas más frecuentes de mega-brechas de datos
+      (Information Disclosure). Redshift escucha en el puerto 5439 por defecto.
+    mitigation: >
+      Deshabilita el acceso público y ubica el clúster en subredes privadas:
+        resource "aws_redshift_cluster" "example" {
+          publicly_accessible  = false
+          cluster_subnet_group_name = aws_redshift_subnet_group.private.name
+        }
+    references:
+      - "https://docs.aws.amazon.com/redshift/latest/mgmt/managing-clusters-vpc.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.4.2"
+    tags: ["redshift", "data-warehouse", "public-access", "network"]
+
+  - id: TMAC-AWS-RS-003
+    name: "Clúster Redshift sin Logging de Auditoría"
+    resource_type: "aws_redshift_cluster"
+    check:
+      attribute: "logging"
+      condition: "not_exists"
+      values: []
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El clúster de Redshift no tiene habilitado el logging de auditoría ('logging' ausente).
+      Sin registros de las consultas SQL ejecutadas, conexiones y errores, no es posible
+      detectar exfiltración de datos ni investigar accesos no autorizados (Repudiation).
+    mitigation: >
+      Habilita el logging de auditoría a un bucket S3:
+        resource "aws_redshift_cluster" "example" {
+          logging {
+            enable        = true
+            bucket_name   = aws_s3_bucket.redshift_logs.id
+            s3_key_prefix = "redshift-audit/"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/redshift/latest/mgmt/db-auditing.html"
+      - "CIS AWS Benchmark v2.0.0 - 2.4.3"
+    tags: ["redshift", "data-warehouse", "logging", "audit"]
+
+  - id: TMAC-AWS-OS-001
+    name: "Dominio OpenSearch sin Encriptación en Reposo"
+    resource_type: "aws_opensearch_domain"
+    check:
+      attribute: "encrypt_at_rest.enabled"
+      condition: "equals"
+      values: [false]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El dominio de Amazon OpenSearch Service (antes Elasticsearch) no tiene habilitado
+      el cifrado en reposo ('encrypt_at_rest.enabled = false'). Los índices de búsqueda
+      pueden contener datos sensibles de logs, eventos de seguridad o información de
+      clientes que quedan expuestos (Information Disclosure).
+    mitigation: >
+      Habilita el cifrado en reposo con KMS:
+        resource "aws_opensearch_domain" "example" {
+          encrypt_at_rest {
+            enabled    = true
+            kms_key_id = aws_kms_key.opensearch_key.arn
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/encryption-at-rest.html"
+    tags: ["opensearch", "elasticsearch", "encryption", "search"]
+
+  - id: TMAC-AWS-OS-002
+    name: "Dominio OpenSearch con Acceso Público (Sin VPC)"
+    resource_type: "aws_opensearch_domain"
+    check:
+      attribute: "vpc_options"
+      condition: "not_exists"
+      values: []
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      El dominio de OpenSearch no está desplegado dentro de una VPC ('vpc_options' ausente).
+      Los dominios públicos de OpenSearch han sido responsables de múltiples brechas masivas
+      de datos al quedar expuestos a internet sin autenticación (Information Disclosure).
+    mitigation: >
+      Despliega el dominio dentro de una VPC con subredes privadas:
+        resource "aws_opensearch_domain" "example" {
+          vpc_options {
+            subnet_ids         = [aws_subnet.private.id]
+            security_group_ids = [aws_security_group.opensearch.id]
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html"
+    tags: ["opensearch", "elasticsearch", "public-access", "vpc"]
+
+  - id: TMAC-AWS-OS-003
+    name: "Dominio OpenSearch sin Cifrado en Tránsito (TLS)"
+    resource_type: "aws_opensearch_domain"
+    check:
+      attribute: "domain_endpoint_options.enforce_https"
+      condition: "equals"
+      values: [false]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El dominio de OpenSearch no fuerza HTTPS ('enforce_https = false'), permitiendo
+      conexiones HTTP no cifradas. Las consultas y respuestas de búsqueda viajan en
+      texto claro, expuestas a interceptación (Information Disclosure).
+    mitigation: >
+      Fuerza HTTPS y establece la política TLS mínima:
+        resource "aws_opensearch_domain" "example" {
+          domain_endpoint_options {
+            enforce_https       = true
+            tls_security_policy = "Policy-Min-TLS-1-2-2019-07"
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/encryption-at-rest.html"
+    tags: ["opensearch", "elasticsearch", "tls", "https", "transit"]
+
+  - id: TMAC-AWS-KDS-001
+    name: "Stream de Kinesis Data Streams sin Encriptación (KMS)"
+    resource_type: "aws_kinesis_stream"
+    check:
+      attribute: "encryption_type"
+      condition: "equals"
+      values: ["NONE"]
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El stream de Amazon Kinesis Data Streams tiene el cifrado desactivado
+      ('encryption_type = NONE'). Los eventos en tiempo real que fluyen por el
+      stream (logs, clickstreams, datos IoT) viajan sin protección criptográfica,
+      expuestos a accesos no autorizados (Information Disclosure).
+    mitigation: >
+      Habilita el cifrado con KMS:
+        resource "aws_kinesis_stream" "example" {
+          encryption_type = "KMS"
+          kms_key_id      = aws_kms_key.kinesis_key.id
+        }
+    references:
+      - "https://docs.aws.amazon.com/streams/latest/dev/server-side-encryption.html"
+    tags: ["kinesis", "streaming", "encryption", "data-flow"]
+
+  - id: TMAC-AWS-MSK-001
+    name: "Clúster MSK (Kafka) sin Cifrado en Tránsito"
+    resource_type: "aws_msk_cluster"
+    check:
+      attribute: "encryption_info.encryption_in_transit.client_broker"
+      condition: "equals"
+      values: ["PLAINTEXT"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El clúster de Amazon MSK (Managed Streaming for Apache Kafka) permite conexiones
+      en texto plano entre clientes y brokers ('client_broker = PLAINTEXT'). Los mensajes
+      Kafka que fluyen por el bus de eventos pueden ser interceptados en la red
+      (Information Disclosure / Tampering).
+    mitigation: >
+      Fuerza TLS en todas las conexiones cliente-broker:
+        resource "aws_msk_cluster" "example" {
+          encryption_info {
+            encryption_in_transit {
+              client_broker = "TLS"
+              in_cluster    = true
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/msk/latest/developerguide/msk-encryption.html"
+    tags: ["msk", "kafka", "streaming", "tls", "transit"]
+
+  - id: TMAC-AWS-MSK-002
+    name: "Clúster MSK sin Autenticación de Clientes (mTLS/SASL)"
+    resource_type: "aws_msk_cluster"
+    check:
+      attribute: "client_authentication"
+      condition: "not_exists"
+      values: []
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El clúster de MSK no tiene configurada autenticación de clientes ('client_authentication'
+      ausente). Sin mTLS o SASL/SCRAM, cualquier cliente con acceso de red al clúster puede
+      producir o consumir mensajes sin autenticarse, permitiendo suplantación de productores
+      legítimos (Spoofing) e inyección de mensajes maliciosos.
+    mitigation: >
+      Habilita autenticación mTLS o SASL/SCRAM:
+        resource "aws_msk_cluster" "example" {
+          client_authentication {
+            sasl {
+              scram = true
+            }
+            tls {
+              certificate_authority_arns = [aws_acmpca_certificate_authority.example.arn]
+            }
+          }
+        }
+    references:
+      - "https://docs.aws.amazon.com/msk/latest/developerguide/msk-authentication.html"
+    tags: ["msk", "kafka", "authentication", "mtls", "sasl"]
+
+  # ============================================================
+  # SECCIÓN: CONTAINERS (FARGATE) — v1.2.0
+  # ============================================================
+
+  - id: TMAC-AWS-FARGATE-001
+    name: "Task Definition de Fargate sin Logging Configurado"
+    resource_type: "aws_ecs_task_definition"
+    check:
+      attribute: "container_definitions"
+      condition: "not_contains"
+      values: ['"logConfiguration"']
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      La definición de tarea de ECS/Fargate no incluye 'logConfiguration' en sus
+      contenedores. Sin enviar los logs del contenedor a CloudWatch Logs o un SIEM,
+      no es posible auditar la actividad del proceso ni investigar compromisos
+      (Repudiation). Un atacante puede ejecutar código sin dejar rastro.
+    mitigation: >
+      Añade logConfiguration a cada contenedor apuntando a CloudWatch Logs:
+        container_definitions = jsonencode([{
+          logConfiguration = {
+            logDriver = "awslogs"
+            options = {
+              "awslogs-group"         = "/ecs/my-task"
+              "awslogs-region"        = "us-east-1"
+              "awslogs-stream-prefix" = "ecs"
+            }
+          }
+        }])
+    references:
+      - "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html"
+    tags: ["fargate", "ecs", "containers", "logging", "audit"]
+
+  - id: TMAC-AWS-FARGATE-002
+    name: "Task Definition de Fargate con Contenedor Privilegiado"
+    resource_type: "aws_ecs_task_definition"
+    check:
+      attribute: "container_definitions"
+      condition: "contains"
+      values: ['"privileged": true']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      La definición de tarea incluye un contenedor con 'privileged: true'. Un contenedor
+      privilegiado tiene acceso completo al host subyacente, permitiendo escapar del
+      aislamiento del contenedor y comprometer el nodo EC2 o el plano de control de ECS
+      (Elevation of Privilege). Es el equivalente a ejecutar como root en el host.
+    mitigation: >
+      Elimina 'privileged: true' de todos los contenedores. Usa capacidades Linux
+      específicas si son necesarias:
+        container_definitions = jsonencode([{
+          privileged = false
+          linuxParameters = {
+            capabilities = {
+              add  = ["NET_BIND_SERVICE"]
+              drop = ["ALL"]
+            }
+          }
+        }])
+    references:
+      - "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_security"
+    tags: ["fargate", "ecs", "containers", "privilege-escalation", "container-escape"]
+
+  - id: TMAC-AWS-FARGATE-003
+    name: "Task Definition de Fargate sin Read-Only Root Filesystem"
+    resource_type: "aws_ecs_task_definition"
+    check:
+      attribute: "container_definitions"
+      condition: "not_contains"
+      values: ['"readonlyRootFilesystem": true']
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      Los contenedores en la definición de tarea no tienen el sistema de archivos raíz
+      configurado como solo lectura ('readonlyRootFilesystem: true'). Un atacante que
+      comprometa el contenedor puede modificar binarios, instalar herramientas de
+      persistencia o alterar la configuración del proceso (Tampering).
+    mitigation: >
+      Habilita readonlyRootFilesystem y monta volúmenes temporales solo donde sea necesario:
+        container_definitions = jsonencode([{
+          readonlyRootFilesystem = true
+          mountPoints = [{
+            sourceVolume  = "tmp"
+            containerPath = "/tmp"
+            readOnly      = false
+          }]
+        }])
+    references:
+      - "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_security"
+    tags: ["fargate", "ecs", "containers", "filesystem", "hardening"]

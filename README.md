@@ -4,9 +4,10 @@ TMAC es una herramienta de análisis estático de seguridad para Infraestructura
 Automatiza el modelado de amenazas identificando vulnerabilidades en código Terraform antes del despliegue,
 usando el framework STRIDE.
 
-## Características principales (v1.0.0 "Ixtla")
+## Características principales (v1.1.0 "Ixtla")
 
 - **Análisis de Terraform:** Escaneo automático de archivos `.tf`.
+- **Análisis de delta de riesgo (`tmac plan`):** Detecta amenazas STRIDE exclusivamente en los recursos que el plan de Terraform va a crear, modificar o destruir — sin analizar el estado completo.
 - **Motor de reglas YAML:** Reglas de amenazas fuertemente tipadas y validadas con Pydantic.
 - **Framework STRIDE:** Categorización automática de hallazgos (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
 - **Múltiples formatos de reporte:** HTML, Markdown y JSON/SARIF.
@@ -75,6 +76,101 @@ tmac scan --dir ./infra --no-color --report json
 # Modo verbose para debugging
 tmac scan --dir ./infra --verbose
 ```
+
+## tmac plan — Análisis de Delta de Riesgo
+
+Analiza un `tfplan.json` generado por Terraform para detectar amenazas STRIDE **exclusivamente en los recursos que el plan va a crear, modificar o destruir**. A diferencia de `tmac scan`, no evalúa el estado completo de la infraestructura — responde a la pregunta: *"¿Qué riesgo nuevo introduce este PR?"*.
+
+### Generar el tfplan.json
+
+```bash
+terraform plan -out=plan.bin
+terraform show -json plan.bin > plan.json
+```
+
+### Uso básico
+
+```bash
+tmac plan --plan-file plan.json
+```
+
+### Opciones del CLI (`tmac plan`)
+
+| Opción | Abreviación | Descripción | Requerido |
+| :--- | :--- | :--- | :--- |
+| `--plan-file` | `-p` | Ruta al `tfplan.json` generado por `terraform show -json`. | **Sí** |
+| `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | No |
+| `--output` | `-o` | Ruta del archivo de reporte. | No |
+| `--rules-dir` | | Directorio de reglas YAML adicionales. | No |
+| `--fail-on` | | Severidad mínima para exit code 1: `critical`, `high`, `medium`, `low`, `info`. | No |
+| `--quiet` | `-q` | Suprime la salida de terminal. | No |
+| `--no-color` | | Deshabilita colores ANSI en la salida. | No |
+| `--verbose` | `-v` | Habilita logging de debug (cambios parseados, recursos por acción, reglas evaluadas). | No |
+
+### Ejemplos prácticos
+
+```bash
+# Análisis básico con reporte Markdown
+tmac plan --plan-file plan.json --report md --output delta-report.md
+
+# Fallar en amenazas Critical, salida JSON/SARIF
+tmac plan --plan-file plan.json --report json --output delta.json --fail-on critical
+
+# Pipeline completo en una línea
+terraform plan -out=plan.bin && terraform show -json plan.bin > plan.json && tmac plan --plan-file plan.json
+
+# Modo verbose para debugging
+tmac plan --plan-file plan.json --verbose
+```
+
+### Códigos de salida de `tmac plan`
+
+| Código | Condición |
+| :--- | :--- |
+| `0` | Sin `DeltaFinding` Critical o High (plan seguro). |
+| `1` | Se detectó al menos un `DeltaFinding` con severidad **Critical**. |
+| `2` | Se detectaron `DeltaFinding` **High** pero ninguno Critical. |
+| `3` | Error de ejecución: archivo no existe, JSON inválido, o `tfplan.json` sin `resource_changes`. |
+
+### Formato del reporte de delta
+
+El reporte muestra el **RiskDelta** neto del plan (`amenazas introducidas − amenazas resueltas`):
+
+- **Amenazas introducidas**: recursos creados o modificados que violan reglas STRIDE.
+- **Amenazas resueltas**: recursos eliminados o modificados que ya no violan reglas STRIDE.
+
+Ejemplo de resumen en Markdown:
+
+```
+> Este plan introduce 2 amenazas nuevas y resuelve 1.
+
+| Acción    | Recurso              | Regla            | Severidad | STRIDE               | Descripción del cambio          |
+|-----------|----------------------|------------------|-----------|----------------------|---------------------------------|
+| NUEVO     | aws_s3_bucket.data   | TMAC-AWS-S3-001  | Critical  | Information Disclosure | acl: private → public-read    |
+| MODIFICADO| aws_s3_bucket.logs   | TMAC-AWS-S3-002  | High      | Information Disclosure | server_side_encryption: AES256 → (none) |
+```
+
+---
+
+## TMAC v1.1.0 vs análisis de estado completo
+
+La mayoría de herramientas de seguridad para IaC analizan el **estado completo** de la infraestructura: evalúan todos los recursos definidos en los archivos `.tf` y reportan todas las amenazas existentes. Esto es útil para auditorías, pero genera ruido en revisiones de PR porque mezcla amenazas preexistentes con las introducidas por el cambio.
+
+**TMAC v1.1.0 responde una pregunta diferente:**
+
+| Herramienta | Pregunta que responde |
+| :--- | :--- |
+| `tmac scan` (v1.0.0) | *"¿Qué riesgo existe en la infraestructura completa?"* |
+| `tmac plan` (v1.1.0) | *"¿Qué riesgo nuevo introduce este PR?"* |
+
+`tmac plan` parsea el output de `terraform show -json` y evalúa **solo los recursos del diff**:
+- Recursos **creados**: detecta amenazas en el estado final.
+- Recursos **modificados**: detecta amenazas introducidas por el cambio (no las preexistentes).
+- Recursos **eliminados**: registra amenazas resueltas al eliminar el recurso.
+
+Esto lo hace ideal para pipelines de CI/CD donde el objetivo es **bloquear solo los cambios que degradan la postura de seguridad**, sin generar falsos positivos por deuda técnica preexistente.
+
+---
 
 ## Códigos de salida (Exit Codes)
 
@@ -203,6 +299,73 @@ jobs:
           sarif_file: tmac-results.json
 ```
 
+### GitHub Actions — `tmac plan` (análisis de delta en PRs)
+
+Bloquea el merge si el plan de Terraform introduce amenazas Critical:
+
+```yaml
+name: TMAC Delta Risk Analysis
+
+on:
+  pull_request:
+    paths:
+      - "**.tf"
+
+jobs:
+  tmac-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install TMAC
+        run: pip install -e .
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./infra
+
+      - name: Generate Terraform Plan
+        run: |
+          terraform plan -out=plan.bin
+          terraform show -json plan.bin > plan.json
+        working-directory: ./infra
+
+      - name: Run TMAC Delta Analysis
+        # Exit code 1 = Critical findings → bloquea el PR
+        # Exit code 2 = High findings → bloquea el PR (ajustar --fail-on según política)
+        # Exit code 0 = plan seguro → permite el merge
+        run: |
+          tmac plan \
+            --plan-file ./infra/plan.json \
+            --report json \
+            --output tmac-delta.json \
+            --fail-on critical \
+            --no-color
+
+      - name: Upload Delta Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmac-delta-report
+          path: tmac-delta.json
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tmac-delta.json
+```
+
 ### GitLab CI
 
 ```yaml
@@ -234,14 +397,15 @@ tmac-security-scan:
 
 ```
 src/tmac/
-├── cli.py          # Interfaz CLI (Click) — parsea args, delega al Scanner
-├── scanner.py      # Orquestador del pipeline de escaneo
+├── cli.py          # Interfaz CLI (Click) — subcomandos `scan` y `plan`
+├── scanner.py      # Orquestador del pipeline de escaneo (tmac scan)
 ├── config.py       # Carga y validación de .tmac.yaml
 ├── models/         # Modelos Pydantic (Finding, ScanResult, ResourceModel)
-├── parsers/        # TerraformParser — extrae ResourceModel de archivos .tf
+├── parsers/        # TerraformParser (.tf) y TfplanParser (tfplan.json)
+├── delta/          # DeltaScanner, DeltaFinding, DeltaScanResult, PlannedChange
 ├── engine/         # RuleLoader, Matcher, Evaluator
 ├── reporters/      # HTMLReporter, MarkdownReporter, JSONReporter (SARIF)
-└── templates/      # Plantillas Jinja2 para HTML y Markdown
+└── templates/      # Plantillas Jinja2 para HTML y Markdown (scan + delta)
 ```
 
 ## Reglas incluidas (v1.0.0)

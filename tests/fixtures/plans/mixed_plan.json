@@ -1,0 +1,54 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.new_public",
+      "type": "aws_s3_bucket",
+      "name": "new_public",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "acl": "public-read",
+          "bucket": "new-public-bucket",
+          "tags": {}
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_s3_bucket.existing",
+      "type": "aws_s3_bucket",
+      "name": "existing",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "acl": "public-read",
+          "bucket": "existing-bucket",
+          "tags": {}
+        },
+        "after": {
+          "acl": "private",
+          "bucket": "existing-bucket",
+          "tags": {}
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_s3_bucket.old_public",
+      "type": "aws_s3_bucket",
+      "name": "old_public",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "acl": "public-read",
+          "bucket": "old-public-bucket",
+          "tags": {}
+        },
+        "after": null,
+        "after_unknown": {}
+      }
+    }
+  ]
+}

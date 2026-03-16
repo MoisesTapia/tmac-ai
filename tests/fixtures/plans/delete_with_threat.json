@@ -1,0 +1,20 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.data",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "acl": "public-read",
+          "bucket": "my-data-bucket",
+          "tags": {}
+        },
+        "after": null,
+        "after_unknown": {}
+      }
+    }
+  ]
+}

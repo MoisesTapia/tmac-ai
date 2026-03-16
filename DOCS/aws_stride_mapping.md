@@ -34,26 +34,31 @@ Las siguientes reglas están **actualmente implementadas** en `src/tmac/rules/aw
 | **AWS CloudFormation** | Process (Deployment) | **T**ampering, **D**enial of Service | `TMAC-AWS-CFN-001` (Stack sin termination protection) |
 | **Amazon ECR** | Data Store (Images) | **T**ampering | `TMAC-AWS-ECR-001` (Sin scan-on-push), `TMAC-AWS-ECR-002` (Etiquetas mutables) |
 | **Amazon EKS & ECS** | Process (Orchestrator) | **R**epudiation, **S**poofing | `TMAC-AWS-EKS-001` (Endpoint público), `TMAC-AWS-EKS-002` (Sin cifrado de secretos KMS), `TMAC-AWS-EKS-003` (Sin logging de control plane), `TMAC-AWS-ECS-001` (Sin Container Insights) |
+| **AWS WAFv2** | Data Flow (Edge) | **D**enial of Service, **R**epudiation | `TMAC-AWS-WAF-001` (Sin reglas de rate limiting), `TMAC-AWS-WAF-002` (Sin logging habilitado) |
+| **Application Load Balancer (ALB)** | Data Flow | **R**epudiation, **I**nfo Disclosure | `TMAC-AWS-ALB-001` (Sin access logs), `TMAC-AWS-ALB-002` (Listener HTTP sin redirect a HTTPS) |
+| **Amazon CloudFront** | Data Flow (CDN/Edge) | **T**ampering, **I**nfo Disclosure | `TMAC-AWS-CF-001` (Sin WAF asociado), `TMAC-AWS-CF-002` (Viewer protocol allow-all) |
+| **Amazon Cognito** | External Entity (IdP) | **S**poofing, **R**epudiation | `TMAC-AWS-COGNITO-001` (Sin MFA obligatorio), `TMAC-AWS-COGNITO-002` (Sin política de contraseña), `TMAC-AWS-COGNITO-003` (Sin Advanced Security Mode) |
+| **AWS Secrets Manager** | Data Store (Secrets) | **I**nfo Disclosure | `TMAC-AWS-SM-001` (Sin rotación automática), `TMAC-AWS-SM-002` (Sin CMK de KMS) |
+| **Amazon Redshift** | Data Store (DW) | **I**nfo Disclosure, **R**epudiation | `TMAC-AWS-RS-001` (Sin encriptación), `TMAC-AWS-RS-002` (Acceso público), `TMAC-AWS-RS-003` (Sin logging de auditoría) |
+| **Amazon OpenSearch Service** | Data Store (Search) | **I**nfo Disclosure | `TMAC-AWS-OS-001` (Sin cifrado en reposo), `TMAC-AWS-OS-002` (Sin VPC), `TMAC-AWS-OS-003` (Sin TLS forzado) |
+| **Amazon Kinesis Data Streams** | Data Flow (Streaming) | **I**nfo Disclosure | `TMAC-AWS-KDS-001` (Sin cifrado KMS) |
+| **Amazon MSK (Kafka)** | Data Flow (Streaming) | **I**nfo Disclosure, **S**poofing | `TMAC-AWS-MSK-001` (Sin TLS en tránsito), `TMAC-AWS-MSK-002` (Sin autenticación mTLS/SASL) |
+| **AWS Fargate (ECS Task Definitions)** | Process (Container) | **R**epudiation, **E**levation of Privilege, **T**ampering | `TMAC-AWS-FARGATE-001` (Sin logging), `TMAC-AWS-FARGATE-002` (Contenedor privilegiado), `TMAC-AWS-FARGATE-003` (Sin read-only rootfs) |
 
 ---
 
 ## 🚧 Servicios Planificados para Versiones Futuras
 
-Los siguientes servicios AWS aparecen en el mapeo de amenazas pero **no tienen reglas implementadas** en TMAC v1.0.0 "Ixtla". Están planificados para versiones posteriores.
+Los siguientes servicios AWS aparecen en el mapeo de amenazas pero **no tienen reglas implementadas** aún. Están planificados para versiones posteriores.
 
 | Servicio AWS | Categorías STRIDE | Amenazas Identificadas | Versión Planificada |
 |---|---|---|---|
-| **AWS Fargate** | **R**epudiation | Clústeres sin Container Insights (invisibilidad de trazas) | v1.1.0 |
-| **AWS Elastic Beanstalk** | **T**ampering, **I**nfo Disclosure | Entornos sin Managed Updates | v1.1.0 |
-| **AWS Batch** | **I**nformation Disclosure | Entornos sin subredes estrictas (IPs públicas) | v1.1.0 |
-| **AWS App Runner** | **S**poofing, **I**nfo Disclosure | Sin Ingress VPC Configuration | v1.1.0 |
-| **Amazon EC2 Image Builder** | **I**nformation Disclosure | AMIs sin CMK de KMS (`kms_key_id`) | v1.1.0 |
-| **Amazon Aurora / Neptune / DocumentDB** | **I**nformation Disclosure | Sin `storage_encrypted` | v1.1.0 |
-| **Amazon ElastiCache & MemoryDB** | **I**nformation Disclosure | Sin TLS en tránsito (`tls_enabled`) | v1.1.0 |
-| **AWS AppSync** | **R**epudiation | Sin Field Level Logs en GraphQL | v1.2.0 |
-| **AWS Amplify** | **I**nformation Disclosure | Ramas pre-productivas sin Basic Auth | v1.2.0 |
-| **Amazon Location Tracker** | **I**nformation Disclosure | Repositorios de ubicación sin KMS | v1.2.0 |
-| **Amazon Device Farm** | **I**nformation Disclosure | Sin configuración VPC estricta | v1.2.0 |
+| **AWS Glue** | **R**epudiation, **I**nfo Disclosure | Jobs sin logging a CloudWatch, conexiones sin SSL | v1.3.0 |
+| **Amazon Athena** | **R**epudiation | Workgroup sin logging de queries | v1.3.0 |
+| **AWS Step Functions** | **R**epudiation | State machine sin logging habilitado | v1.3.0 |
+| **Amazon EventBridge** | **T**ampering, **S**poofing | Event bus con política abierta al público | v1.3.0 |
+| **AWS Transfer Family** | **I**nfo Disclosure, **S**poofing | Servidor SFTP sin autenticación IAM | v1.3.0 |
+| **Amazon MQ** | **I**nfo Disclosure | Broker sin cifrado en reposo | v1.3.0 |
 
 ---
 
@@ -107,9 +112,9 @@ resource "aws_flow_log" "main" {
 
 ## 🎯 Abordaje de TMAC frente al Framework STRIDE
 
-*   **Spoofing (Suplantación de Identidad):** Abordado garantizando la integración con **IAM** (Autenticación estricta en DBs y APIs) y previniendo `Principal: *` o accesos "NONE" en Lambdas y Gateways.
-*   **Tampering (Manipulación de Datos):** Penaliza fuertemente a las bases de datos (S3, RDS, DynamoDB, CFN) que no presentan mecánicas de Versionado, Point-In-Time-Recovery o candados Anti-Borrado.
-*   **Repudiation (Repudio):** Cubierto obligando a activar los Logs de Auditoría pertinentes por servicio: VPC Flow Logs, APIGW Access Logs, AWS X-Ray, CloudTrail y Recording en Config.
-*   **Information Disclosure (Fuga de Información):** Categoría crítica y predominante. Salvaguardada verificando la obligatoria implementación general de llaves **CMK (KMS)**, requiriendo TLS continuo y bloqueando SGs con puerto saliente 0.0.0.0/0.
-*   **Denial of Service (Denegación de Servicio):** Controlado mitigando fallas de arquitectura, como Multi-AZ en RDS y Auto Scaling, o límites de concurrencia en Funciones Serverless para prevenir DoS Financiero.
-*   **Elevation of Privilege (Elevación de Privilegios):** Mapeado detectando confianza ciega inter-cuenta (Trust Policies abiertas), bloqueando vulnerabilidades de red (IMDSv1 en EC2) y exigiendo control organizacional SCP (Organizations).
+*   **Spoofing (Suplantación de Identidad):** Abordado garantizando la integración con **IAM** (Autenticación estricta en DBs y APIs), previniendo `Principal: *` o accesos "NONE" en Lambdas y Gateways, forzando **MFA en Cognito**, autenticación mTLS/SASL en MSK, y bloqueando Lambda URLs sin autorización.
+*   **Tampering (Manipulación de Datos):** Penaliza fuertemente a las bases de datos (S3, RDS, DynamoDB, CFN) que no presentan mecánicas de Versionado, Point-In-Time-Recovery o candados Anti-Borrado. Incluye protección de contenedores Fargate (read-only rootfs, sin privileged) y CloudFront sin WAF.
+*   **Repudiation (Repudio):** Cubierto obligando a activar los Logs de Auditoría pertinentes por servicio: VPC Flow Logs, APIGW Access Logs, AWS X-Ray, CloudTrail, Config, **ALB Access Logs**, **WAFv2 Logging**, **Redshift Audit Logging**, **Cognito Advanced Security**, y logging de contenedores Fargate.
+*   **Information Disclosure (Fuga de Información):** Categoría crítica y predominante. Salvaguardada verificando la obligatoria implementación general de llaves **CMK (KMS)**, requiriendo TLS continuo (ALB, MSK, OpenSearch, Kinesis), bloqueando acceso público en **Redshift** y **OpenSearch**, y protegiendo secretos con **Secrets Manager** con rotación automática.
+*   **Denial of Service (Denegación de Servicio):** Controlado mitigando fallas de arquitectura (Multi-AZ en RDS, Auto Scaling multi-AZ), límites de concurrencia en Lambdas, y añadiendo **WAFv2 con rate limiting** como capa de protección en el edge para CloudFront y ALB.
+*   **Elevation of Privilege (Elevación de Privilegios):** Mapeado detectando confianza ciega inter-cuenta (Trust Policies abiertas), bloqueando vulnerabilidades de red (IMDSv1 en EC2), exigiendo control organizacional SCP (Organizations), y previniendo **contenedores Fargate privilegiados** que permiten escapar del aislamiento del contenedor.

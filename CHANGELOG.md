@@ -7,6 +7,32 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [1.1.0] — "Ixtla" — 2026-03-16
+
+### Added
+
+- **`src/tmac/delta/models.py`**: Nuevos modelos Pydantic `PlannedChange`, `ChangeAction`, `DeltaFinding` (extiende `Finding`) y `DeltaScanResult` (extiende `ScanResult`) para representar cambios planificados y hallazgos de delta.
+- **`src/tmac/parsers/tfplan.py`**: Nuevo `TfplanParser` que implementa `BaseParser` y parsea el output de `terraform show -json` extrayendo `PlannedChange[]` con semántica correcta de `before`/`after` por acción (`create`, `update`, `delete`, `replace`, `no-op`).
+- **`src/tmac/delta/scanner.py`**: Nuevo `DeltaScanner` que orquesta el pipeline de análisis de delta: `TfplanParser → RuleLoader → Evaluator → DeltaScanResult`. Reutiliza `RuleLoader` y `Evaluator` de v1.0.0 sin modificaciones. Lanza `DeltaScanError` ante archivos inválidos.
+- **Subcomando `tmac plan`**: Nuevo subcomando CLI con flag obligatorio `--plan-file` y los mismos flags de salida que `tmac scan` (`--report`, `--output`, `--rules-dir`, `--fail-on`, `--quiet`, `--no-color`, `--verbose`). Exit codes: `0` (sin Critical/High), `1` (Critical), `2` (High sin Critical), `3` (error).
+- **`src/tmac/templates/report_delta.html.j2`**: Template HTML con sección `delta-summary` que muestra `findings_introduced`, `findings_resolved` y `RiskDelta` neto, con badges por tipo de cambio (`NUEVO`, `MODIFICADO`, `ELIMINADO`).
+- **`src/tmac/templates/report_delta.md.j2`**: Template Markdown con resumen ejecutivo y tabla de delta con columnas: Acción, Recurso, Regla, Severidad, STRIDE, Descripción del cambio.
+- **`tests/unit/test_tfplan_parser.py`**: Tests unitarios del `TfplanParser` cubriendo parseo por acción, extracción de `address`, manejo de errores y property-based tests (Properties 1–5).
+- **`tests/unit/test_delta_scanner.py`**: Tests unitarios del `DeltaScanner` cubriendo clasificación de amenazas introducidas/resueltas, conteos, `ignore_map` y property-based tests (Properties 7–10, 12–13).
+- **`tests/integration/test_plan_cli.py`**: Tests de integración end-to-end con `CliRunner` para exit codes, formatos de reporte, flags y test de no-regresión de `tmac scan`.
+- **`tests/property/test_delta_properties.py`**: 18 property-based tests con Hypothesis (`@settings(max_examples=100)`) cubriendo todas las propiedades de corrección del diseño.
+- **`tests/fixtures/plans/`**: Fixtures `tfplan.json` para los cuatro escenarios: `create_with_threat.json`, `update_secure_to_insecure.json`, `update_insecure_to_secure.json`, `delete_with_threat.json`, `clean_plan.json`, `mixed_plan.json`.
+
+### Changed
+
+- **`src/tmac/reporters/html.py`**: `HTMLReporter.generate()` detecta `DeltaScanResult` via duck-typing y usa `report_delta.html.j2`; comportamiento v1.0.0 sin cambios para `ScanResult` normal.
+- **`src/tmac/reporters/markdown.py`**: `MarkdownReporter.generate()` detecta `DeltaScanResult` via duck-typing y usa `report_delta.md.j2`; comportamiento v1.0.0 sin cambios para `ScanResult` normal.
+- **`src/tmac/reporters/json_report.py`**: `JSONReporter.generate()` añade campo `properties` con `changeAction`, `valueBefore`, `valueAfter` en cada `result` SARIF cuando el finding es `DeltaFinding`; comportamiento v1.0.0 sin cambios para `Finding` normal.
+- **`src/tmac/cli.py`**: Añadido subcomando `plan`; el subcomando `scan` existente no fue modificado (compatibilidad hacia atrás total).
+- **`README.md`**: Documentado subcomando `tmac plan`, ejemplo de integración en GitHub Actions, y sección diferenciadora vs herramientas de análisis de estado completo.
+
+---
+
 ## [1.0.0] — "Ixtla" — 2026-03-14
 
 ### Added
@@ -58,10 +84,10 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Planned
 
-- v1.1.0: Análisis de `tfplan.json` para detectar amenazas en cambios antes de `terraform apply`.
 - v1.2.0: Soporte para AWS CloudFormation templates.
 
 ---
 
+[1.1.0]: https://github.com/tmac-security/tmac/releases/tag/v1.1.0
 [1.0.0]: https://github.com/tmac-security/tmac/releases/tag/v1.0.0
-[Unreleased]: https://github.com/tmac-security/tmac/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tmac-security/tmac/compare/v1.1.0...HEAD
