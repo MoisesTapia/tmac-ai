@@ -325,7 +325,7 @@ def test_evaluate_change_skips_wrong_resource_type():
 
 
 # ---------------------------------------------------------------------------
-# Property 7: Semántica de DeltaFinding por tipo de cambio
+# Property 7: DeltaFinding semantics by change type
 # Feature: tmac-v1-1-tfplan-delta, Property 7
 # ---------------------------------------------------------------------------
 
@@ -336,7 +336,7 @@ _acl_strategy = st.sampled_from(["public-read", "public-read-write"])
 @given(acl=_acl_strategy)
 def test_property_7_delta_finding_semantics_create(acl: str):
     """Property 7: DeltaFinding for create has change_action=create and value_before=None."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 7: Semántica de DeltaFinding por tipo de cambio
+    # Feature: tmac-v1-1-tfplan-delta, Property 7: DeltaFinding semantics by change type
     scanner = DeltaScanner()
     rule = _make_rule()
     change = PlannedChange(
@@ -359,7 +359,7 @@ def test_property_7_delta_finding_semantics_create(acl: str):
 @given(acl_after=_acl_strategy)
 def test_property_7_delta_finding_semantics_update(acl_after: str):
     """Property 7: DeltaFinding for update has value_before and value_after set."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 7: Semántica de DeltaFinding por tipo de cambio
+    # Feature: tmac-v1-1-tfplan-delta, Property 7: DeltaFinding semantics by change type
     scanner = DeltaScanner()
     rule = _make_rule()
     change = PlannedChange(
@@ -387,7 +387,7 @@ def test_property_7_delta_finding_semantics_update(acl_after: str):
 @given(n_rules=st.integers(min_value=1, max_value=5))
 def test_property_8_exact_findings_for_update(n_rules: int):
     """Property 8: update secure→insecure produces exactly N findings for N violated rules."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 8: DeltaScanner produce exactamente los DeltaFinding correctos para updates
+    # Feature: tmac-v1-1-tfplan-delta, Property 8: DeltaScanner produces exactly the correct DeltaFindings for updates
     scanner = DeltaScanner()
     rules = [
         _make_rule(
@@ -425,7 +425,7 @@ def test_property_8_exact_findings_for_update(n_rules: int):
 )
 def test_property_9_resolved_threats(action: ChangeAction, n_rules: int):
     """Property 9: update/delete insecure→secure resolves exactly M findings."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 9: DeltaScanner registra correctamente amenazas resueltas
+    # Feature: tmac-v1-1-tfplan-delta, Property 9: DeltaScanner correctly records resolved threats
     scanner = DeltaScanner()
     rules = [
         _make_rule(
@@ -478,7 +478,7 @@ def test_property_10_count_invariants(
     tmp_path: Path, n_create: int, n_update: int, n_delete: int
 ):
     """Property 10: resource count fields match actual PlannedChange counts."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 10: Invariantes de conteo del DeltaScanResult
+    # Feature: tmac-v1-1-tfplan-delta, Property 10: DeltaScanResult count invariants
     resource_changes = []
     for i in range(n_create):
         resource_changes.append({
@@ -526,7 +526,7 @@ def test_property_10_count_invariants(
 @given(acl=st.sampled_from(["private", "public-read", "public-read-write"]))
 def test_property_12_evaluation_equivalence(acl: str):
     """Property 12: evaluating rule against PlannedChange.after == evaluating against ResourceModel."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 12: Equivalencia de evaluación entre DeltaScanner y Scanner
+    # Feature: tmac-v1-1-tfplan-delta, Property 12: Evaluation equivalence between DeltaScanner and Scanner
     scanner = DeltaScanner()
     evaluator = Evaluator()
     rule = _make_rule()
@@ -560,7 +560,7 @@ def test_property_12_evaluation_equivalence(acl: str):
 @given(acl=_acl_strategy)
 def test_property_13_ignore_suppresses_resource(tmp_path: Path, acl: str):
     """Property 13: resource in ignore_map with ['*'] produces no DeltaFinding."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 13: tmac:ignore suprime recursos del análisis de delta
+    # Feature: tmac-v1-1-tfplan-delta, Property 13: tmac:ignore suppresses resources from delta analysis
     data = _minimal_plan("aws_s3_bucket.data", ["create"], before=None, after={"acl": acl})
     path = _write_plan(tmp_path, data)
     scanner = DeltaScanner()

@@ -164,7 +164,7 @@ class TestStatisticsAccuracy:
 
 
 # ---------------------------------------------------------------------------
-# Property 1: run_scan retorna ScanResult válido para cualquier directorio
+# Property 1: run_scan returns a valid ScanResult for any directory
 # Validates: Requirements 1.1, 9.2, 9.3, 9.4
 # ---------------------------------------------------------------------------
 
@@ -172,7 +172,7 @@ class TestStatisticsAccuracy:
 @given(n_files=st.integers(min_value=0, max_value=5))
 def test_property_1_run_scan_valid_scan_result(n_files):
     """
-    **Property 1: run_scan retorna ScanResult válido para cualquier directorio**
+    **Property 1: run_scan returns a valid ScanResult for any directory**
 
     For any valid directory with .tf files, Scanner.run_scan() must return a
     ScanResult where:

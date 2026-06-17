@@ -67,7 +67,7 @@ def _make_scan_statistics() -> ScanStatistics:
 # ---------------------------------------------------------------------------
 
 def test_planned_change_accepts_all_fields():
-    """PlannedChange acepta todos los campos y los serializa correctamente."""
+    """PlannedChange accepts all fields and serializes them correctly."""
     pc = PlannedChange(
         address="aws_s3_bucket.data",
         resource_type="aws_s3_bucket",
@@ -86,7 +86,7 @@ def test_planned_change_accepts_all_fields():
 
 
 def test_planned_change_create_before_none():
-    """PlannedChange con action=create acepta before=None."""
+    """PlannedChange with action=create accepts before=None."""
     pc = PlannedChange(
         address="aws_s3_bucket.new",
         resource_type="aws_s3_bucket",
@@ -100,7 +100,7 @@ def test_planned_change_create_before_none():
 
 
 def test_planned_change_delete_after_none():
-    """PlannedChange con action=delete acepta after=None."""
+    """PlannedChange with action=delete accepts after=None."""
     pc = PlannedChange(
         address="aws_s3_bucket.old",
         resource_type="aws_s3_bucket",
@@ -118,13 +118,13 @@ def test_planned_change_delete_after_none():
 # ---------------------------------------------------------------------------
 
 def test_change_action_has_exactly_four_values():
-    """ChangeAction tiene exactamente los valores create, update, delete, replace."""
+    """ChangeAction has exactly the values create, update, delete, replace."""
     values = {a.value for a in ChangeAction}
     assert values == {"create", "update", "delete", "replace"}
 
 
 def test_change_action_is_str_enum():
-    """ChangeAction es un str Enum (comparación directa con strings)."""
+    """ChangeAction is a str Enum (direct comparison with strings)."""
     assert ChangeAction.create == "create"
     assert ChangeAction.update == "update"
     assert ChangeAction.delete == "delete"
@@ -136,7 +136,7 @@ def test_change_action_is_str_enum():
 # ---------------------------------------------------------------------------
 
 def test_delta_finding_inherits_finding_fields():
-    """DeltaFinding hereda todos los campos de Finding."""
+    """DeltaFinding inherits all fields from Finding."""
     df = _make_delta_finding()
     # Inherited Finding fields
     assert df.rule_id == "TMAC-AWS-S3-001"
@@ -153,7 +153,7 @@ def test_delta_finding_inherits_finding_fields():
 
 
 def test_delta_finding_has_delta_fields():
-    """DeltaFinding añade los campos de delta."""
+    """DeltaFinding adds the delta fields."""
     df = _make_delta_finding()
     assert df.change_action == ChangeAction.update
     assert df.changed_attribute == "acl"
@@ -162,7 +162,7 @@ def test_delta_finding_has_delta_fields():
 
 
 def test_delta_finding_create_accepts_value_before_none():
-    """DeltaFinding con change_action=create acepta value_before=None."""
+    """DeltaFinding with change_action=create accepts value_before=None."""
     df = _make_delta_finding(
         change_action=ChangeAction.create,
         value_before=None,
@@ -174,7 +174,7 @@ def test_delta_finding_create_accepts_value_before_none():
 
 
 def test_delta_finding_update_accepts_both_values():
-    """DeltaFinding con change_action=update acepta value_before y value_after poblados."""
+    """DeltaFinding with change_action=update accepts value_before and value_after populated."""
     df = _make_delta_finding(
         change_action=ChangeAction.update,
         value_before="private",
@@ -189,7 +189,7 @@ def test_delta_finding_update_accepts_both_values():
 # ---------------------------------------------------------------------------
 
 def test_delta_scan_result_inherits_scan_result_fields():
-    """DeltaScanResult hereda todos los campos de ScanResult."""
+    """DeltaScanResult inherits all fields from ScanResult."""
     df = _make_delta_finding()
     result = DeltaScanResult(
         metadata=_make_scan_metadata(),
@@ -206,7 +206,7 @@ def test_delta_scan_result_inherits_scan_result_fields():
 
 
 def test_delta_scan_result_has_delta_fields():
-    """DeltaScanResult añade los campos de delta con defaults correctos."""
+    """DeltaScanResult adds the delta fields with correct defaults."""
     result = DeltaScanResult(
         metadata=_make_scan_metadata(),
         statistics=_make_scan_statistics(),
@@ -234,7 +234,7 @@ def test_delta_scan_result_invariant():
 
 # ---------------------------------------------------------------------------
 # Property 6: Round-trip serialization of DeltaFinding
-# Feature: tmac-v1-1-tfplan-delta, Property 6: Round-trip de serialización de DeltaFinding
+# Feature: tmac-v1-1-tfplan-delta, Property 6: DeltaFinding serialization round-trip
 # ---------------------------------------------------------------------------
 
 _change_action_st = st.sampled_from(list(ChangeAction))
@@ -249,7 +249,7 @@ _optional_str = st.one_of(st.none(), st.text(max_size=50))
     value_after=_optional_str,
 )
 def test_delta_finding_round_trip(change_action, changed_attribute, value_before, value_after):
-    """Property 6: serializar con model_dump() y reconstruir produce objeto equivalente."""
+    """Property 6: serializing with model_dump() and reconstructing produces an equivalent object."""
     df = _make_delta_finding(
         change_action=change_action,
         changed_attribute=changed_attribute,
@@ -277,7 +277,7 @@ from tmac.cli import cli
 
 
 def test_plan_help_shows_plan_file_flag():
-    """tmac plan --help muestra el flag --plan-file como requerido."""
+    """tmac plan --help shows the --plan-file flag as required."""
     runner = CliRunner()
     result = runner.invoke(cli, ["plan", "--help"])
     assert result.exit_code == 0
@@ -285,7 +285,7 @@ def test_plan_help_shows_plan_file_flag():
 
 
 def test_plan_without_plan_file_returns_error():
-    """tmac plan sin --plan-file retorna error de Click con mensaje descriptivo."""
+    """tmac plan without --plan-file returns a Click error with a descriptive message."""
     runner = CliRunner()
     result = runner.invoke(cli, ["plan"])
     assert result.exit_code != 0
@@ -293,7 +293,7 @@ def test_plan_without_plan_file_returns_error():
 
 
 def test_plan_nonexistent_file_returns_exit_code_3():
-    """tmac plan --plan-file /no/existe retorna exit code 3."""
+    """tmac plan --plan-file /no/existe returns exit code 3."""
     runner = CliRunner()
     result = runner.invoke(cli, ["plan", "--plan-file", "/no/existe.json"])
     assert result.exit_code == 3

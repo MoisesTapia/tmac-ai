@@ -1,5 +1,5 @@
 """
-Tests unitarios para src/tmac/config.py
+Unit tests for src/tmac/config.py
 
 Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5
 """

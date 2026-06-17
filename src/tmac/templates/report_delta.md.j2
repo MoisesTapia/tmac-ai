@@ -6,36 +6,36 @@
 
 ---
 
-> Este plan introduce {{ result.findings_introduced }} amenazas nuevas y resuelve {{ result.findings_resolved }}.
+> This plan introduces {{ result.findings_introduced }} new threats and resolves {{ result.findings_resolved }}.
 
 ## 📊 Delta Summary
 
-| Métrica | Valor |
+| Metric | Value |
 |---------|-------|
-| ⬆ Amenazas introducidas | **{{ result.findings_introduced }}** |
-| ⬇ Amenazas resueltas | **{{ result.findings_resolved }}** |
-| ⚖ RiskDelta neto | **{{ result.findings_introduced - result.findings_resolved }}** |
-| ✚ Recursos creados | {{ result.resources_created }} |
-| ✎ Recursos modificados | {{ result.resources_updated }} |
-| ✖ Recursos eliminados | {{ result.resources_deleted }} |
+| ⬆ Threats introduced | **{{ result.findings_introduced }}** |
+| ⬇ Threats resolved | **{{ result.findings_resolved }}** |
+| ⚖ Net RiskDelta | **{{ result.findings_introduced - result.findings_resolved }}** |
+| ✚ Resources created | {{ result.resources_created }} |
+| ✎ Resources updated | {{ result.resources_updated }} |
+| ✖ Resources deleted | {{ result.resources_deleted }} |
 
 ---
 
 ## 🔍 Delta Findings
 
 {% if result.findings %}
-| Acción | Recurso | Regla | Severidad | STRIDE | Descripción del cambio |
+| Action | Resource | Rule | Severity | STRIDE | Change description |
 |--------|---------|-------|-----------|--------|------------------------|
 {% for finding in result.findings %}
-{% if finding.change_action.value == 'create' %}{% set accion = 'NUEVO' %}{% elif finding.change_action.value in ('update', 'replace') %}{% set accion = 'MODIFICADO' %}{% else %}{% set accion = 'ELIMINADO' %}{% endif %}
+{% if finding.change_action.value == 'create' %}{% set accion = 'NEW' %}{% elif finding.change_action.value in ('update', 'replace') %}{% set accion = 'MODIFIED' %}{% else %}{% set accion = 'REMOVED' %}{% endif %}
 {% if finding.severity == 'Critical' %}{% set sev_emoji = '🔴' %}{% elif finding.severity == 'High' %}{% set sev_emoji = '🟠' %}{% elif finding.severity == 'Medium' %}{% set sev_emoji = '🟡' %}{% elif finding.severity == 'Low' %}{% set sev_emoji = '🟢' %}{% else %}{% set sev_emoji = '🔵' %}{% endif %}
 {% set stride_str = finding.stride if finding.stride is string else finding.stride | join(', ') %}
-{% if finding.value_before is not none and finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → ' ~ finding.value_after %}{% elif finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': → ' ~ finding.value_after %}{% elif finding.value_before is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → (eliminado)' %}{% else %}{% set cambio = finding.changed_attribute %}{% endif %}
+{% if finding.value_before is not none and finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → ' ~ finding.value_after %}{% elif finding.value_after is not none %}{% set cambio = finding.changed_attribute ~ ': → ' ~ finding.value_after %}{% elif finding.value_before is not none %}{% set cambio = finding.changed_attribute ~ ': ' ~ finding.value_before ~ ' → (removed)' %}{% else %}{% set cambio = finding.changed_attribute %}{% endif %}
 | {{ accion }} | `{{ finding.resource_type }}.{{ finding.resource_name }}` | `{{ finding.rule_id }}` | {{ sev_emoji }} {{ finding.severity }} | {{ stride_str }} | {{ cambio }} |
 {% endfor %}
 {% else %}
-✅ **Este plan no introduce ninguna amenaza nueva.**
+✅ **This plan does not introduce any new threats.**
 {% if result.findings_resolved > 0 %}
-Resuelve {{ result.findings_resolved }} amenaza(s) existente(s).
+Resolves {{ result.findings_resolved }} existing threat(s).
 {% endif %}
 {% endif %}

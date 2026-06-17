@@ -15,7 +15,7 @@ SARIF_SEVERITY_MAP = {
 class JSONReporter(BaseReporter):
     """Generates a SARIF 2.1.0 compliant JSON report of scan results."""
 
-    def generate(self, result: ScanResult) -> str:
+    def generate(self, result: ScanResult, diagram: str | None = None) -> str:
         # Build unique rules from findings
         seen_rule_ids: set = set()
         rules = []

@@ -1,0 +1,13 @@
+graph TD
+    aws_db_instance_prod["aws_db_instance<br/>prod"]
+    aws_flow_log_vpc_flow["aws_flow_log<br/>vpc_flow"]
+    aws_instance_app["aws_instance<br/>app"]
+    aws_security_group_web_sg["aws_security_group<br/>web_sg"]
+    aws_subnet_web["aws_subnet<br/>web"]
+    aws_vpc_main["aws_vpc<br/>main"]
+    aws_subnet_web -->|vpc_id| aws_vpc_main
+    aws_security_group_web_sg -->|vpc_id| aws_vpc_main
+    aws_instance_app -->|subnet_id| aws_subnet_web
+    aws_instance_app -->|vpc_security_group_ids| aws_security_group_web_sg
+    aws_db_instance_prod -->|vpc_security_group_ids| aws_security_group_web_sg
+    aws_flow_log_vpc_flow -->|vpc_id| aws_vpc_main

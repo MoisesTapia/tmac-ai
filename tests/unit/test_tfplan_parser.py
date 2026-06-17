@@ -189,7 +189,7 @@ def test_map_action_unknown_returns_none(parser: TfplanParser):
 
 
 # ---------------------------------------------------------------------------
-# Property 1: Semántica before/after por acción del parser
+# Property 1: before/after semantics per parser action
 # Feature: tmac-v1-1-tfplan-delta, Property 1
 # ---------------------------------------------------------------------------
 
@@ -203,7 +203,7 @@ def test_property_1_before_after_semantics(
     tmp_path: Path, parser: TfplanParser, action: str, attrs: dict
 ):
     """Property 1: before/after semantics are correct for each action type."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 1: Semántica before/after por acción del parser
+    # Feature: tmac-v1-1-tfplan-delta, Property 1: before/after semantics per parser action
     before = attrs if action in ("update", "delete") else None
     after = attrs if action in ("update", "create") else None
     data = _minimal_plan("aws_s3_bucket.test", [action], before=before, after=after)
@@ -223,7 +223,7 @@ def test_property_1_before_after_semantics(
 
 
 # ---------------------------------------------------------------------------
-# Property 2: El parser omite recursos no-op
+# Property 2: The parser omits no-op resources
 # Feature: tmac-v1-1-tfplan-delta, Property 2
 # ---------------------------------------------------------------------------
 
@@ -231,7 +231,7 @@ def test_property_1_before_after_semantics(
 @given(n_noop=st.integers(min_value=1, max_value=5))
 def test_property_2_noop_omitted(tmp_path: Path, parser: TfplanParser, n_noop: int):
     """Property 2: no-op resources never appear in the result."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 2: El parser omite recursos no-op
+    # Feature: tmac-v1-1-tfplan-delta, Property 2: The parser omits no-op resources
     resource_changes = [
         {
             "address": f"aws_s3_bucket.bucket_{i}",
@@ -252,7 +252,7 @@ def test_property_2_noop_omitted(tmp_path: Path, parser: TfplanParser, n_noop: i
 
 
 # ---------------------------------------------------------------------------
-# Property 3: El parser es determinista
+# Property 3: The parser is deterministic
 # Feature: tmac-v1-1-tfplan-delta, Property 3
 # ---------------------------------------------------------------------------
 
@@ -265,7 +265,7 @@ def test_property_3_deterministic(
     tmp_path: Path, parser: TfplanParser, action: str, acl: str
 ):
     """Property 3: parsing the same file twice produces identical results."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 3: El parser es determinista
+    # Feature: tmac-v1-1-tfplan-delta, Property 3: The parser is deterministic
     before = {"acl": acl} if action in ("update", "delete") else None
     after = {"acl": acl} if action in ("update", "create") else None
     data = _minimal_plan("aws_s3_bucket.test", [action], before=before, after=after)
@@ -278,7 +278,7 @@ def test_property_3_deterministic(
 
 
 # ---------------------------------------------------------------------------
-# Property 4: Round-trip del parser (serializar + parsear)
+# Property 4: Parser round-trip (serialize + parse)
 # Feature: tmac-v1-1-tfplan-delta, Property 4
 # ---------------------------------------------------------------------------
 
@@ -294,7 +294,7 @@ def test_property_4_round_trip(
 
     Validates: Requirements 1.11, 1.12
     """
-    # Feature: tmac-v1-1-tfplan-delta, Property 4: Round-trip del parser (serializar + parsear)
+    # Feature: tmac-v1-1-tfplan-delta, Property 4: Parser round-trip (serialize + parse)
     before = {"acl": acl} if action in ("update", "delete") else None
     after = {"acl": acl} if action in ("update", "create") else None
 
@@ -341,7 +341,7 @@ def test_property_4_round_trip(
 
 
 # ---------------------------------------------------------------------------
-# Property 5: El parser maneja JSON inválido sin lanzar excepciones
+# Property 5: The parser handles invalid JSON without raising exceptions
 # Feature: tmac-v1-1-tfplan-delta, Property 5
 # ---------------------------------------------------------------------------
 
@@ -351,7 +351,7 @@ def test_property_5_invalid_json_no_exception(
     tmp_path: Path, parser: TfplanParser, bad_content: str
 ):
     """Property 5: any non-JSON content returns [] without raising exceptions."""
-    # Feature: tmac-v1-1-tfplan-delta, Property 5: El parser maneja JSON inválido sin lanzar excepciones
+    # Feature: tmac-v1-1-tfplan-delta, Property 5: The parser handles invalid JSON without raising exceptions
     p = tmp_path / "bad.json"
     try:
         p.write_text(bad_content, encoding="utf-8", errors="replace")

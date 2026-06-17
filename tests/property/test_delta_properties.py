@@ -86,7 +86,7 @@ def _make_delta_scan_result(findings: List[DeltaFinding], resolved: int = 0) -> 
 
 
 # ===========================================================================
-# Property 1: Semántica before/after por acción del parser
+# Property 1: Parser before/after semantics by action
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -95,7 +95,7 @@ def _make_delta_scan_result(findings: List[DeltaFinding], resolved: int = 0) -> 
     attrs=attributes_strategy(),
 )
 def test_parser_before_after_semantics_by_action(tmp_path, action, attrs):
-    # Feature: tmac-v1-1-tfplan-delta, Property 1: Semántica before/after por acción del parser
+    # Feature: tmac-v1-1-tfplan-delta, Property 1: Parser before/after semantics by action
     before = attrs if action in ("update", "delete") else None
     after = attrs if action in ("update", "create") else None
     data = _minimal_plan("aws_s3_bucket.test", [action], before=before, after=after)
@@ -119,7 +119,7 @@ def test_parser_before_after_semantics_by_action(tmp_path, action, attrs):
 
 
 # ===========================================================================
-# Property 2: El parser omite recursos no-op
+# Property 2: The parser omits no-op resources
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -128,7 +128,7 @@ def test_parser_before_after_semantics_by_action(tmp_path, action, attrs):
     n_real=st.integers(min_value=0, max_value=3),
 )
 def test_parser_omits_noop_resources(tmp_path, n_noop, n_real):
-    # Feature: tmac-v1-1-tfplan-delta, Property 2: El parser omite recursos no-op
+    # Feature: tmac-v1-1-tfplan-delta, Property 2: The parser omits no-op resources
     resource_changes = []
     for i in range(n_noop):
         resource_changes.append({
@@ -169,13 +169,13 @@ def test_parser_omits_noop_resources(tmp_path, n_noop, n_real):
 
 
 # ===========================================================================
-# Property 3: El parser es determinista
+# Property 3: The parser is deterministic
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(planned_change_strategy())
 def test_parser_deterministic(tmp_path, change):
-    # Feature: tmac-v1-1-tfplan-delta, Property 3: El parser es determinista
+    # Feature: tmac-v1-1-tfplan-delta, Property 3: The parser is deterministic
     actions = (
         ["delete", "create"] if change.action == ChangeAction.replace
         else [change.action.value]
@@ -194,13 +194,13 @@ def test_parser_deterministic(tmp_path, change):
 
 
 # ===========================================================================
-# Property 4: Round-trip del parser (serializar + parsear)
+# Property 4: Parser round-trip (serialize + parse)
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(planned_change_strategy())
 def test_parser_round_trip(tmp_path, change):
-    # Feature: tmac-v1-1-tfplan-delta, Property 4: Round-trip del parser (serializar + parsear)
+    # Feature: tmac-v1-1-tfplan-delta, Property 4: Parser round-trip (serialize + parse)
     actions = (
         ["delete", "create"] if change.action == ChangeAction.replace
         else [change.action.value]
@@ -259,13 +259,13 @@ def test_parser_round_trip(tmp_path, change):
 
 
 # ===========================================================================
-# Property 5: El parser maneja JSON inválido sin lanzar excepciones
+# Property 5: The parser handles invalid JSON without raising exceptions
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(bad_content=st.text(min_size=1, max_size=200))
 def test_parser_handles_invalid_json(tmp_path, bad_content):
-    # Feature: tmac-v1-1-tfplan-delta, Property 5: El parser maneja JSON inválido sin lanzar excepciones
+    # Feature: tmac-v1-1-tfplan-delta, Property 5: The parser handles invalid JSON without raising exceptions
     p = tmp_path / "bad.json"
     try:
         p.write_text(bad_content, encoding="utf-8", errors="replace")
@@ -281,13 +281,13 @@ def test_parser_handles_invalid_json(tmp_path, bad_content):
 
 
 # ===========================================================================
-# Property 6: Round-trip de serialización de DeltaFinding
+# Property 6: DeltaFinding serialization round-trip
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(delta_finding_strategy())
 def test_delta_finding_round_trip(finding):
-    # Feature: tmac-v1-1-tfplan-delta, Property 6: Round-trip de serialización de DeltaFinding
+    # Feature: tmac-v1-1-tfplan-delta, Property 6: DeltaFinding serialization round-trip
     data = finding.model_dump()
     reconstructed = DeltaFinding(**data)
 
@@ -301,7 +301,7 @@ def test_delta_finding_round_trip(finding):
 
 
 # ===========================================================================
-# Property 7: Semántica de DeltaFinding por tipo de cambio
+# Property 7: DeltaFinding semantics by change type
 # ===========================================================================
 
 @settings(max_examples=100)
@@ -310,7 +310,7 @@ def test_delta_finding_round_trip(finding):
     acl=st.sampled_from(["public-read", "public-read-write"]),
 )
 def test_delta_finding_semantics_by_change_type(change_action, acl):
-    # Feature: tmac-v1-1-tfplan-delta, Property 7: Semántica de DeltaFinding por tipo de cambio
+    # Feature: tmac-v1-1-tfplan-delta, Property 7: DeltaFinding semantics by change type
     from tmac.models.rule import CheckCondition, ThreatRule
 
     scanner = DeltaScanner()
@@ -363,13 +363,13 @@ def test_delta_finding_semantics_by_change_type(change_action, acl):
 
 
 # ===========================================================================
-# Property 8: DeltaScanner produce exactamente los DeltaFinding correctos para updates
+# Property 8: DeltaScanner produces exactly the correct DeltaFindings for updates
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(n_rules=st.integers(min_value=1, max_value=5))
 def test_delta_scanner_correct_findings_for_updates(n_rules):
-    # Feature: tmac-v1-1-tfplan-delta, Property 8: DeltaScanner produce exactamente los DeltaFinding correctos para updates
+    # Feature: tmac-v1-1-tfplan-delta, Property 8: DeltaScanner produces exactly the correct DeltaFindings for updates
     from tmac.models.rule import CheckCondition, ThreatRule
 
     scanner = DeltaScanner()
@@ -402,7 +402,7 @@ def test_delta_scanner_correct_findings_for_updates(n_rules):
 
 
 # ===========================================================================
-# Property 9: DeltaScanner registra correctamente amenazas resueltas
+# Property 9: DeltaScanner correctly records resolved threats
 # ===========================================================================
 
 @settings(max_examples=100)
@@ -411,7 +411,7 @@ def test_delta_scanner_correct_findings_for_updates(n_rules):
     n_rules=st.integers(min_value=1, max_value=5),
 )
 def test_delta_scanner_resolved_findings_correct(action, n_rules):
-    # Feature: tmac-v1-1-tfplan-delta, Property 9: DeltaScanner registra correctamente amenazas resueltas
+    # Feature: tmac-v1-1-tfplan-delta, Property 9: DeltaScanner correctly records resolved threats
     from tmac.models.rule import CheckCondition, ThreatRule
 
     scanner = DeltaScanner()
@@ -457,7 +457,7 @@ def test_delta_scanner_resolved_findings_correct(action, n_rules):
 
 
 # ===========================================================================
-# Property 10: Invariantes de conteo del DeltaScanResult
+# Property 10: DeltaScanResult count invariants
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
@@ -467,7 +467,7 @@ def test_delta_scanner_resolved_findings_correct(action, n_rules):
     n_delete=st.integers(min_value=0, max_value=3),
 )
 def test_delta_scan_result_count_invariants(tmp_path, n_create, n_update, n_delete):
-    # Feature: tmac-v1-1-tfplan-delta, Property 10: Invariantes de conteo del DeltaScanResult
+    # Feature: tmac-v1-1-tfplan-delta, Property 10: DeltaScanResult count invariants
     resource_changes = []
     for i in range(n_create):
         resource_changes.append({
@@ -508,7 +508,7 @@ def test_delta_scan_result_count_invariants(tmp_path, n_create, n_update, n_dele
 
 
 # ===========================================================================
-# Property 11: Exit codes del CLI `tmac plan`
+# Property 11: Exit codes for the `tmac plan` CLI
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -516,7 +516,7 @@ def test_delta_scan_result_count_invariants(tmp_path, n_create, n_update, n_dele
     severity=st.sampled_from(["Critical", "High", "Medium", "Low", "Info"]),
 )
 def test_cli_exit_codes(tmp_path, severity):
-    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes del CLI `tmac plan`
+    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes for the `tmac plan` CLI
     from tmac.models.rule import CheckCondition, ThreatRule
 
     # Build a plan with one resource that will trigger a finding of the given severity
@@ -545,7 +545,7 @@ def test_cli_exit_codes(tmp_path, severity):
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(st.just(None))  # parametric placeholder — uses fixture files
 def test_cli_exit_code_clean_plan_is_zero(tmp_path, _):
-    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes del CLI `tmac plan`
+    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes for the `tmac plan` CLI
     data = _minimal_plan(
         "aws_s3_bucket.safe",
         ["create"],
@@ -568,7 +568,7 @@ def test_cli_exit_code_clean_plan_is_zero(tmp_path, _):
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(st.just(None))
 def test_cli_exit_code_invalid_file_is_three(tmp_path, _):
-    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes del CLI `tmac plan`
+    # Feature: tmac-v1-1-tfplan-delta, Property 11: Exit codes for the `tmac plan` CLI
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -579,13 +579,13 @@ def test_cli_exit_code_invalid_file_is_three(tmp_path, _):
 
 
 # ===========================================================================
-# Property 12: Equivalencia de evaluación entre DeltaScanner y Scanner
+# Property 12: Evaluation equivalence between DeltaScanner and Scanner
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(attrs=attributes_strategy(), rule=rule_strategy())
 def test_evaluation_equivalence(attrs, rule):
-    # Feature: tmac-v1-1-tfplan-delta, Property 12: Equivalencia de evaluación entre DeltaScanner y Scanner
+    # Feature: tmac-v1-1-tfplan-delta, Property 12: Evaluation equivalence between DeltaScanner and Scanner
     scanner = DeltaScanner()
     evaluator = Evaluator()
 
@@ -619,13 +619,13 @@ def test_evaluation_equivalence(attrs, rule):
 
 
 # ===========================================================================
-# Property 13: tmac:ignore suprime recursos del análisis de delta
+# Property 13: tmac:ignore suppresses resources from delta analysis
 # ===========================================================================
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(acl=st.sampled_from(["public-read", "public-read-write"]))
 def test_ignore_map_suppresses_resources(tmp_path, acl):
-    # Feature: tmac-v1-1-tfplan-delta, Property 13: tmac:ignore suprime recursos del análisis de delta
+    # Feature: tmac-v1-1-tfplan-delta, Property 13: tmac:ignore suppresses resources from delta analysis
     address = "aws_s3_bucket.data"
     data = _minimal_plan(address, ["create"], before=None, after={"acl": acl})
     plan_path = str(tmp_path / "plan.json")
@@ -637,13 +637,13 @@ def test_ignore_map_suppresses_resources(tmp_path, acl):
 
 
 # ===========================================================================
-# Property 14: Invariante de consistencia del reporte
+# Property 14: Report consistency invariant
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(findings=st.lists(delta_finding_strategy(), min_size=0, max_size=5))
 def test_report_consistency_invariant(findings):
-    # Feature: tmac-v1-1-tfplan-delta, Property 14: Invariante de consistencia del reporte
+    # Feature: tmac-v1-1-tfplan-delta, Property 14: Report consistency invariant
     result = _make_delta_scan_result(findings)
 
     # HTML
@@ -665,13 +665,13 @@ def test_report_consistency_invariant(findings):
 
 
 # ===========================================================================
-# Property 15: HTMLReporter renderiza sección de delta sin errores para cualquier DeltaScanResult
+# Property 15: HTMLReporter renders the delta section without errors for any DeltaScanResult
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(findings=st.lists(delta_finding_strategy(), min_size=0, max_size=5))
 def test_html_reporter_delta_no_errors(findings):
-    # Feature: tmac-v1-1-tfplan-delta, Property 15: HTMLReporter renderiza sección de delta sin errores
+    # Feature: tmac-v1-1-tfplan-delta, Property 15: HTMLReporter renders the delta section without errors
     result = _make_delta_scan_result(findings)
 
     try:
@@ -686,13 +686,13 @@ def test_html_reporter_delta_no_errors(findings):
 
 
 # ===========================================================================
-# Property 16: MarkdownReporter genera tabla y resumen ejecutivo
+# Property 16: MarkdownReporter generates a table and an executive summary
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(findings=st.lists(delta_finding_strategy(), min_size=1, max_size=5))
 def test_markdown_reporter_table_and_summary(findings):
-    # Feature: tmac-v1-1-tfplan-delta, Property 16: MarkdownReporter genera tabla y resumen ejecutivo
+    # Feature: tmac-v1-1-tfplan-delta, Property 16: MarkdownReporter generates a table and an executive summary
     result = _make_delta_scan_result(findings)
 
     md = MarkdownReporter().generate(result)
@@ -702,19 +702,19 @@ def test_markdown_reporter_table_and_summary(findings):
     assert str(result.findings_resolved) in md
 
     # Table columns must be present
-    assert "Acción" in md or "Accion" in md or "Action" in md
-    assert "Recurso" in md or "Resource" in md
-    assert "Regla" in md or "Rule" in md
+    assert "Action" in md
+    assert "Resource" in md
+    assert "Rule" in md
 
 
 # ===========================================================================
-# Property 17: JSONReporter incluye campos de delta en SARIF properties
+# Property 17: JSONReporter includes delta fields in SARIF properties
 # ===========================================================================
 
 @settings(max_examples=100)
 @given(findings=st.lists(delta_finding_strategy(), min_size=1, max_size=5))
 def test_json_reporter_sarif_delta_properties(findings):
-    # Feature: tmac-v1-1-tfplan-delta, Property 17: JSONReporter incluye campos de delta en SARIF properties
+    # Feature: tmac-v1-1-tfplan-delta, Property 17: JSONReporter includes delta fields in SARIF properties
     result = _make_delta_scan_result(findings)
 
     sarif = json.loads(JSONReporter().generate(result))
@@ -733,13 +733,13 @@ def test_json_reporter_sarif_delta_properties(findings):
 
 
 # ===========================================================================
-# Property 18: No-regresión de `tmac scan`
+# Property 18: `tmac scan` no-regression
 # ===========================================================================
 
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 @given(st.just(None))
 def test_scan_no_regression(tmp_path, _):
-    # Feature: tmac-v1-1-tfplan-delta, Property 18: No-regresión de tmac scan
+    # Feature: tmac-v1-1-tfplan-delta, Property 18: tmac scan no-regression
     # Verify that tmac scan produces consistent results on the fixtures directory
     # and that adding v1.1.0 modules does not affect the scan command.
     runner = CliRunner()

@@ -630,11 +630,11 @@
                         <tr class="finding-row" onclick="toggleDetails('{{ loop.index }}')">
                             <td>
                                 {% if finding.change_action.value == 'create' %}
-                                <span class="badge badge-create">NUEVO</span>
+                                <span class="badge badge-create">NEW</span>
                                 {% elif finding.change_action.value in ('update', 'replace') %}
-                                <span class="badge badge-update">MODIFICADO</span>
+                                <span class="badge badge-update">MODIFIED</span>
                                 {% elif finding.change_action.value == 'delete' %}
-                                <span class="badge badge-delete">ELIMINADO</span>
+                                <span class="badge badge-delete">REMOVED</span>
                                 {% else %}
                                 <span class="badge badge-update">{{ finding.change_action.value | upper }}</span>
                                 {% endif %}

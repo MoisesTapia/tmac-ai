@@ -2,7 +2,7 @@
 
 **Document ID:** PRD-TMAC-2024-001  
 **Version:** v1.0.0 Ixtla (Initial Release)  
-**Status:** Draft / En Revisión  
+**Status:** Draft / In Review  
 **Author:** Security Architecture Team  
 **Classification:** Internal / Confidential  
 **Last Updated:** March 2026
@@ -12,7 +12,7 @@
 ## Table of Contents
 
 1. [Introduction and Vision](#1-introduction-and-vision)
-2. [Roadmap (Ciclo Nacional Mexicano)](#2-roadmap-ciclo-nacional-mexicano)
+2. [Roadmap (Mexican National Cycle)](#2-roadmap-mexican-national-cycle)
 3. [System Architecture (v1.0.0 Ixtla)](#3-system-architecture-v100-ixtla)
 4. [Functional Requirements](#4-functional-requirements)
 5. [Non-Functional Requirements](#5-non-functional-requirements)
@@ -69,7 +69,7 @@ TMAC solves these problems by making threat modeling a native part of the CI/CD 
 
 ---
 
-## 2. Roadmap (Ciclo Nacional Mexicano)
+## 2. Roadmap (Mexican National Cycle)
 
 Each release is named after significant elements of Mexican heritage, reflecting the project's cultural identity. The roadmap is structured in three phases: Foundation, Expansion, and Intelligence.
 
@@ -645,7 +645,7 @@ The following criteria must ALL be satisfied before v1.0.0 is tagged and release
 
 ```yaml
 - id: TMAC-AWS-S3-001
-  name: "S3 Bucket con Acceso Público (ACL)"
+  name: "S3 Bucket with Public Access (ACL)"
   resource_type: "aws_s3_bucket"
   check:
     attribute: "acl"
@@ -653,8 +653,8 @@ The following criteria must ALL be satisfied before v1.0.0 is tagged and release
     values: ["public-read", "public-read-write"]
   severity: "Critical"
   stride: "Information Disclosure"
-  description: "Se detectó un bucket con ACL pública..."
-  mitigation: "Cambia el atributo 'acl' a 'private' y habilita 'block_public_access'."
+  description: "A bucket with a public ACL was detected..."
+  mitigation: "Change the 'acl' attribute to 'private' and enable 'block_public_access'."
   references:
     - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
     - "CIS AWS Benchmark 2.1.5"

@@ -161,7 +161,7 @@ class TestResourceModelToDict:
 
 
 # ---------------------------------------------------------------------------
-# Property 19: ResourceModel round-trip de serialización
+# Property 19: ResourceModel serialization round-trip
 # Validates: Requirements 20.2, 20.3
 # ---------------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ def test_property_19_resource_model_round_trip(
     line_number: int,
 ):
     """
-    **Property 19: ResourceModel round-trip de serialización**
+    **Property 19: ResourceModel serialization round-trip**
 
     For any ResourceModel, calling to_dict() and reconstructing with
     ResourceModel(**data) must produce an equivalent object with all fields

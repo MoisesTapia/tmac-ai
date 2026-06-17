@@ -1,0 +1,15 @@
+digraph tmac_architecture {
+    rankdir=LR;
+    node [shape=box, style="rounded,filled", fillcolor="#e8f0fe", fontname="Helvetica"];
+    edge [fontname="Helvetica", fontsize=10, color="#5f6368"];
+    aws_db_instance_prod [label="aws_db_instance\nprod"];
+    aws_instance_app [label="aws_instance\napp"];
+    aws_security_group_web_sg [label="aws_security_group\nweb_sg"];
+    aws_subnet_web [label="aws_subnet\nweb"];
+    aws_vpc_main [label="aws_vpc\nmain"];
+    aws_subnet_web -> aws_vpc_main [label="vpc_id"];
+    aws_security_group_web_sg -> aws_vpc_main [label="vpc_id"];
+    aws_instance_app -> aws_subnet_web [label="subnet_id"];
+    aws_instance_app -> aws_security_group_web_sg [label="vpc_security_group_ids"];
+    aws_db_instance_prod -> aws_security_group_web_sg [label="vpc_security_group_ids"];
+}

@@ -1,43 +1,43 @@
-# Guía de Contribución — TMAC
+# Contribution Guide — TMAC
 
-¡Gracias por tu interés en contribuir a TMAC! Esta guía cubre cómo configurar el entorno,
-ejecutar los tests, y el proceso para añadir nuevas reglas de amenazas.
+Thanks for your interest in contributing to TMAC! This guide covers how to set up the environment,
+run the tests, and the process for adding new threat rules.
 
-## Tabla de contenidos
+## Table of contents
 
-1. [Configurar el entorno de desarrollo](#1-configurar-el-entorno-de-desarrollo)
-2. [Ejecutar los tests](#2-ejecutar-los-tests)
-3. [Contribuir nuevas reglas](#3-contribuir-nuevas-reglas)
-4. [Proceso de Pull Request](#4-proceso-de-pull-request)
+1. [Set up the development environment](#1-set-up-the-development-environment)
+2. [Run the tests](#2-run-the-tests)
+3. [Contribute new rules](#3-contribute-new-rules)
+4. [Pull Request process](#4-pull-request-process)
 
 ---
 
-## 1. Configurar el entorno de desarrollo
+## 1. Set up the development environment
 
-### Requisitos previos
+### Prerequisites
 
 - Python **3.10+**
-- [Poetry](https://python-poetry.org/docs/#installation) (gestor de dependencias)
+- [Poetry](https://python-poetry.org/docs/#installation) (dependency manager)
 - Git
 
-### Pasos
+### Steps
 
 ```bash
-# 1. Clonar el repositorio
+# 1. Clone the repository
 git clone https://github.com/tmac-security/tmac.git
 cd tmac
 
-# 2. Instalar dependencias (incluyendo dev)
+# 2. Install dependencies (including dev)
 poetry install
 
-# 3. Activar el entorno virtual de Poetry
+# 3. Activate the Poetry virtual environment
 poetry shell
 
-# 4. Verificar la instalación
+# 4. Verify the installation
 tmac --version
 ```
 
-### Alternativa con pip
+### Alternative with pip
 
 ```bash
 python -m venv venv
@@ -45,137 +45,140 @@ source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 ```
 
-### Herramientas de desarrollo incluidas
+### Included development tools
 
-| Herramienta | Uso |
+| Tool | Use |
 | :--- | :--- |
-| `pytest` | Ejecución de tests |
-| `pytest-cov` | Cobertura de código |
+| `pytest` | Running tests |
+| `pytest-cov` | Code coverage |
 | `hypothesis` | Property-based testing |
-| `ruff` | Linting y formato |
-| `black` | Formateo de código |
-| `mypy` | Verificación de tipos |
+| `ruff` | Linting and formatting |
+| `black` | Code formatting |
+| `mypy` | Type checking |
 
 ---
 
-## 2. Ejecutar los tests
+## 2. Run the tests
 
-### Suite completa
+### Full suite
 
 ```bash
 pytest
 ```
 
-### Con cobertura de código
+### With code coverage
 
 ```bash
-# Cobertura del código de producción (objetivo: ≥90%)
+# Coverage of production code (target: ≥90%)
 pytest --cov=tmac --cov-report=term-missing
 
-# Solo tests de integración (objetivo: ≥80%)
+# Integration tests only (target: ≥80%)
 pytest tests/integration/ --cov=tmac
 ```
 
-### Tests específicos
+### Specific tests
 
 ```bash
-# Solo tests unitarios
+# Unit tests only
 pytest tests/unit/
 
-# Solo tests de integración
+# Integration tests only
 pytest tests/integration/
 
-# Un módulo específico
+# A specific module
 pytest tests/unit/test_evaluator.py
 
-# Un test específico
+# A specific test
 pytest tests/unit/test_evaluator.py::test_evaluator_list_any_match -v
 ```
 
-### Tests de propiedades (Hypothesis)
+### Property tests (Hypothesis)
 
-Los tests de propiedades usan Hypothesis con `@settings(max_examples=100)`.
-Para ejecutarlos con más ejemplos durante desarrollo:
+The property tests use Hypothesis with `@settings(max_examples=100)`.
+To run them with more examples during development:
 
 ```bash
-# Ejecutar con más ejemplos para mayor confianza
+# Run with more examples for greater confidence
 pytest tests/ -k "property" --hypothesis-seed=0
 ```
 
-### Linting y tipos
+### Linting and types
 
 ```bash
-# Linting con ruff
+# Linting with ruff
 ruff check src/ tests/
 
-# Formateo con black
+# Formatting with black
 black src/ tests/
 
-# Verificación de tipos con mypy
+# Type checking with mypy
 mypy src/tmac/
 ```
 
 ---
 
-## 3. Contribuir nuevas reglas
+## 3. Contribute new rules
 
-Las reglas de amenazas se definen en archivos `threats.yaml` dentro de `src/tmac/rules/`.
+Threat rules are defined in `threats*.yaml` files inside `src/tmac/rules/aws/`.
+The `RuleLoader` automatically loads all files that match `threats*.yaml`
+(`threats.yaml`, `threats_extended.yaml`, ...), so you can add rules to the
+existing file or create a new one following that naming pattern.
 
-### Schema de una regla
+### Schema of a rule
 
 ```yaml
-- id: TMAC-AWS-{SERVICE}-{NNN}       # Formato obligatorio, ej: TMAC-AWS-S3-007
-  name: "Nombre descriptivo de la amenaza"
-  resource_type: "aws_resource_type"  # Tipo de recurso Terraform exacto
+- id: TMAC-AWS-{SERVICE}-{NNN}       # Mandatory format, e.g.: TMAC-AWS-S3-007
+  name: "Descriptive name of the threat"
+  resource_type: "aws_resource_type"  # Exact Terraform resource type
   check:
-    attribute: "path.al.atributo"     # Path al atributo del recurso
-    condition: "equals"               # Ver operadores disponibles
-    values: ["valor_esperado"]
-    and_check:                        # Opcional: condición adicional (AND lógico)
-      attribute: "otro.atributo"
+    attribute: "path.to.attribute"     # Path to the resource attribute
+    condition: "equals"               # See available operators
+    values: ["expected_value"]
+    and_check:                        # Optional: additional condition (logical AND)
+      attribute: "other.attribute"
       condition: "contains"
-      values: ["otro_valor"]
+      values: ["other_value"]
   severity: "Critical"                # Critical | High | Medium | Low | Info
-  stride: "Information Disclosure"    # Categoría STRIDE (ver lista abajo)
+  stride: "Information Disclosure"    # STRIDE category (see list below)
   description: >
-    Descripción detallada de la amenaza y su impacto.
+    Detailed description of the threat and its impact.
   mitigation: >
-    Pasos concretos para mitigar la amenaza con ejemplo de código Terraform.
+    Concrete steps to mitigate the threat with a Terraform code example.
   references:
     - "https://docs.aws.amazon.com/..."
     - "CIS AWS Benchmark vX.X - X.X"
-  tags: ["servicio", "categoria", "etiqueta"]
+  tags: ["service", "category", "tag"]
 ```
 
-### Convenciones de nomenclatura
+### Naming conventions
 
-- **ID**: `TMAC-{CLOUD}-{SERVICE}-{NNN}` donde:
-  - `CLOUD`: proveedor cloud en mayúsculas (`AWS`, `GCP`, `AZURE`)
-  - `SERVICE`: servicio en mayúsculas (`S3`, `IAM`, `SG`, `RDS`, `EC2`, `VPC`, `CW`)
-  - `NNN`: número secuencial de 3 dígitos (`001`, `002`, ...)
-- **`resource_type`**: debe coincidir exactamente con el tipo de recurso Terraform (ej. `aws_s3_bucket`)
-- **`severity`**: usar `Critical`, `High`, `Medium`, `Low`, o `Info` (con mayúscula inicial)
-- **`stride`**: una de las 6 categorías: `Spoofing`, `Tampering`, `Repudiation`, `Information Disclosure`, `Denial of Service`, `Elevation of Privilege`
+- **ID**: `TMAC-{CLOUD}-{SERVICE}-{NNN}` where:
+  - `CLOUD`: cloud provider in uppercase (`AWS`, `GCP`, `AZURE`)
+  - `SERVICE`: service in uppercase (`S3`, `IAM`, `SG`, `RDS`, `EC2`, `VPC`, `CW`)
+  - `NNN`: 3-digit sequential number (`001`, `002`, ...)
+- **`resource_type`**: must match exactly the Terraform resource type (e.g., `aws_s3_bucket`)
+- **`severity`**: use `Critical`, `High`, `Medium`, `Low`, or `Info` (capitalized)
+- **`stride`**: one of the 6 categories: `Spoofing`, `Tampering`, `Repudiation`, `Information Disclosure`, `Denial of Service`, `Elevation of Privilege`
 
-### Operadores de condición disponibles
+### Available condition operators
 
-| Operador | Descripción |
+| Operator | Description |
 | :--- | :--- |
-| `equals` | El atributo es igual al valor. |
-| `not_equals` | El atributo no es igual al valor. |
-| `in` | El atributo está en la lista de valores. |
-| `not_in` | El atributo no está en la lista de valores. |
-| `contains` | El atributo contiene el valor (string o lista). |
-| `not_contains` | El atributo no contiene el valor. |
-| `regex` | El atributo coincide con la expresión regular. |
-| `exists` | El atributo existe en el recurso. |
-| `not_exists` | El atributo no existe en el recurso. |
+| `equals` | The attribute equals the value. |
+| `not_equals` | The attribute does not equal the value. |
+| `in` | The attribute is in the list of values. |
+| `not_in` | The attribute is not in the list of values. |
+| `contains` | The attribute contains the value (string or list). |
+| `not_contains` | The attribute does not contain the value. |
+| `regex` | The attribute matches the regular expression. |
+| `exists` | The attribute exists in the resource. |
+| `not_exists` | The attribute does not exist in the resource. |
 
-### Ejemplo completo: nueva regla S3
+### Complete example: new S3 rule
 
 ```yaml
 - id: TMAC-AWS-S3-007
-  name: "S3 Bucket sin Versionado Habilitado"
+  name: "S3 Bucket without Versioning Enabled"
   resource_type: "aws_s3_bucket"
   check:
     attribute: "versioning.enabled"
@@ -184,11 +187,11 @@ Las reglas de amenazas se definen en archivos `threats.yaml` dentro de `src/tmac
   severity: "Medium"
   stride: "Tampering"
   description: >
-    El bucket S3 no tiene habilitado el versionado de objetos. Sin versionado,
-    la sobreescritura o eliminación accidental o maliciosa de objetos es
-    irreversible, facilitando ataques de Tampering.
+    The S3 bucket does not have object versioning enabled. Without versioning,
+    accidental or malicious overwriting or deletion of objects is
+    irreversible, facilitating Tampering attacks.
   mitigation: >
-    Habilita el versionado en el bucket:
+    Enable versioning on the bucket:
       resource "aws_s3_bucket_versioning" "example" {
         bucket = aws_s3_bucket.example.id
         versioning_configuration {
@@ -200,18 +203,18 @@ Las reglas de amenazas se definen en archivos `threats.yaml` dentro de `src/tmac
   tags: ["s3", "versioning", "data-integrity"]
 ```
 
-### Añadir fixtures de test para la nueva regla
+### Add test fixtures for the new rule
 
-Toda regla nueva debe incluir al menos un fixture positivo (que dispara la regla) y uno negativo (que no la dispara) en `tests/fixtures/`:
+Every new rule must include at least one positive fixture (that triggers the rule) and one negative fixture (that does not trigger it) in `tests/fixtures/`:
 
-**`tests/fixtures/s3_no_versioning.tf`** (positivo — dispara la regla):
+**`tests/fixtures/s3_no_versioning.tf`** (positive — triggers the rule):
 ```hcl
 resource "aws_s3_bucket" "no_versioning" {
   bucket = "my-bucket-no-versioning"
 }
 ```
 
-**`tests/fixtures/s3_with_versioning.tf`** (negativo — no dispara la regla):
+**`tests/fixtures/s3_with_versioning.tf`** (negative — does not trigger the rule):
 ```hcl
 resource "aws_s3_bucket" "with_versioning" {
   bucket = "my-bucket-with-versioning"
@@ -225,11 +228,11 @@ resource "aws_s3_bucket_versioning" "example" {
 }
 ```
 
-Luego añade el par a `RULE_FIXTURES` en `tests/integration/test_rules.py`:
+Then add the pair to `RULE_FIXTURES` in `tests/integration/test_rules.py`:
 
 ```python
 RULE_FIXTURES = [
-    # ... reglas existentes ...
+    # ... existing rules ...
     ("TMAC-AWS-S3-007", "s3_no_versioning.tf",    True),
     ("TMAC-AWS-S3-007", "s3_with_versioning.tf",  False),
 ]
@@ -237,37 +240,37 @@ RULE_FIXTURES = [
 
 ---
 
-## 4. Proceso de Pull Request
+## 4. Pull Request process
 
-1. **Crea un branch** desde `main` con un nombre descriptivo:
+1. **Create a branch** from `main` with a descriptive name:
    ```bash
    git checkout -b feat/tmac-aws-s3-007-versioning
    ```
 
-2. **Implementa los cambios** siguiendo las convenciones del proyecto.
+2. **Implement the changes** following the project conventions.
 
-3. **Añade o actualiza tests** — toda nueva regla requiere fixtures y tests parametrizados.
+3. **Add or update tests** — every new rule requires fixtures and parametrized tests.
 
-4. **Verifica que los tests pasan**:
+4. **Verify that the tests pass**:
    ```bash
    pytest --cov=tmac
    ruff check src/ tests/
    mypy src/tmac/
    ```
 
-5. **Actualiza `CHANGELOG.md`** añadiendo tu cambio bajo `[Unreleased]`.
+5. **Update `CHANGELOG.md`** by adding your change under `[Unreleased]`.
 
-6. **Abre el Pull Request** con una descripción clara de:
-   - Qué amenaza detecta la nueva regla
-   - Por qué es relevante (referencia a CIS Benchmark, CVE, etc.)
-   - Cómo se probó
+6. **Open the Pull Request** with a clear description of:
+   - What threat the new rule detects
+   - Why it is relevant (reference to CIS Benchmark, CVE, etc.)
+   - How it was tested
 
-### Criterios de aceptación para nuevas reglas
+### Acceptance criteria for new rules
 
-- [ ] ID sigue el formato `TMAC-{CLOUD}-{SERVICE}-{NNN}`
-- [ ] `resource_type` es un tipo de recurso Terraform válido
-- [ ] `severity` y `stride` usan los valores permitidos
-- [ ] Fixture positivo dispara exactamente un `Finding` con el `rule_id` correcto
-- [ ] Fixture negativo no produce ningún `Finding`
-- [ ] Tests pasan con `pytest` sin errores
-- [ ] Cobertura de código no disminuye por debajo del 90%
+- [ ] ID follows the format `TMAC-{CLOUD}-{SERVICE}-{NNN}`
+- [ ] `resource_type` is a valid Terraform resource type
+- [ ] `severity` and `stride` use the allowed values
+- [ ] Positive fixture triggers exactly one `Finding` with the correct `rule_id`
+- [ ] Negative fixture produces no `Finding`
+- [ ] Tests pass with `pytest` without errors
+- [ ] Code coverage does not drop below 90%

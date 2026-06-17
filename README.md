@@ -1,204 +1,278 @@
 # TMAC (Threat Modeling as Code)
 
-TMAC es una herramienta de análisis estático de seguridad para Infraestructura como Código (IaC).
-Automatiza el modelado de amenazas identificando vulnerabilidades en código Terraform antes del despliegue,
-usando el framework STRIDE.
+TMAC is a static security analysis tool for Infrastructure as Code (IaC).
+It automates threat modeling by identifying vulnerabilities in Terraform code before deployment,
+using the STRIDE framework.
 
-## Características principales (v1.1.0 "Ixtla")
+## Key features (v1.1.0 "Ixtla")
 
-- **Análisis de Terraform:** Escaneo automático de archivos `.tf`.
-- **Análisis de delta de riesgo (`tmac plan`):** Detecta amenazas STRIDE exclusivamente en los recursos que el plan de Terraform va a crear, modificar o destruir — sin analizar el estado completo.
-- **Motor de reglas YAML:** Reglas de amenazas fuertemente tipadas y validadas con Pydantic.
-- **Framework STRIDE:** Categorización automática de hallazgos (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
-- **Múltiples formatos de reporte:** HTML, Markdown y JSON/SARIF.
-- **Integración CI/CD:** Exit codes estructurados basados en severidad para romper el pipeline ante amenazas críticas.
-- **Ejecución offline:** Sin envío de datos a APIs externas.
+- **Terraform analysis (`tmac scan`):** Static scanning of `.tf` files against a catalog of **520+ rules** STRIDE covering **105 resource types** AWS.
+- **Risk delta analysis (`tmac plan`):** Detects STRIDE threats exclusively in the resources that the Terraform plan will create, modify, or destroy — without analyzing the full state.
+- **Architecture diagram (`tmac diagram`):** Builds the dependency graph between resources and exports it to Mermaid, Graphviz (DOT), draw.io (XML), or image (PNG/SVG/PDF). Supports noise filtering, grouping by microservice, and extraction of configuration metadata for threat modeling.
+- **YAML rule engine:** Strongly typed threat rules validated with Pydantic, organized across multiple files (`threats*.yaml`).
+- **STRIDE framework:** Automatic categorization of findings (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
+- **Multiple report formats:** HTML, Markdown, and JSON/SARIF 2.1.0.
+- **CI/CD integration:** Structured exit codes based on severity to break the pipeline on critical threats.
+- **Offline execution:** No data sent to external APIs.
 
-## Requisitos
+## Documentation
+
+- [Command reference](DOCS/COMMANDS.md) — complete guide to `scan`, `plan`, and `diagram`.
+- [Rule catalog](DOCS/RULES.md) — the 520+ rules by service and severity.
+- [Contribution guide](CONTRIBUTING.md) — how to add rules and run the tests.
+- [Roadmap](ROADMAP.md) — vision and future versions.
+
+## Requirements
 
 - **Python 3.10+**
-- [Poetry](https://python-poetry.org/) (recomendado) o `pip`
+- [Poetry](https://python-poetry.org/) (recommended) or `pip`
 
-## Instalación
+## Installation
 
 ```bash
-# Clonar el repositorio
+# Clone the repository
 git clone https://github.com/tmac-security/tmac.git
 cd tmac
 
-# Instalar con Poetry
+# Install with Poetry
 poetry install
 
-# O con pip en un entorno virtual
+# Or with pip in a virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
 pip install -e .
 ```
 
-## Uso
+## Usage
 
-### Análisis básico
+### Basic analysis
 
 ```bash
 tmac scan
 ```
 
-Escanea el directorio actual y genera un reporte HTML (`tmac-report.html`).
+Scans the current directory and generates an HTML report (`tmac-report.html`).
 
-### Opciones del CLI (`tmac scan`)
+### CLI options (`tmac scan`)
 
-| Opción | Abreviación | Descripción | Por defecto |
+| Option | Abbreviation | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `--dir` | `-d` | Directorio a escanear con archivos `.tf`. | `.` |
-| `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | `html` |
-| `--output` | `-o` | Ruta del archivo de reporte. | `tmac-report.[fmt]` |
-| `--rules-dir` | | Directorio de reglas YAML adicionales. | (reglas internas) |
-| `--config` | | Ruta al archivo de configuración. | `.tmac.yaml` |
-| `--fail-on` | | Severidad mínima para exit code 1. | `critical` |
-| `--severity` | | Severidad mínima a incluir en el reporte. | `all` |
-| `--exclude` | `-e` | Patrón glob a excluir (repetible). | — |
-| `--no-color` | | Deshabilita colores ANSI en la salida. | `False` |
-| `--verbose` | `-v` | Habilita logging de debug. | `False` |
-| `--quiet` | `-q` | Suprime la salida de terminal. | `False` |
+| `--dir` | `-d` | Directory to scan with `.tf` files. | `.` |
+| `--report` | `-r` | Report format: `html`, `json`, `md`. | `html` |
+| `--output` | `-o` | Report file path. | `tmac-report.[fmt]` |
+| `--rules-dir` | | Directory of additional YAML rules. | (internal rules) |
+| `--config` | | Path to the configuration file. | `.tmac.yaml` |
+| `--fail-on` | | Minimum severity for exit code 1. | `critical` |
+| `--severity` | | Minimum severity to include in the report. | `all` |
+| `--exclude` | `-e` | Glob pattern to exclude (repeatable). | — |
+| `--no-color` | | Disables ANSI colors in the output. | `False` |
+| `--verbose` | `-v` | Enables debug logging. | `False` |
+| `--quiet` | `-q` | Suppresses terminal output. | `False` |
 
-### Ejemplos prácticos
+### Practical examples
 
 ```bash
-# Escanear carpeta específica, reporte Markdown, fallar en High o superior
+# Scan a specific folder, Markdown report, fail on High or higher
 tmac scan --dir ./infra/prod --report md --output security_report.md --fail-on high
 
-# Excluir directorio .terraform y módulos de terceros
+# Exclude the .terraform directory and third-party modules
 tmac scan --dir ./infra --exclude .terraform --exclude "**/.terraform/**"
 
-# Salida sin colores para logs de CI
+# Output without colors for CI logs
 tmac scan --dir ./infra --no-color --report json
 
-# Modo verbose para debugging
+# Verbose mode for debugging
 tmac scan --dir ./infra --verbose
 ```
 
-## tmac plan — Análisis de Delta de Riesgo
+## tmac plan — Risk Delta Analysis
 
-Analiza un `tfplan.json` generado por Terraform para detectar amenazas STRIDE **exclusivamente en los recursos que el plan va a crear, modificar o destruir**. A diferencia de `tmac scan`, no evalúa el estado completo de la infraestructura — responde a la pregunta: *"¿Qué riesgo nuevo introduce este PR?"*.
+Analyzes a `tfplan.json` generated by Terraform to detect STRIDE threats **exclusively in the resources that the plan will create, modify, or destroy**. Unlike `tmac scan`, it does not evaluate the full state of the infrastructure — it answers the question: *"What new risk does this PR introduce?"*.
 
-### Generar el tfplan.json
+### Generate the tfplan.json
 
 ```bash
 terraform plan -out=plan.bin
 terraform show -json plan.bin > plan.json
 ```
 
-### Uso básico
+### Basic usage
 
 ```bash
 tmac plan --plan-file plan.json
 ```
 
-### Opciones del CLI (`tmac plan`)
+### CLI options (`tmac plan`)
 
-| Opción | Abreviación | Descripción | Requerido |
+| Option | Abbreviation | Description | Required |
 | :--- | :--- | :--- | :--- |
-| `--plan-file` | `-p` | Ruta al `tfplan.json` generado por `terraform show -json`. | **Sí** |
-| `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | No |
-| `--output` | `-o` | Ruta del archivo de reporte. | No |
-| `--rules-dir` | | Directorio de reglas YAML adicionales. | No |
-| `--fail-on` | | Severidad mínima para exit code 1: `critical`, `high`, `medium`, `low`, `info`. | No |
-| `--quiet` | `-q` | Suprime la salida de terminal. | No |
-| `--no-color` | | Deshabilita colores ANSI en la salida. | No |
-| `--verbose` | `-v` | Habilita logging de debug (cambios parseados, recursos por acción, reglas evaluadas). | No |
+| `--plan-file` | `-p` | Path to the `tfplan.json` generated by `terraform show -json`. | **Yes** |
+| `--report` | `-r` | Report format: `html`, `json`, `md`. | No |
+| `--output` | `-o` | Report file path. | No |
+| `--rules-dir` | | Directory of additional YAML rules. | No |
+| `--fail-on` | | Minimum severity for exit code 1: `critical`, `high`, `medium`, `low`, `info`. | No |
+| `--quiet` | `-q` | Suppresses terminal output. | No |
+| `--no-color` | | Disables ANSI colors in the output. | No |
+| `--verbose` | `-v` | Enables debug logging (parsed changes, resources by action, evaluated rules). | No |
 
-### Ejemplos prácticos
+### Practical examples
 
 ```bash
-# Análisis básico con reporte Markdown
+# Basic analysis with a Markdown report
 tmac plan --plan-file plan.json --report md --output delta-report.md
 
-# Fallar en amenazas Critical, salida JSON/SARIF
+# Fail on Critical threats, JSON/SARIF output
 tmac plan --plan-file plan.json --report json --output delta.json --fail-on critical
 
-# Pipeline completo en una línea
+# Complete pipeline in one line
 terraform plan -out=plan.bin && terraform show -json plan.bin > plan.json && tmac plan --plan-file plan.json
 
-# Modo verbose para debugging
+# Verbose mode for debugging
 tmac plan --plan-file plan.json --verbose
 ```
 
-### Códigos de salida de `tmac plan`
+### Exit codes of `tmac plan`
 
-| Código | Condición |
+| Code | Condition |
 | :--- | :--- |
-| `0` | Sin `DeltaFinding` Critical o High (plan seguro). |
-| `1` | Se detectó al menos un `DeltaFinding` con severidad **Critical**. |
-| `2` | Se detectaron `DeltaFinding` **High** pero ninguno Critical. |
-| `3` | Error de ejecución: archivo no existe, JSON inválido, o `tfplan.json` sin `resource_changes`. |
+| `0` | No Critical or High `DeltaFinding` (safe plan). |
+| `1` | At least one `DeltaFinding` with **Critical** severity was detected. |
+| `2` | **High** `DeltaFinding` were detected but none Critical. |
+| `3` | Execution error: file does not exist, invalid JSON, or `tfplan.json` without `resource_changes`. |
 
-### Formato del reporte de delta
+### Delta report format
 
-El reporte muestra el **RiskDelta** neto del plan (`amenazas introducidas − amenazas resueltas`):
+The report shows the net **RiskDelta** of the plan (`threats introduced − threats resolved`):
 
-- **Amenazas introducidas**: recursos creados o modificados que violan reglas STRIDE.
-- **Amenazas resueltas**: recursos eliminados o modificados que ya no violan reglas STRIDE.
+- **Threats introduced**: created or modified resources that violate STRIDE rules.
+- **Threats resolved**: removed or modified resources that no longer violate STRIDE rules.
 
-Ejemplo de resumen en Markdown:
+Example summary in Markdown:
 
 ```
-> Este plan introduce 2 amenazas nuevas y resuelve 1.
+> This plan introduces 2 new threats and resolves 1.
 
-| Acción    | Recurso              | Regla            | Severidad | STRIDE               | Descripción del cambio          |
+| Action    | Resource             | Rule             | Severity  | STRIDE               | Change description              |
 |-----------|----------------------|------------------|-----------|----------------------|---------------------------------|
-| NUEVO     | aws_s3_bucket.data   | TMAC-AWS-S3-001  | Critical  | Information Disclosure | acl: private → public-read    |
-| MODIFICADO| aws_s3_bucket.logs   | TMAC-AWS-S3-002  | High      | Information Disclosure | server_side_encryption: AES256 → (none) |
+| NEW       | aws_s3_bucket.data   | TMAC-AWS-S3-001  | Critical  | Information Disclosure | acl: private → public-read    |
+| MODIFIED  | aws_s3_bucket.logs   | TMAC-AWS-S3-002  | High      | Information Disclosure | server_side_encryption: AES256 → (none) |
 ```
 
 ---
 
-## TMAC v1.1.0 vs análisis de estado completo
+## TMAC v1.1.0 vs full-state analysis
 
-La mayoría de herramientas de seguridad para IaC analizan el **estado completo** de la infraestructura: evalúan todos los recursos definidos en los archivos `.tf` y reportan todas las amenazas existentes. Esto es útil para auditorías, pero genera ruido en revisiones de PR porque mezcla amenazas preexistentes con las introducidas por el cambio.
+Most IaC security tools analyze the **full state** of the infrastructure: they evaluate every resource defined in the `.tf` files and report all existing threats. This is useful for audits, but it generates noise in PR reviews because it mixes pre-existing threats with those introduced by the change.
 
-**TMAC v1.1.0 responde una pregunta diferente:**
+**TMAC v1.1.0 answers a different question:**
 
-| Herramienta | Pregunta que responde |
+| Tool | Question it answers |
 | :--- | :--- |
-| `tmac scan` (v1.0.0) | *"¿Qué riesgo existe en la infraestructura completa?"* |
-| `tmac plan` (v1.1.0) | *"¿Qué riesgo nuevo introduce este PR?"* |
+| `tmac scan` (v1.0.0) | *"What risk exists in the full infrastructure?"* |
+| `tmac plan` (v1.1.0) | *"What new risk does this PR introduce?"* |
 
-`tmac plan` parsea el output de `terraform show -json` y evalúa **solo los recursos del diff**:
-- Recursos **creados**: detecta amenazas en el estado final.
-- Recursos **modificados**: detecta amenazas introducidas por el cambio (no las preexistentes).
-- Recursos **eliminados**: registra amenazas resueltas al eliminar el recurso.
+`tmac plan` parses the output of `terraform show -json` and evaluates **only the resources in the diff**:
+- **Created** resources: detects threats in the final state.
+- **Modified** resources: detects threats introduced by the change (not pre-existing ones).
+- **Removed** resources: records threats resolved by removing the resource.
 
-Esto lo hace ideal para pipelines de CI/CD donde el objetivo es **bloquear solo los cambios que degradan la postura de seguridad**, sin generar falsos positivos por deuda técnica preexistente.
+This makes it ideal for CI/CD pipelines where the goal is to **block only the changes that degrade the security posture**, without generating false positives from pre-existing technical debt.
 
 ---
 
-## Códigos de salida (Exit Codes)
+## tmac diagram — Architecture Diagram
 
-| Código | Condición |
+Reads all the Terraform code in a repository, builds the dependency graph between resources (from the `${type.name.attribute}` references), and generates an architecture diagram. Useful for visualizing how the infrastructure is interconnected and as input for threat modeling.
+
+### Basic usage
+
+```bash
+tmac diagram --dir ./infra
+```
+
+Generates `tmac-diagram.mmd` (Mermaid) with all resources and their connections.
+
+### CLI options (`tmac diagram`)
+
+| Option | Abbreviation | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `--dir` | `-d` | Terraform directory to analyze. | `.` |
+| `--format` | `-f` | Format: `mermaid`, `dot`, `drawio`, `png`, `svg`, `pdf`. | `mermaid` |
+| `--output` | `-o` | Output file path. | `tmac-diagram.[ext]` |
+| `--simplify` | `-s` | Hides plumbing resources (IAM, permissions, policies) for a readable diagram. | `False` |
+| `--group` | `-g` | Groups resources by microservice (subgraphs). | `False` |
+| `--exclude-type` | | Resource type to hide from the diagram (repeatable). | — |
+| `--metadata` | | Also generates a document with the configuration of each resource. | `False` |
+| `--metadata-format` | | Format of the metadata document: `md`, `json`. | `md` |
+| `--exclude` | `-e` | Glob pattern to exclude (repeatable). | — |
+
+### Output formats
+
+- **mermaid**: Mermaid text, renders natively in GitHub/GitLab/Markdown.
+- **dot**: Graphviz DOT format (text).
+- **drawio**: XML editable in [draw.io](https://draw.io) / diagrams.net.
+- **png / svg / pdf**: rendered image. Requires [Graphviz](https://graphviz.org/) installed (`brew install graphviz` or `apt-get install graphviz`).
+
+### Examples
+
+```bash
+# Clean diagram grouped by microservice, as a PNG image
+tmac diagram --dir ./infra --simplify --group --format png --output arch.png
+
+# Mermaid diagram + configuration metadata document (for threat modeling)
+tmac diagram --dir ./infra --metadata --metadata-format json
+
+# Hide specific types
+tmac diagram --dir ./infra --exclude-type aws_iam_role --exclude-type aws_cloudwatch_log_group
+```
+
+### Metadata document (`--metadata`)
+
+With `--metadata`, in addition to the diagram, `tmac-metadata.md` (or `.json`) is generated with the configuration of each resource, classified into:
+
+- **Security-relevant attributes**: defined in `src/tmac/rules/aws/security_attrs.yaml` (editable). If an attribute is missing, it is marked as `<not defined>` — a signal for threat modeling.
+- **Configuration**: scalar attributes of the resource (`cidr_block`, `engine`, etc.).
+- **Connections**: references to other resources.
+- **Nested blocks**: `ingress`, `egress`, etc.
+- **Related configuration**: satellite resources that contribute security to this resource (e.g., a VPC with an associated `aws_flow_log` shows "VPC Flow Logs").
+
+### Diagram embedded in the scan report
+
+The `tmac scan` command accepts `--diagram` to embed the (simplified) Mermaid diagram inside the HTML or Markdown report:
+
+```bash
+tmac scan --dir ./infra --report html --output report.html --diagram
+```
+
+---
+
+## Exit Codes
+
+| Code | Condition |
 | :--- | :--- |
-| `0` | Escaneo completado sin hallazgos Critical o High (o por debajo del threshold `--fail-on`). |
-| `1` | Se detectaron hallazgos con severidad **Critical**. |
-| `2` | Se detectaron hallazgos **High** pero ninguno Critical. |
-| `3` | Error de ejecución: directorio inaccesible, configuración inválida, o error de parseo. |
+| `0` | Scan completed with no Critical or High findings (or below the `--fail-on` threshold). |
+| `1` | Findings with **Critical** severity were detected. |
+| `2` | **High** findings were detected but none Critical. |
+| `3` | Execution error: inaccessible directory, invalid configuration, or parsing error. |
 
-## Ignorar falsos positivos (`tmac:ignore`)
+## Ignore false positives (`tmac:ignore`)
 
-Suprime hallazgos específicos con comentarios en tus archivos `.tf`:
+Suppress specific findings with comments in your `.tf` files:
 
 ```hcl
-# Ignorar todas las reglas para este recurso
+# Ignore all rules for this resource
 # tmac:ignore
 resource "aws_s3_bucket" "public_assets" {
   bucket = "public-assets-bucket"
 }
 
-# Ignorar solo una regla específica
+# Ignore only one specific rule
 # tmac:ignore[TMAC-AWS-S3-001]
 resource "aws_s3_bucket" "another_bucket" {
   bucket = "another-bucket"
 }
 
-# Ignorar múltiples reglas específicas
+# Ignore multiple specific rules
 # tmac:ignore[TMAC-AWS-S3-001]
 # tmac:ignore[TMAC-AWS-S3-002]
 resource "aws_s3_bucket" "yet_another" {
@@ -206,15 +280,15 @@ resource "aws_s3_bucket" "yet_another" {
 }
 ```
 
-## Estructura de reglas (`threats.yaml`)
+## Rule structure (`threats.yaml`)
 
-Las reglas siguen el formato `TMAC-{CLOUD}-{SERVICE}-{NNN}`:
+Rules follow the format `TMAC-{CLOUD}-{SERVICE}-{NNN}`:
 
 ```yaml
 version: "1.0"
 rules:
   - id: TMAC-AWS-S3-001
-    name: "S3 Bucket con Acceso Público (ACL)"
+    name: "S3 Bucket with Public Access (ACL)"
     resource_type: "aws_s3_bucket"
     check:
       attribute: "acl"
@@ -222,28 +296,28 @@ rules:
       values: ["public-read", "public-read-write"]
     severity: "Critical"
     stride: "Information Disclosure"
-    description: "Descripción de la amenaza."
-    mitigation: "Pasos de mitigación."
+    description: "Description of the threat."
+    mitigation: "Mitigation steps."
     references:
       - "https://docs.aws.amazon.com/..."
     tags: ["s3", "public-access"]
 ```
 
-### Operadores de condición disponibles
+### Available condition operators
 
-| Operador | Descripción |
+| Operator | Description |
 | :--- | :--- |
-| `equals` | El atributo es igual al valor. |
-| `not_equals` | El atributo no es igual al valor. |
-| `in` | El atributo está en la lista de valores. |
-| `not_in` | El atributo no está en la lista de valores. |
-| `contains` | El atributo contiene el valor (string o lista). |
-| `not_contains` | El atributo no contiene el valor. |
-| `regex` | El atributo coincide con la expresión regular. |
-| `exists` | El atributo existe en el recurso. |
-| `not_exists` | El atributo no existe en el recurso. |
+| `equals` | The attribute equals the value. |
+| `not_equals` | The attribute does not equal the value. |
+| `in` | The attribute is in the list of values. |
+| `not_in` | The attribute is not in the list of values. |
+| `contains` | The attribute contains the value (string or list). |
+| `not_contains` | The attribute does not contain the value. |
+| `regex` | The attribute matches the regular expression. |
+| `exists` | The attribute exists in the resource. |
+| `not_exists` | The attribute does not exist in the resource. |
 
-## Configuración (`.tmac.yaml`)
+## Configuration (`.tmac.yaml`)
 
 ```yaml
 scan:
@@ -256,7 +330,7 @@ report:
   format: html
 ```
 
-## Integración CI/CD
+## CI/CD integration
 
 ### GitHub Actions
 
@@ -299,9 +373,9 @@ jobs:
           sarif_file: tmac-results.json
 ```
 
-### GitHub Actions — `tmac plan` (análisis de delta en PRs)
+### GitHub Actions — `tmac plan` (delta analysis on PRs)
 
-Bloquea el merge si el plan de Terraform introduce amenazas Critical:
+Blocks the merge if the Terraform plan introduces Critical threats:
 
 ```yaml
 name: TMAC Delta Risk Analysis
@@ -341,9 +415,9 @@ jobs:
         working-directory: ./infra
 
       - name: Run TMAC Delta Analysis
-        # Exit code 1 = Critical findings → bloquea el PR
-        # Exit code 2 = High findings → bloquea el PR (ajustar --fail-on según política)
-        # Exit code 0 = plan seguro → permite el merge
+        # Exit code 1 = Critical findings → blocks the PR
+        # Exit code 2 = High findings → blocks the PR (adjust --fail-on per policy)
+        # Exit code 0 = safe plan → allows the merge
         run: |
           tmac plan \
             --plan-file ./infra/plan.json \
@@ -393,36 +467,65 @@ tmac-security-scan:
         - "**/*.tf"
 ```
 
-## Arquitectura
+## Included examples
+
+The `examples/` directory contains Terraform architectures ready to try out the tool:
+
+| Example | Description |
+| :--- | :--- |
+| `examples/ecommerce/` | Serverless microservices: API Gateway → Lambda → DynamoDB, EventBridge, and SQS. |
+| `examples/enterprise/` | Multi-AZ and multi-region enterprise architecture: VPC, ALB+WAF, Auto Scaling, Aurora Serverless, RDS Proxy, Cognito, DevOps, VPC endpoints, Kinesis/S3/Glacier, Pinpoint, Route53 failover, CloudTrail, and warm standby. |
+
+```bash
+# Scan the enterprise example and generate the grouped diagram
+tmac scan --dir examples/enterprise --report html --output report.html --diagram
+tmac diagram --dir examples/enterprise --simplify --group --format png --output arch.png
+```
+
+## Architecture
 
 ```
 src/tmac/
-├── cli.py          # Interfaz CLI (Click) — subcomandos `scan` y `plan`
-├── scanner.py      # Orquestador del pipeline de escaneo (tmac scan)
-├── config.py       # Carga y validación de .tmac.yaml
-├── models/         # Modelos Pydantic (Finding, ScanResult, ResourceModel)
-├── parsers/        # TerraformParser (.tf) y TfplanParser (tfplan.json)
+├── cli.py          # CLI interface (Click) — `scan` and `plan` subcommands
+├── scanner.py      # Scan pipeline orchestrator (tmac scan)
+├── config.py       # Loading and validation of .tmac.yaml
+├── models/         # Pydantic models (Finding, ScanResult, ResourceModel)
+├── parsers/        # TerraformParser (.tf) and TfplanParser (tfplan.json)
 ├── delta/          # DeltaScanner, DeltaFinding, DeltaScanResult, PlannedChange
 ├── engine/         # RuleLoader, Matcher, Evaluator
+├── graph/          # GraphBuilder, filters, grouping, metadata and diagram renderers
 ├── reporters/      # HTMLReporter, MarkdownReporter, JSONReporter (SARIF)
-└── templates/      # Plantillas Jinja2 para HTML y Markdown (scan + delta)
+└── templates/      # Jinja2 templates for HTML and Markdown (scan + delta)
 ```
 
-## Reglas incluidas (v1.0.0)
+## Rule catalog
 
-| ID | Servicio | Nombre | Severidad |
-| :--- | :--- | :--- | :--- |
-| TMAC-AWS-S3-001 | S3 | Bucket con ACL pública | Critical |
-| TMAC-AWS-S3-002 | S3 | Bucket sin encriptación SSE | High |
-| TMAC-AWS-S3-003 | S3 | Bucket sin logging de acceso | Medium |
-| TMAC-AWS-IAM-001 | IAM | Comodín `*` en Resource de política | High |
-| TMAC-AWS-IAM-002 | IAM | Usuario con política inline | Medium |
-| TMAC-AWS-SG-001 | Security Groups | Puerto SSH (22) abierto al mundo | High |
-| TMAC-AWS-SG-002 | Security Groups | Puerto RDP (3389) abierto al mundo | Critical |
-| TMAC-AWS-RDS-001 | RDS | Base de datos sin encriptación | Medium |
-| TMAC-AWS-RDS-002 | RDS | Instancia con acceso público | High |
-| TMAC-AWS-CW-001 | CloudTrail | Trail deshabilitado o sin logging | High |
+TMAC v1.1.0 includes **520+ rules** covering **105 resource types** AWS, with a minimum of 8 rules for each resource type present in the reference examples.
 
-## Licencia
+Distribution by severity:
 
-MIT — ver [LICENSE](LICENSE) para más detalles.
+| Severity | Rules |
+| :--- | :--- |
+| 🔴 Critical | 24 |
+| 🟠 High | 56 |
+| 🟡 Medium | 121 |
+| 🟢 Low | 106 |
+| 🔵 Info | 213 |
+
+### Organization of the rule files
+
+Rules are loaded automatically from all `threats*.yaml` files in `src/tmac/rules/aws/`:
+
+| File | Content |
+| :--- | :--- |
+| `threats.yaml` | Base catalog by service (S3, IAM, SG, RDS, EC2, Lambda, etc.). |
+| `threats_extended.yaml` | Extended coverage up to ≥8 rules per resource type. |
+| `security_attrs.yaml` | Curated layer of security-relevant attributes per resource (used by `tmac diagram --metadata`). |
+
+To add your own rules without touching the internal ones, use `--rules-dir ./my-rules`.
+
+See the [complete rule catalog](DOCS/RULES.md) for the breakdown by service.
+
+## License
+
+MIT — see [LICENSE](LICENSE) for more details.

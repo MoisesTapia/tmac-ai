@@ -39,3 +39,13 @@
 {% else %}
 ✅ **Excellent work! No security findings detected.**
 {% endif %}
+{% if diagram %}
+
+---
+
+## 🗺️ Architecture Diagram
+
+```mermaid
+{{ diagram }}
+```
+{% endif %}

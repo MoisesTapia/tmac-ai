@@ -1,5 +1,5 @@
 """
-Tests unitarios para Evaluator y Matcher.
+Unit tests for Evaluator and Matcher.
 Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 13.1, 13.2, 13.3, 13.4, 13.5
 """
 import pytest
@@ -45,7 +45,7 @@ evaluator = Evaluator()
 
 
 # ---------------------------------------------------------------------------
-# 4.1 — Tests parametrizados por operador (Req 5.4, 13.1)
+# 4.1 — Parametrized tests per operator (Req 5.4, 13.1)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("condition,values,actual,expected", [
@@ -84,7 +84,7 @@ evaluator = Evaluator()
     ("not_exists",   [],              "something",    False),
 ])
 def test_all_operators(condition, values, actual, expected):
-    """Req 5.4, 13.1: Evaluator es correcto para todos los operadores."""
+    """Req 5.4, 13.1: Evaluator is correct for all operators."""
     cond = CheckCondition(attribute="x", condition=condition, values=values)
     attrs = {"x": actual} if actual is not None else {}
     # For not_exists we need the key absent; for exists with None we also need it absent
@@ -95,11 +95,11 @@ def test_all_operators(condition, values, actual, expected):
 
 
 # ---------------------------------------------------------------------------
-# 4.1 — and_check compuesto (Req 13.2)
+# 4.1 — Composite and_check (Req 13.2)
 # ---------------------------------------------------------------------------
 
 def test_and_check_both_true():
-    """Req 13.2: and_check compuesto evalúa correctamente cuando ambas condiciones son True."""
+    """Req 13.2: composite and_check evaluates correctly when both conditions are True."""
     inner = CheckCondition(attribute="cidr", condition="equals", values=["0.0.0.0/0"])
     outer = CheckCondition(attribute="port", condition="equals", values=[22], and_check=inner)
     attrs = {"port": 22, "cidr": "0.0.0.0/0"}
@@ -107,7 +107,7 @@ def test_and_check_both_true():
 
 
 def test_and_check_first_false():
-    """and_check: si la primera condición es False, el resultado es False."""
+    """and_check: if the first condition is False, the result is False."""
     inner = CheckCondition(attribute="cidr", condition="equals", values=["0.0.0.0/0"])
     outer = CheckCondition(attribute="port", condition="equals", values=[22], and_check=inner)
     attrs = {"port": 443, "cidr": "0.0.0.0/0"}
@@ -115,7 +115,7 @@ def test_and_check_first_false():
 
 
 def test_and_check_second_false():
-    """and_check: si la segunda condición es False, el resultado es False."""
+    """and_check: if the second condition is False, the result is False."""
     inner = CheckCondition(attribute="cidr", condition="equals", values=["0.0.0.0/0"])
     outer = CheckCondition(attribute="port", condition="equals", values=[22], and_check=inner)
     attrs = {"port": 22, "cidr": "10.0.0.0/8"}
@@ -123,11 +123,11 @@ def test_and_check_second_false():
 
 
 # ---------------------------------------------------------------------------
-# 4.1 — SG con múltiples bloques ingress (Req 5.1, 5.2, 13.3)
+# 4.1 — SG with multiple ingress blocks (Req 5.1, 5.2, 13.3)
 # ---------------------------------------------------------------------------
 
 def test_multi_ingress_detects_when_any_block_matches():
-    """Req 5.1, 5.2, 13.3: SG con múltiples bloques ingress detecta regla cuando cualquier bloque la satisface."""
+    """Req 5.1, 5.2, 13.3: SG with multiple ingress blocks detects a rule when any block satisfies it."""
     # Only the second ingress block has port 22 open to 0.0.0.0/0
     attrs = {
         "ingress": [
@@ -164,11 +164,11 @@ def test_multi_ingress_first_block_matches():
 
 
 # ---------------------------------------------------------------------------
-# 4.2 — Matcher: tmac:ignore global (Req 13.4)
+# 4.2 — Matcher: global tmac:ignore (Req 13.4)
 # ---------------------------------------------------------------------------
 
 def test_matcher_global_ignore_suppresses_all_findings():
-    """Req 13.4: Matcher omite recursos con # tmac:ignore global."""
+    """Req 13.4: Matcher skips resources with a global # tmac:ignore."""
     rule = _make_rule(attribute="acl", condition="equals", values=["public-read"],
                       resource_type="aws_s3_bucket")
     resource = _make_resource(resource_type="aws_s3_bucket", name="my_bucket",
@@ -201,7 +201,7 @@ def test_matcher_global_ignore_does_not_affect_other_resources():
 # ---------------------------------------------------------------------------
 
 def test_matcher_rule_ignore_suppresses_only_specified_rule():
-    """Req 13.5: Matcher omite solo la regla especificada con # tmac:ignore[RULE-ID]."""
+    """Req 13.5: Matcher skips only the specified rule with # tmac:ignore[RULE-ID]."""
     rule1 = _make_rule(rule_id="TMAC-AWS-S3-001", attribute="acl",
                         condition="equals", values=["public-read"],
                         resource_type="aws_s3_bucket")
@@ -232,7 +232,7 @@ def test_matcher_no_ignore_map_produces_findings():
 
 
 # ---------------------------------------------------------------------------
-# Property 9: Evaluator detecta condición en cualquier elemento de lista de bloques
+# Property 9: Evaluator detects a condition in any element of a list of blocks
 # Validates: Requirements 5.1, 5.2, 5.5
 # ---------------------------------------------------------------------------
 
@@ -247,9 +247,9 @@ def test_matcher_no_ignore_map_produces_findings():
 def test_property_9_evaluator_list_any_match(ports):
     """
     **Validates: Requirements 5.1, 5.2, 5.5**
-    Property 9: Evaluator detecta condición en cualquier elemento de lista de bloques.
-    Si cualquier bloque ingress tiene from_port == 22, el evaluator debe retornar True.
-    Reordenar los bloques no cambia el resultado.
+    Property 9: Evaluator detects a condition in any element of a list of blocks.
+    If any ingress block has from_port == 22, the evaluator must return True.
+    Reordering the blocks does not change the result.
     """
     target_port = 22
     ingress_blocks = [{"from_port": p, "to_port": p, "cidr_blocks": ["0.0.0.0/0"]} for p in ports]
@@ -266,7 +266,7 @@ def test_property_9_evaluator_list_any_match(ports):
 
 
 # ---------------------------------------------------------------------------
-# Property 10: Evaluator es correcto para todos los operadores
+# Property 10: Evaluator is correct for all operators
 # Validates: Requirements 5.4
 # ---------------------------------------------------------------------------
 

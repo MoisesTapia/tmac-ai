@@ -174,7 +174,7 @@ class TestMarkdownReporter:
 
 
 # ---------------------------------------------------------------------------
-# Property 15: HTMLReporter renderiza stride como lista de badges
+# Property 15: HTMLReporter renders stride as a list of badges
 # Validates: Requirements 8.1, 8.2
 # ---------------------------------------------------------------------------
 
@@ -182,7 +182,7 @@ class TestMarkdownReporter:
 @given(stride_value=st.one_of(st.text(min_size=1, max_size=50), st.lists(st.text(min_size=1, max_size=50), min_size=1, max_size=5)))
 def test_property_15_html_reporter_stride_as_badges(stride_value: Union[str, List[str]]):
     """
-    **Property 15: HTMLReporter renderiza stride como lista de badges**
+    **Property 15: HTMLReporter renders stride as a list of badges**
 
     For any Finding where stride is a string or a list, the HTML generated
     must contain at least one element with class badge-stride per STRIDE category.
@@ -203,7 +203,7 @@ def test_property_15_html_reporter_stride_as_badges(stride_value: Union[str, Lis
 
 
 # ---------------------------------------------------------------------------
-# Property 16: MarkdownReporter renderiza emoji correcto por severidad
+# Property 16: MarkdownReporter renders the correct emoji per severity
 # Validates: Requirements 8.5
 # ---------------------------------------------------------------------------
 
@@ -220,7 +220,7 @@ _SEVERITY_EMOJI_MAP = {
 @given(severity=st.sampled_from(["Critical", "High", "Medium", "Low", "Info"]))
 def test_property_16_markdown_reporter_severity_emoji(severity: str):
     """
-    **Property 16: MarkdownReporter renderiza emoji correcto por severidad**
+    **Property 16: MarkdownReporter renders the correct emoji per severity**
 
     For any Finding with severity Critical, High, Medium, Low, or Info,
     the Markdown generated must contain the corresponding emoji.
@@ -511,24 +511,24 @@ def _make_delta_scan_result(
 
 class TestHTMLReporterDelta:
     def test_delta_scan_result_generates_delta_summary_section(self):
-        """HTMLReporter.generate() con DeltaScanResult genera HTML con sección delta-summary. (Req 5.1)"""
+        """HTMLReporter.generate() with a DeltaScanResult generates HTML with a delta-summary section. (Req 5.1)"""
         reporter = HTMLReporter()
         finding = _make_delta_finding(change_action=ChangeAction.create)
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
         assert "delta-summary" in output
 
-    def test_delta_finding_create_renders_nuevo_badge(self):
-        """HTML contiene badge NUEVO para DeltaFinding con change_action=create. (Req 5.2)"""
+    def test_delta_finding_create_renders_new_badge(self):
+        """HTML contains a NEW badge for a DeltaFinding with change_action=create. (Req 5.2)"""
         reporter = HTMLReporter()
         finding = _make_delta_finding(change_action=ChangeAction.create)
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "NUEVO" in output
+        assert "NEW" in output
         assert "badge-create" in output
 
-    def test_delta_finding_update_renders_modificado_badge(self):
-        """HTML contiene badge MODIFICADO para DeltaFinding con change_action=update. (Req 5.2)"""
+    def test_delta_finding_update_renders_modified_badge(self):
+        """HTML contains a MODIFIED badge for a DeltaFinding with change_action=update. (Req 5.2)"""
         reporter = HTMLReporter()
         finding = _make_delta_finding(
             change_action=ChangeAction.update,
@@ -537,11 +537,11 @@ class TestHTMLReporterDelta:
         )
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "MODIFICADO" in output
+        assert "MODIFIED" in output
         assert "badge-update" in output
 
-    def test_delta_finding_delete_renders_eliminado_badge(self):
-        """HTML contiene badge ELIMINADO para DeltaFinding con change_action=delete. (Req 5.2)"""
+    def test_delta_finding_delete_renders_removed_badge(self):
+        """HTML contains a REMOVED badge for a DeltaFinding with change_action=delete. (Req 5.2)"""
         reporter = HTMLReporter()
         finding = _make_delta_finding(
             change_action=ChangeAction.delete,
@@ -550,11 +550,11 @@ class TestHTMLReporterDelta:
         )
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "ELIMINADO" in output
+        assert "REMOVED" in output
         assert "badge-delete" in output
 
     def test_delta_scan_result_zero_findings_renders_valid_html(self):
-        """DeltaScanResult con findings_introduced=0 genera HTML válido sin errores de template. (Req 5.6)"""
+        """DeltaScanResult with findings_introduced=0 generates valid HTML without template errors. (Req 5.6)"""
         reporter = HTMLReporter()
         result = _make_delta_scan_result(findings=[], findings_introduced=0, findings_resolved=2)
         output = reporter.generate(result)
@@ -563,7 +563,7 @@ class TestHTMLReporterDelta:
         assert "delta-summary" in output
 
     def test_normal_scan_result_uses_original_template(self):
-        """HTMLReporter.generate() con ScanResult normal (no delta) sigue usando el template original. (Req 5.1)"""
+        """HTMLReporter.generate() with a normal (non-delta) ScanResult still uses the original template. (Req 5.1)"""
         reporter = HTMLReporter()
         result = _make_scan_result()
         output = reporter.generate(result)
@@ -574,7 +574,7 @@ class TestHTMLReporterDelta:
 
 
 # ---------------------------------------------------------------------------
-# Property 15: HTMLReporter renderiza sección de delta sin errores para cualquier DeltaScanResult
+# Property 15: HTMLReporter renders the delta section without errors for any DeltaScanResult
 # Feature: tmac-v1-1-tfplan-delta, Property 15
 # Validates: Requirements 5.1, 5.6
 # ---------------------------------------------------------------------------
@@ -610,7 +610,7 @@ def test_property_15_html_reporter_delta_no_template_errors(
     resources_deleted: int,
 ) -> None:
     """
-    **Property 15: HTMLReporter renderiza sección de delta sin errores para cualquier DeltaScanResult**
+    **Property 15: HTMLReporter renders the delta section without errors for any DeltaScanResult**
 
     For any DeltaScanResult (including findings_introduced==0), HTMLReporter must generate
     valid HTML containing the delta-summary section with correct values for findings_introduced,
@@ -648,68 +648,68 @@ def test_property_15_html_reporter_delta_no_template_errors(
 
 class TestMarkdownReporterDelta:
     def test_executive_summary_line_with_correct_values(self):
-        """Markdown contiene línea de resumen ejecutivo con findings_introduced y findings_resolved. (Req 5.4)"""
+        """Markdown contains an executive summary line with findings_introduced and findings_resolved. (Req 5.4)"""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
         result = _make_delta_scan_result(findings=[finding], findings_resolved=2)
         output = reporter.generate(result)
-        assert "Este plan introduce 1 amenazas nuevas y resuelve 2" in output
+        assert "This plan introduces 1 new threats and resolves 2" in output
 
     def test_delta_table_columns_present(self):
-        """Markdown contiene tabla con columnas Acción, Recurso, Regla, Severidad, STRIDE, Descripción del cambio. (Req 5.3)"""
+        """Markdown contains a table with the columns Action, Resource, Rule, Severity, STRIDE, Change description. (Req 5.3)"""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(change_action=ChangeAction.create)
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "Acción" in output
-        assert "Recurso" in output
-        assert "Regla" in output
-        assert "Severidad" in output
+        assert "Action" in output
+        assert "Resource" in output
+        assert "Rule" in output
+        assert "Severity" in output
         assert "STRIDE" in output
-        assert "Descripción del cambio" in output
+        assert "Change description" in output
 
     def test_zero_findings_renders_valid_markdown_with_correct_summary(self):
-        """DeltaScanResult con findings_introduced=0 genera Markdown válido con resumen ejecutivo correcto. (Req 5.4)"""
+        """DeltaScanResult with findings_introduced=0 generates valid Markdown with a correct executive summary. (Req 5.4)"""
         reporter = MarkdownReporter()
         result = _make_delta_scan_result(findings=[], findings_introduced=0, findings_resolved=3)
         output = reporter.generate(result)
-        assert "Este plan introduce 0 amenazas nuevas y resuelve 3" in output
+        assert "This plan introduces 0 new threats and resolves 3" in output
         assert "TMAC Delta Risk Report" in output
 
     def test_normal_scan_result_uses_original_template(self):
-        """MarkdownReporter.generate() con ScanResult normal sigue usando el template original. (Req 5.3)"""
+        """MarkdownReporter.generate() with a normal ScanResult still uses the original template. (Req 5.3)"""
         reporter = MarkdownReporter()
         result = _make_scan_result()
         output = reporter.generate(result)
         assert "TMAC Security Report" in output
-        assert "Este plan introduce" not in output
+        assert "This plan introduces" not in output
 
-    def test_delta_finding_create_shows_nuevo(self):
-        """Fila de tabla muestra NUEVO para change_action=create."""
+    def test_delta_finding_create_shows_new(self):
+        """Table row shows NEW for change_action=create."""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(change_action=ChangeAction.create, value_before=None, value_after="public-read")
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "NUEVO" in output
+        assert "NEW" in output
 
-    def test_delta_finding_update_shows_modificado(self):
-        """Fila de tabla muestra MODIFICADO para change_action=update."""
+    def test_delta_finding_update_shows_modified(self):
+        """Table row shows MODIFIED for change_action=update."""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "MODIFICADO" in output
+        assert "MODIFIED" in output
 
-    def test_delta_finding_delete_shows_eliminado(self):
-        """Fila de tabla muestra ELIMINADO para change_action=delete."""
+    def test_delta_finding_delete_shows_removed(self):
+        """Table row shows REMOVED for change_action=delete."""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(change_action=ChangeAction.delete, value_before="public-read", value_after=None)
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
-        assert "ELIMINADO" in output
+        assert "REMOVED" in output
 
     def test_value_change_description_in_table(self):
-        """Descripción del cambio muestra 'attr: before → after' en la tabla."""
+        """The change description shows 'attr: before → after' in the table."""
         reporter = MarkdownReporter()
         finding = _make_delta_finding(
             change_action=ChangeAction.update,
@@ -725,7 +725,7 @@ class TestMarkdownReporterDelta:
 
 
 # ---------------------------------------------------------------------------
-# Property 16: MarkdownReporter genera tabla y resumen ejecutivo
+# Property 16: MarkdownReporter generates a table and an executive summary
 # Feature: tmac-v1-1-tfplan-delta, Property 16
 # Validates: Requirements 5.3, 5.4
 # ---------------------------------------------------------------------------
@@ -740,11 +740,11 @@ def test_property_16_markdown_reporter_delta_table_and_summary(
     findings_resolved: int,
 ) -> None:
     """
-    **Property 16: MarkdownReporter genera tabla y resumen ejecutivo**
+    **Property 16: MarkdownReporter generates a table and an executive summary**
 
     For any DeltaScanResult with at least one DeltaFinding, the generated Markdown must contain
     an executive summary line with findings_introduced and findings_resolved values, and a table
-    with columns: Acción, Recurso, Regla, Severidad, STRIDE, Descripción del cambio.
+    with columns: Action, Resource, Rule, Severity, STRIDE, Change description.
 
     # Feature: tmac-v1-1-tfplan-delta, Property 16
 
@@ -755,15 +755,15 @@ def test_property_16_markdown_reporter_delta_table_and_summary(
     output = reporter.generate(result)
 
     # Executive summary line must be present with correct values
-    assert f"Este plan introduce {result.findings_introduced} amenazas nuevas y resuelve {findings_resolved}" in output
+    assert f"This plan introduces {result.findings_introduced} new threats and resolves {findings_resolved}" in output
 
     # Table columns must be present
-    assert "Acción" in output
-    assert "Recurso" in output
-    assert "Regla" in output
-    assert "Severidad" in output
+    assert "Action" in output
+    assert "Resource" in output
+    assert "Rule" in output
+    assert "Severity" in output
     assert "STRIDE" in output
-    assert "Descripción del cambio" in output
+    assert "Change description" in output
 
 
 # ---------------------------------------------------------------------------
@@ -774,7 +774,7 @@ def test_property_16_markdown_reporter_delta_table_and_summary(
 
 class TestJSONReporterDelta:
     def test_delta_scan_result_contains_properties_change_action(self):
-        """JSON SARIF generado desde DeltaScanResult contiene properties.changeAction en cada result. (Req 5.5)"""
+        """JSON SARIF generated from a DeltaScanResult contains properties.changeAction in each result. (Req 5.5)"""
         reporter = JSONReporter()
         finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
         result = _make_delta_scan_result(findings=[finding])
@@ -784,7 +784,7 @@ class TestJSONReporterDelta:
         assert sarif_result["properties"]["changeAction"] == "update"
 
     def test_delta_finding_create_value_before_is_null(self):
-        """properties.valueBefore es null para DeltaFinding con change_action=create. (Req 5.5)"""
+        """properties.valueBefore is null for a DeltaFinding with change_action=create. (Req 5.5)"""
         reporter = JSONReporter()
         finding = _make_delta_finding(change_action=ChangeAction.create, value_before=None, value_after="public-read")
         result = _make_delta_scan_result(findings=[finding])
@@ -794,7 +794,7 @@ class TestJSONReporterDelta:
         assert props["valueAfter"] == "public-read"
 
     def test_delta_finding_delete_value_after_is_null(self):
-        """properties.valueAfter es null para DeltaFinding con change_action=delete. (Req 5.5)"""
+        """properties.valueAfter is null for a DeltaFinding with change_action=delete. (Req 5.5)"""
         reporter = JSONReporter()
         finding = _make_delta_finding(change_action=ChangeAction.delete, value_before="public-read", value_after=None)
         result = _make_delta_scan_result(findings=[finding])
@@ -804,7 +804,7 @@ class TestJSONReporterDelta:
         assert props["valueAfter"] is None
 
     def test_delta_finding_update_values_correct(self):
-        """properties.valueBefore y valueAfter tienen los valores correctos para change_action=update. (Req 5.5)"""
+        """properties.valueBefore and valueAfter have the correct values for change_action=update. (Req 5.5)"""
         reporter = JSONReporter()
         finding = _make_delta_finding(
             change_action=ChangeAction.update,
@@ -819,7 +819,7 @@ class TestJSONReporterDelta:
         assert props["valueAfter"] == "public-read"
 
     def test_normal_scan_result_has_no_properties_field(self):
-        """JSONReporter.generate() con ScanResult normal no incluye properties en los resultados SARIF. (Req 5.5)"""
+        """JSONReporter.generate() with a normal ScanResult does not include properties in the SARIF results. (Req 5.5)"""
         reporter = JSONReporter()
         result = _make_scan_result()
         data = json.loads(reporter.generate(result))
@@ -828,7 +828,7 @@ class TestJSONReporterDelta:
 
 
 # ---------------------------------------------------------------------------
-# Property 17: JSONReporter incluye campos de delta en SARIF properties
+# Property 17: JSONReporter includes delta fields in SARIF properties
 # Feature: tmac-v1-1-tfplan-delta, Property 17
 # Validates: Requirements 5.5
 # ---------------------------------------------------------------------------
@@ -842,7 +842,7 @@ def test_property_17_json_reporter_sarif_delta_properties(
     findings: List[DeltaFinding],
 ) -> None:
     """
-    **Property 17: JSONReporter incluye campos de delta en SARIF properties**
+    **Property 17: JSONReporter includes delta fields in SARIF properties**
 
     For any DeltaFinding, the generated SARIF JSON must contain in the properties object
     of the corresponding result the fields changeAction, valueBefore and valueAfter with
@@ -867,7 +867,7 @@ def test_property_17_json_reporter_sarif_delta_properties(
 
 
 # ---------------------------------------------------------------------------
-# Property 14: Invariante de consistencia del reporte (HTML, Markdown, JSON)
+# Property 14: Report consistency invariant (HTML, Markdown, JSON)
 # Feature: tmac-v1-1-tfplan-delta, Property 14
 # Validates: Requirements 5.7
 # ---------------------------------------------------------------------------
@@ -883,7 +883,7 @@ def test_property_14_report_consistency_invariant(
     findings_resolved: int,
 ) -> None:
     """
-    **Property 14: Invariante de consistencia del reporte**
+    **Property 14: Report consistency invariant**
 
     For any DeltaScanResult, the number of findings rendered in any report format
     (HTML, Markdown, JSON) must equal DeltaScanResult.findings_introduced.
@@ -907,4 +907,4 @@ def test_property_14_report_consistency_invariant(
 
     # Markdown: executive summary line contains findings_introduced
     md_output = MarkdownReporter().generate(result)
-    assert f"Este plan introduce {n} amenazas nuevas" in md_output
+    assert f"This plan introduces {n} new threats" in md_output

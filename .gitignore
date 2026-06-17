@@ -44,5 +44,5 @@ tmac-metadata.*
 mypy_errors.txt
 debug.py
 
-# Kiro (local only — no debe versionarse)
+# Kiro (local only — must not be versioned)
 .kiro/

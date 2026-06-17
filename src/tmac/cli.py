@@ -9,6 +9,10 @@ from tmac.reporters.html import HTMLReporter
 from tmac.reporters.json_report import JSONReporter
 from tmac.reporters.markdown import MarkdownReporter
 from tmac.delta.scanner import DeltaScanError, DeltaScanner
+from tmac.graph.service import DiagramError, DiagramService
+from tmac.graph.diagrams import IMAGE_FORMATS, render_graph, render_image
+from tmac.graph.grouping import group_by_name
+from tmac.graph.metadata import render_metadata
 from tmac.scanner import ScanError, Scanner
 
 SEVERITY_LEVELS = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
@@ -32,6 +36,7 @@ def cli() -> None:
 @click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
 @click.option("--exclude", "-e", "exclude", multiple=True, type=click.STRING, help="Glob patterns to exclude (repeatable).")
 @click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output.")
+@click.option("--diagram", "with_diagram", is_flag=True, help="Embed an architecture diagram (Mermaid) in HTML/MD reports.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
 def scan(
     directory: str,
@@ -44,6 +49,7 @@ def scan(
     quiet: bool,
     exclude: tuple,
     no_color: bool,
+    with_diagram: bool,
     verbose: bool,
 ) -> None:
     """Scan infrastructure code for security threats."""
@@ -69,6 +75,15 @@ def scan(
         click.echo(str(exc), err=True)
         sys.exit(3)
 
+    # Build the architecture diagram only when requested and for HTML/MD reports.
+    diagram_src: str | None = None
+    if with_diagram and fmt in ("html", "md"):
+        try:
+            graph = DiagramService().build_graph(directory, exclude_patterns=list(exclude), simplify=True)
+            diagram_src = render_graph(graph, "mermaid")
+        except DiagramError as exc:
+            click.echo(f"Warning: could not generate the diagram: {exc}", err=True)
+
     reporter: BaseReporter
     if fmt == "html":
         reporter = HTMLReporter()
@@ -77,7 +92,7 @@ def scan(
     else:
         reporter = JSONReporter()
 
-    report_content = reporter.generate(result)
+    report_content = reporter.generate(result, diagram=diagram_src)
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(report_content)
 
@@ -88,7 +103,7 @@ def scan(
 
 
 @cli.command()
-@click.option("--plan-file", "-p", required=True, type=click.Path(), help="Ruta al tfplan.json.")
+@click.option("--plan-file", "-p", required=True, type=click.Path(), help="Path to the tfplan.json.")
 @click.option("--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format.")
 @click.option("--output", "-o", type=click.Path(), help="Output file path.")
 @click.option("--rules-dir", type=click.Path(exists=True), help="Additional rules directory.")
@@ -106,7 +121,7 @@ def plan(
     no_color: bool,
     verbose: bool,
 ) -> None:
-    """Analiza un tfplan.json para detectar el delta de riesgo STRIDE."""
+    """Analyze a tfplan.json to detect the STRIDE risk delta."""
     if verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
     if no_color:
@@ -136,11 +151,86 @@ def plan(
 
     if not quiet:
         click.echo(
-            f"Delta scan complete: {result.findings_introduced} amenazas introducidas, "
-            f"{result.findings_resolved} resueltas. Reporte guardado en {out_file}"
+            f"Delta scan complete: {result.findings_introduced} threats introduced, "
+            f"{result.findings_resolved} resolved. Report saved to {out_file}"
         )
 
     _exit_with_code(result.findings, threshold)
+
+
+@cli.command()
+@click.option("--dir", "-d", "directory", default=".", type=click.Path(exists=True), help="Terraform directory to analyze.")
+@click.option("--format", "-f", "diagram_format", type=click.Choice(["mermaid", "dot", "drawio", "png", "svg", "pdf"]), default="mermaid", help="Diagram format.")
+@click.option("--output", "-o", type=click.Path(), help="Output file path.")
+@click.option("--metadata", "metadata_flag", is_flag=True, help="Also generate a document with the configuration of each resource.")
+@click.option("--metadata-format", type=click.Choice(["md", "json"]), default="md", help="Metadata document format.")
+@click.option("--simplify", "-s", is_flag=True, help="Hide plumbing resources (IAM, permissions, policies) for a more readable diagram.")
+@click.option("--group", "-g", "group_flag", is_flag=True, help="Group resources by microservice (subgraphs).")
+@click.option("--exclude-type", "exclude_types", multiple=True, type=click.STRING, help="Resource type to hide from the diagram (repeatable).")
+@click.option("--exclude", "-e", "exclude", multiple=True, type=click.STRING, help="Glob patterns to exclude (repeatable).")
+@click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
+@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+def diagram(
+    directory: str,
+    diagram_format: str,
+    output: str,
+    metadata_flag: bool,
+    metadata_format: str,
+    simplify: bool,
+    group_flag: bool,
+    exclude_types: tuple,
+    exclude: tuple,
+    quiet: bool,
+    verbose: bool,
+) -> None:
+    """Generate an architecture diagram from the Terraform dependency graph."""
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+
+    ext = {"mermaid": "mmd", "dot": "dot", "drawio": "drawio", "png": "png", "svg": "svg", "pdf": "pdf"}[diagram_format]
+    out_file = output or f"tmac-diagram.{ext}"
+    exclude_patterns = list(exclude)
+    service = DiagramService()
+
+    try:
+        graph = service.build_graph(
+            directory,
+            exclude_patterns=exclude_patterns,
+            simplify=simplify,
+            exclude_types=list(exclude_types),
+        )
+        groups = group_by_name(graph) if group_flag else None
+        if diagram_format in IMAGE_FORMATS:
+            render_image(graph, out_file, diagram_format, groups)
+        else:
+            content = render_graph(graph, diagram_format, groups)
+            with open(out_file, "w", encoding="utf-8") as f:
+                f.write(content)
+    except DiagramError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(3)
+    except RuntimeError as exc:
+        click.echo(str(exc), err=True)
+        sys.exit(3)
+
+    if not quiet:
+        click.echo(
+            f"Diagram generated: {len(graph.nodes)} resources, {len(graph.edges)} connections. "
+            f"Saved to {out_file}"
+        )
+
+    if metadata_flag:
+        try:
+            metadata = service.extract_metadata(directory, exclude_patterns=exclude_patterns)
+        except DiagramError as exc:
+            click.echo(str(exc), err=True)
+            sys.exit(3)
+        meta_ext = "json" if metadata_format == "json" else "md"
+        meta_file = f"tmac-metadata.{meta_ext}"
+        with open(meta_file, "w", encoding="utf-8") as f:
+            f.write(render_metadata(metadata, metadata_format))
+        if not quiet:
+            click.echo(f"Metadata for {len(metadata)} resources saved to {meta_file}")
 
 
 def _exit_with_code(findings: list, threshold: str) -> None:

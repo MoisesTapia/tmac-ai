@@ -6,8 +6,8 @@ from tmac.delta.models import DeltaScanResult
 
 class MarkdownReporter(BaseReporter):
     """Generates a Markdown report intended for Pull Request comments."""
-    
-    def generate(self, result: ScanResult) -> str:
+
+    def generate(self, result: ScanResult, diagram: str | None = None) -> str:
         templates_dir = Path(__file__).parent.parent / "templates"
         env = Environment(loader=FileSystemLoader(templates_dir))
 
@@ -16,4 +16,4 @@ class MarkdownReporter(BaseReporter):
         else:
             template = env.get_template("report.md.j2")
 
-        return template.render(result=result)
+        return template.render(result=result, diagram=diagram)
