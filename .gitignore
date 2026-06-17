@@ -40,3 +40,6 @@ tmac-report.md
 *.log
 mypy_errors.txt
 debug.py
+
+# Kiro (local only — no debe versionarse)
+.kiro/
