@@ -90,7 +90,7 @@ class TestHeadingsPresent:
         assert "Severity" in rendered, "Heading 'Severity' missing"
         assert "Resource" in rendered, "Heading 'Resource' missing"
         assert "Rule" in rendered, "Heading 'Rule' missing"
-        assert "Action" in rendered, "Heading 'Action' missing"
+        assert "File" in rendered, "Heading 'File' missing"
 
     def test_headings_present_in_severity_breakdown(self):
         """The Severity heading must appear in the breakdown table even with no findings."""
@@ -110,7 +110,7 @@ class TestHeadingsPresent:
         assert "Severity" in rendered
         assert "Resource" in rendered
         assert "Rule" in rendered
-        assert "Action" in rendered
+        assert "File" in rendered
 
 
 class TestEmptyFindingSet:

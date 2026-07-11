@@ -56,6 +56,7 @@ class CommentContext:
     max_length: int      # Platform maximum comment length (R2.13)
     introduced: int      # Newly introduced threat count (R2.1)
     resolved: int        # Resolved threat count (R2.1)
+    repo_url: str = ""   # Base GitHub repo URL for generating file links (optional)
 
 
 # ---------------------------------------------------------------------------
@@ -110,28 +111,71 @@ class CommentFormatter:
             )
             lines.append("")
 
-        # Findings section
+        # Findings section — grouped by severity, each group collapsible
         lines.append("### Findings")
         if not ordered:
             lines.append("")
             lines.append("✅ No findings")
         else:
-            lines.append("| Severity | Resource | Rule | Action |")
-            lines.append("|----------|----------|------|--------|")
-            for finding in ordered:
-                sev_lower = finding.severity.lower()
-                sev_emoji = _SEVERITY_EMOJI.get(sev_lower, "")
-                resource = f"`{finding.resource_type}.{finding.resource_name}`"
-                rule = f"`{finding.rule_id}`"
-                action = self._action_label(finding)
-                lines.append(
-                    f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |"
-                )
+            lines.extend(self._render_collapsible_groups(ordered, ctx))
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")
 
         return "\n".join(lines)
+
+    def _render_collapsible_groups(self, rows: List[Finding], ctx: "CommentContext | None" = None) -> List[str]:
+        """Render findings grouped by severity, each group in a <details> block."""
+        groups: dict = {sev: [] for sev in _SEVERITY_ORDER}
+        for f in rows:
+            key = f.severity.lower()
+            if key in groups:
+                groups[key].append(f)
+
+        lines: List[str] = []
+        for sev in _SEVERITY_ORDER:
+            group = groups[sev]
+            if not group:
+                continue
+            emoji = _SEVERITY_EMOJI[sev]
+            count = len(group)
+            label = f"{emoji} {sev.capitalize()} — {count} finding{'s' if count != 1 else ''}"
+            lines.append("")
+            lines.append("<details>")
+            lines.append(f"<summary>{label}</summary>")
+            lines.append("")
+            lines.append("| Resource | Rule | File | STRIDE | Mitigation |")
+            lines.append("|----------|------|------|--------|------------|")
+            for f in group:
+                resource = f"`{f.resource_type}.{f.resource_name}`"
+                rule = f"`{f.rule_id}`"
+                stride = f.stride if isinstance(f.stride, str) else ", ".join(f.stride)
+                mitigation = f.mitigation.replace("\n", " ").replace("|", "\\|")[:120]
+                # File + line: link to GitHub if repo_url available, otherwise plain text
+                file_ref = self._file_ref(f, ctx)
+                lines.append(
+                    f"| {resource} | {rule} | {file_ref} | {stride} | {mitigation} |"
+                )
+            lines.append("")
+            lines.append("</details>")
+
+        return lines
+
+    def _file_ref(self, finding: Finding, ctx: "CommentContext | None") -> str:
+        """Return a file:line reference, linked to GitHub when repo_url is set."""
+        file_path = finding.file_path or ""
+        line = finding.line_number
+
+        # Normalize path: strip leading ./ or /
+        clean_path = file_path.lstrip("./")
+
+        if ctx and ctx.repo_url:
+            # e.g. https://github.com/owner/repo/blob/v1.6.0/examples/file.tf#L31
+            url = f"{ctx.repo_url.rstrip('/')}/blob/HEAD/{clean_path}#L{line}"
+            return f"[`{clean_path}:{line}`]({url})"
+        elif clean_path:
+            return f"`{clean_path}:{line}`"
+        return ""
 
     # ------------------------------------------------------------------
     # Internal helpers (unit-tested directly)
@@ -265,17 +309,7 @@ class CommentFormatter:
             lines.append("")
             lines.append("✅ No findings")
         else:
-            lines.append("| Severity | Resource | Rule | Action |")
-            lines.append("|----------|----------|------|--------|")
-            for finding in rows:
-                sev_lower = finding.severity.lower()
-                sev_emoji = _SEVERITY_EMOJI.get(sev_lower, "")
-                resource = f"`{finding.resource_type}.{finding.resource_name}`"
-                rule = f"`{finding.rule_id}`"
-                action = self._action_label(finding)
-                lines.append(
-                    f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |"
-                )
+            lines.extend(self._render_collapsible_groups(rows, ctx))
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")
