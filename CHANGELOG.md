@@ -15,12 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`src/tmac/ci/` package**: new CI layer package with the following modules:
   - `git_diff.py`: `changed_tf_files(base_ref, head_ref)` + `GitRefError` to detect which `.tf` files changed between two refs.
   - `secrets.py`: `read_token()` reads `GITHUB_TOKEN` / `CI_JOB_TOKEN` / `TMAC_TOKEN` from the environment; `redact(text)` replaces any token occurrence in output strings with `***REDACTED***`.
-  - `comment.py`: `CommentFormatter.format()` renders the idempotent Markdown comment with the MARKER, executive summary, severity breakdown, findings table, `BLOCKED/WARNING/APPROVED` badge, and artifact reference. Supports intelligent size-based truncation.
+  - `comment.py`: `CommentFormatter.format()` renders the idempotent Markdown comment with the MARKER, executive summary, severity breakdown, **collapsible findings grouped by severity** (via `<details>/<summary>`), file:line links to GitHub, `BLOCKED/WARNING/APPROVED` badge, and artifact reference. Supports intelligent size-based truncation.
   - `publisher.py`: `GitHubCommentPublisher` and `GitLabCommentPublisher` with idempotent find-or-update behavior through an injectable `HttpTransport`.
-  - `runner.py`: `CIRunner.run()` orchestrates the complete flow. Handles `PublishError`, `PublishPermissionError`, and `NoPullRequestContext` without altering the findings-based exit code.
+  - `runner.py`: `CIRunner.run()` orchestrates the complete flow. Handles `PublishError`, `PublishPermissionError`, and `NoPullRequestContext` without altering the findings-based exit code. Always writes the report artifact locally regardless of token presence.
 - **`action.yml`**: official composite GitHub Action with inputs `dir`, `fail-on`, `delta-only`, `comment`, `report-format`, `output`; permissions limited to `pull-requests: write, contents: read`; artifact uploaded with `if: always()`.
 - **`ci/github/entrypoint.sh`**: Action entrypoint; validates inputs (invalid values → descriptive error + exit 3), maps flags, publishes comment only on `pull_request` events, propagates the `tmac ci` exit code unchanged.
 - **`ci/gitlab/tmac.gitlab-ci.yml`**: includable GitLab CI template with `TMAC_DIR/FAIL_ON/DELTA_ONLY/COMMENT` variables, `artifacts: when: always`, `rules:` that gate comments to `merge_request_event`.
+- **`.github/workflows/tmac.yml`**: ready-to-use GitHub Actions workflow for the repo itself — triggers on PRs with `.tf` changes.
 - **`Dockerfile`**: official image based on `python:3.11-slim`, `ENTRYPOINT ["tmac"]`, non-root user.
 - **`.pre-commit-hooks.yaml`**: hook `id: tmac` running `tmac scan` against staged `.tf` files; automatically skipped when no `.tf` files are staged.
 - **`Scanner.include_paths`**: new optional parameter in `Scanner.run_scan()` to restrict analysis to a subset of paths — fully backward-compatible (default `None`).
@@ -31,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`src/tmac/cli.py`**: added the `ci` subcommand; `@click.version_option` updated to `"1.6.0"`.
 - **`src/tmac/scanner.py`**: added `include_paths: Optional[List[str]] = None` to `run_scan()`.
+- **`src/tmac/ci/runner.py`**: report artifact is now always written locally even when token is absent (previously skipped); only the remote upload is skipped.
+- **`src/tmac/ci/comment.py`**: findings table replaced with collapsible `<details>/<summary>` sections grouped by severity; `Action` column replaced with `File` column showing `file:line` with direct GitHub links.
+- **`DOCS/ARCHITECTURE.md`**: updated to reflect the new `src/tmac/ci/` package and distribution artifacts.
+- **`CONTRIBUTING.md`**: corrected repo URL to `MoisesTapia/tmac-ai`.
 
 ---
 

@@ -24,8 +24,8 @@ run the tests, and the process for adding new threat rules.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/tmac-security/tmac.git
-cd tmac
+git clone https://github.com/MoisesTapia/tmac-ai.git
+cd tmac-ai
 
 # 2. Install dependencies (including dev)
 poetry install

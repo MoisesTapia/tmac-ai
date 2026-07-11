@@ -35,6 +35,10 @@ htmlcov/
 tmac-report.html
 tmac-report.json
 tmac-report.md
+tmac-ci-report.*
+tmac-ci-*.md
+tmac-ci-*.html
+tmac-ci-*.json
 tmac-delta-report.*
 tmac-diagram.*
 tmac-metadata.*
@@ -43,6 +47,13 @@ tmac-metadata.*
 *.log
 mypy_errors.txt
 debug.py
+
+# GitHub Actions workflow logs
+.github/workflows/*.log
+
+# DOCS — generated/binary files that should not be versioned
+DOCS/*.docx
+DOCS/threats.yaml
 
 # Kiro (local only — must not be versioned)
 # Kiro (local only — no debe versionarse)
