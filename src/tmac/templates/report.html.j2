@@ -390,7 +390,7 @@
 
     </style>
     <script>
-        // Paginación Core
+        // Pagination Core
         const itemsPerPage = 6;
         let currentPage = 1;
         let totalItems = 0;
@@ -413,7 +413,7 @@
             if (page < 1 || page > totalPages) return;
             currentPage = page;
             
-            // Cerrar cualquier acordeon abierto
+            // Close any open accordion
             document.querySelectorAll('.finding-details.show').forEach(el => el.classList.remove('show'));
             document.querySelectorAll('.details-row.active').forEach(el => el.classList.remove('active'));
 
@@ -442,7 +442,7 @@
                 content.classList.remove('show');
                 row.classList.remove('active');
             } else {
-                // Acordeon behavior
+                // Accordion behavior
                 document.querySelectorAll('.finding-details.show').forEach(el => el.classList.remove('show'));
                 document.querySelectorAll('.details-row.active').forEach(el => el.classList.remove('active'));
                 
@@ -618,6 +618,20 @@
             <h3>Excellent work!</h3>
             <p style="color: var(--text-muted); margin: 0;">No security findings detected in the provided infrastructure code.</p>
         </div>
+        {% endif %}
+
+        {% if diagram %}
+        <section class="card" style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+            <h2>🗺️ Architecture Diagram</h2>
+            <p style="color: var(--text-muted);">Dependency graph between Terraform resources.</p>
+            <div class="mermaid">
+{{ diagram }}
+            </div>
+        </section>
+        <script type="module">
+            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+            mermaid.initialize({ startOnLoad: true });
+        </script>
         {% endif %}
 
     </main>

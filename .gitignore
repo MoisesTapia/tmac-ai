@@ -35,11 +35,15 @@ htmlcov/
 tmac-report.html
 tmac-report.json
 tmac-report.md
+tmac-delta-report.*
+tmac-diagram.*
+tmac-metadata.*
 
 # Misc
 *.log
 mypy_errors.txt
 debug.py
 
+# Kiro (local only — must not be versioned)
 # Kiro (local only — no debe versionarse)
 .kiro/

@@ -1,137 +1,137 @@
-# TMAC Roadmap — Ciclo Nacional Mexicano
+# TMAC Roadmap — Mexican National Cycle
 
-Cada release lleva el nombre de un elemento significativo del patrimonio mexicano.
-El roadmap se estructura en seis fases: Foundation → CI/CD Native → Platform → Intelligence → MCP + Agente → Threat Modeling Real.
+Each release is named after a significant element of Mexican heritage.
+The roadmap is structured into six phases: Foundation → CI/CD Native → Platform → Intelligence → MCP + Agent → Real Threat Modeling.
 
-**Visión:** Convertir TMAC en la herramienta de threat modeling más integrada del ecosistema DevSecOps — no solo un linter que corres manualmente, sino un agente de seguridad que vive en tu repositorio, analiza cada push, comenta en tus PRs, y evoluciona hacia un threat modeler conversacional completo.
+**Vision:** Turn TMAC into the most integrated threat modeling tool in the DevSecOps ecosystem — not just a linter you run manually, but a security agent that lives in your repository, analyzes every push, comments on your PRs, and evolves into a complete conversational threat modeler.
 
 ---
 
-## Comparativa con la competencia
+## Comparison with the competition
 
-| Capacidad | ThreatMitigator | TMAC v1.x | TMAC v2.x | TMAC v3.x |
+| Capability | ThreatMitigator | TMAC v1.x | TMAC v2.x | TMAC v3.x |
 |---|---|---|---|---|
-| Análisis estático Terraform | ✅ | ✅ | ✅ | ✅ |
+| Static Terraform analysis | ✅ | ✅ | ✅ | ✅ |
 | SARIF / GitHub Code Scanning | ✅ | ✅ | ✅ | ✅ |
-| GitHub Action nativa | ✅ | ✅ (v1.6) | ✅ | ✅ |
-| **Análisis de delta en tfplan** | ❌ | ✅ (v1.1) | ✅ | ✅ |
-| **Agente en PR — comenta amenazas** | ❌ | ✅ (v1.6) | ✅ | ✅ |
-| **Dashboard web multi-repo** | ❌ | ✅ (v1.8) | ✅ | ✅ |
-| **MCP Server — agente conversacional** | ❌ | ❌ | ✅ (v2.0) | ✅ |
-| **Grafo de dependencias IaC** | ❌ | ❌ | ✅ (v2.2) | ✅ |
-| **STRIDE sobre flujos del DFD** | ❌ | ❌ | ❌ | ✅ (v3.0) |
-| **TM completo automatizado** | ❌ | ❌ | ❌ | ✅ (v3.5) |
+| Native GitHub Action | ✅ | ✅ (v1.6) | ✅ | ✅ |
+| **Delta analysis on tfplan** | ❌ | ✅ (v1.1) | ✅ | ✅ |
+| **Agent in PR — comments threats** | ❌ | ✅ (v1.6) | ✅ | ✅ |
+| **Multi-repo web dashboard** | ❌ | ✅ (v1.8) | ✅ | ✅ |
+| **MCP Server — conversational agent** | ❌ | ❌ | ✅ (v2.0) | ✅ |
+| **IaC dependency graph** | ❌ | ❌ | ✅ (v2.2) | ✅ |
+| **STRIDE over DFD flows** | ❌ | ❌ | ❌ | ✅ (v3.0) |
+| **Complete automated TM** | ❌ | ❌ | ❌ | ✅ (v3.5) |
 
 ---
 
 ## Phase 1: Foundation — Ixtla (v1.0.0 – v1.1.0)
 
-### v1.0.0 — Análisis estático de Terraform *(Ixtla, actual, Q1 2026)*
+### v1.0.0 — Static Terraform analysis *(Ixtla, current, Q1 2026)*
 
-**Paradigma**: lint de seguridad por recurso individual.
+**Paradigm**: security lint per individual resource.
 
-Cada regla evalúa condiciones sobre los atributos de un solo bloque `resource`. No hay conocimiento de relaciones entre recursos.
+Each rule evaluates conditions on the attributes of a single `resource` block. There is no knowledge of relationships between resources.
 
-Capacidades:
-- Parseo de archivos `.tf` con extracción de `ResourceModel`
-- Evaluación de condiciones STRIDE por recurso (10 reglas AWS base)
-- Reportes HTML, Markdown, SARIF/JSON
-- Mecanismo `tmac:ignore` por recurso y por regla
-- Exit codes estructurados para CI/CD (0/1/2/3)
-- Configuración via `.tmac.yaml`
+Capabilities:
+- Parsing of `.tf` files with `ResourceModel` extraction
+- Evaluation of STRIDE conditions per resource (10 base AWS rules)
+- HTML, Markdown, SARIF/JSON reports
+- `tmac:ignore` mechanism per resource and per rule
+- Structured exit codes for CI/CD (0/1/2/3)
+- Configuration via `.tmac.yaml`
 
-Limitación fundamental: no construye grafo de dependencias. Una Lambda expuesta indirectamente por un rol IAM permisivo no es detectable en esta versión.
-
----
-
-### v1.1.0 — Análisis de delta de riesgo via tfplan.json *(Ixtla, Q2 2026)*
-
-**Paradigma**: análisis de cambios *antes* de `terraform apply` — lo que ningún competidor hace con STRIDE.
-
-Parsea el plan de ejecución de Terraform (`tfplan.json`) para detectar amenazas en los recursos que van a ser creados, modificados o destruidos. El diferenciador clave: no analiza el estado completo, sino el **delta de riesgo** introducido por el PR.
-
-Capacidades nuevas:
-- Parser de `tfplan.json` (output de `terraform plan -out=plan.json`)
-- Motor de detección de cambios de riesgo: recurso seguro → inseguro
-- Diferenciación entre recursos nuevos, modificados y destruidos
-- Reporte de delta: "este PR introduce 3 amenazas nuevas y resuelve 1"
-- Integración con el agente de PR (v1.6): el comentario automático muestra solo las amenazas del diff
-
-Ejemplo de amenaza detectable:
-> "El plan modifica `aws_s3_bucket.data` cambiando `acl` de `private` a `public-read` — introducción de riesgo Critical (STRIDE-I)"
-
-**Plus vs ThreatMitigator:** ellos analizan el estado completo. TMAC analiza el *cambio* — lo que importa en un PR review.
+Fundamental limitation: it does not build a dependency graph. A Lambda indirectly exposed by a permissive IAM role is not detectable in this version.
 
 ---
 
-## Phase 2: CI/CD Native + Distribución — Ixtla (v1.2.0 – v1.6.0)
+### v1.1.0 — Risk delta analysis via tfplan.json *(Ixtla, Q2 2026)*
+
+**Paradigm**: analysis of changes *before* `terraform apply` — something no competitor does with STRIDE.
+
+Parses the Terraform execution plan (`tfplan.json`) to detect threats in the resources that will be created, modified, or destroyed. The key differentiator: it does not analyze the full state, but the **risk delta** introduced by the PR.
+
+New capabilities:
+- Parser for `tfplan.json` (output of `terraform plan -out=plan.json`)
+- Risk change detection engine: secure → insecure resource
+- Differentiation between new, modified, and destroyed resources
+- Delta report: "this PR introduces 3 new threats and resolves 1"
+- Integration with the PR agent (v1.6): the automatic comment shows only the threats in the diff
+
+Example of a detectable threat:
+> "The plan modifies `aws_s3_bucket.data`, changing `acl` from `private` to `public-read` — introduction of Critical risk (STRIDE-I)"
+
+**Plus vs ThreatMitigator:** they analyze the full state. TMAC analyzes the *change* — what matters in a PR review.
+
+---
+
+## Phase 2: CI/CD Native + Distribution — Ixtla (v1.2.0 – v1.6.0)
 
 ### v1.2.0 — AWS CloudFormation *(Ixtla, Q3 2026)*
 
-Soporte para CloudFormation templates en YAML/JSON. Mismo engine de reglas, nuevo parser.
+Support for CloudFormation templates in YAML/JSON. Same rule engine, new parser.
 
-Capacidades nuevas:
-- `CloudFormationParser` que implementa `BaseParser`
-- Reglas específicas para recursos CFN (`AWS::S3::Bucket`, `AWS::IAM::Role`, etc.)
-- Soporte para `!Ref` y `!Sub` en resolución de atributos
+New capabilities:
+- `CloudFormationParser` that implements `BaseParser`
+- Specific rules for CFN resources (`AWS::S3::Bucket`, `AWS::IAM::Role`, etc.)
+- Support for `!Ref` and `!Sub` in attribute resolution
 
 ---
 
 ### v1.3.0 — Kubernetes Security *(Ixtla, Q4 2026)*
 
-Análisis de manifiestos Kubernetes con foco en RBAC y Pod Security.
+Analysis of Kubernetes manifests with a focus on RBAC and Pod Security.
 
-Capacidades nuevas:
-- `KubernetesParser` para manifiestos YAML (`Deployment`, `Pod`, `ClusterRole`, etc.)
-- Reglas para RBAC (ClusterRoleBindings con `*` en verbs/resources)
-- Reglas para Pod Security (privileged containers, hostNetwork, hostPID)
-- Reglas para Network Policies ausentes
+New capabilities:
+- `KubernetesParser` for YAML manifests (`Deployment`, `Pod`, `ClusterRole`, etc.)
+- Rules for RBAC (ClusterRoleBindings with `*` in verbs/resources)
+- Rules for Pod Security (privileged containers, hostNetwork, hostPID)
+- Rules for missing Network Policies
 
 ---
 
 ### v1.4.0 — Multicloud: Azure Bicep *(Ixtla, Q1 2027)*
 
-Expansión al ecosistema Azure con soporte para Bicep y ARM templates.
+Expansion to the Azure ecosystem with support for Bicep and ARM templates.
 
-Capacidades nuevas:
-- `BicepParser` para archivos `.bicep`
-- Reglas para recursos Azure (`Microsoft.Storage/storageAccounts`, `Microsoft.Network/networkSecurityGroups`, etc.)
-- Mapeo STRIDE para servicios Azure equivalentes a los AWS
-
----
-
-### v1.5.0 — Docker Compose / Microservicios *(Ixtla, Q2 2027)*
-
-Análisis de infraestructura de microservicios definida en Docker Compose.
-
-Capacidades nuevas:
-- `DockerComposeParser` para `docker-compose.yml`
-- Detección de privilegios excesivos (`privileged: true`, `cap_add`)
-- Análisis de exposición de puertos y redes
-- Detección de secretos hardcodeados en variables de entorno
+New capabilities:
+- `BicepParser` for `.bicep` files
+- Rules for Azure resources (`Microsoft.Storage/storageAccounts`, `Microsoft.Network/networkSecurityGroups`, etc.)
+- STRIDE mapping for Azure services equivalent to the AWS ones
 
 ---
 
-### v1.6.0 — TMAC como Agente Nativo de GitHub y GitLab *(Ixtla, Q3 2027)*
+### v1.5.0 — Docker Compose / Microservices *(Ixtla, Q2 2027)*
 
-**Paradigma**: TMAC vive en tu repositorio. Cada push de código Terraform dispara un análisis automático y el agente comenta directamente en el PR con las amenazas encontradas.
+Analysis of microservices infrastructure defined in Docker Compose.
 
-**Este es el diferenciador más visible de la serie v1.x.** ThreatMitigator tiene una GitHub Action, pero no tiene un agente que razone sobre el diff y genere un comentario narrativo de threat modeling.
+New capabilities:
+- `DockerComposeParser` for `docker-compose.yml`
+- Detection of excessive privileges (`privileged: true`, `cap_add`)
+- Analysis of port and network exposure
+- Detection of hardcoded secrets in environment variables
 
-Capacidades nuevas:
+---
 
-**GitHub Action oficial:**
+### v1.6.0 — TMAC as a Native GitHub and GitLab Agent *(Ixtla, Q3 2027)*
+
+**Paradigm**: TMAC lives in your repository. Every push of Terraform code triggers an automatic analysis, and the agent comments directly on the PR with the threats found.
+
+**This is the most visible differentiator of the v1.x series.** ThreatMitigator has a GitHub Action, but it does not have an agent that reasons about the diff and generates a narrative threat modeling comment.
+
+New capabilities:
+
+**Official GitHub Action:**
 ```yaml
 # .github/workflows/tmac.yml
 - uses: tmac-security/tmac-action@v1
   with:
     dir: ./infra
     fail-on: high
-    comment-pr: true        # ← agente comenta en el PR
-    delta-only: true        # ← analiza solo los archivos cambiados en el push
+    comment-pr: true        # ← the agent comments on the PR
+    delta-only: true        # ← analyzes only the files changed in the push
 ```
 
-**GitLab CI template oficial:**
+**Official GitLab CI template:**
 ```yaml
 # .gitlab-ci.yml
 include:
@@ -139,90 +139,90 @@ include:
     file: /templates/tmac.gitlab-ci.yml
 ```
 
-**Agente de PR — comentario automático:**
-Cuando se hace push de archivos `.tf`, el agente:
-1. Detecta qué archivos `.tf` cambiaron en el diff del PR
-2. Ejecuta `tmac scan` solo sobre esos archivos (`--delta-only`)
-3. Genera un comentario estructurado en el PR con:
-   - Resumen ejecutivo: "Este PR introduce 2 amenazas nuevas (1 Critical, 1 High)"
-   - Tabla de findings con severidad, recurso, categoría STRIDE y mitigación
-   - Badge de estado: 🔴 BLOQUEADO / 🟡 ADVERTENCIA / ✅ APROBADO
-   - Link al reporte HTML completo (subido como artifact)
+**PR agent — automatic comment:**
+When `.tf` files are pushed, the agent:
+1. Detects which `.tf` files changed in the PR diff
+2. Runs `tmac scan` only on those files (`--delta-only`)
+3. Generates a structured comment on the PR with:
+   - Executive summary: "This PR introduces 2 new threats (1 Critical, 1 High)"
+   - Table of findings with severity, resource, STRIDE category, and mitigation
+   - Status badge: 🔴 BLOCKED / 🟡 WARNING / ✅ APPROVED
+   - Link to the full HTML report (uploaded as an artifact)
 
-**Ejemplo de comentario en PR:**
+**Example PR comment:**
 
 ```
-## 🔴 TMAC Security Review — 2 amenazas detectadas
+## 🔴 TMAC Security Review — 2 threats detected
 
-Este PR modifica 3 archivos `.tf` e introduce las siguientes amenazas:
+This PR modifies 3 `.tf` files and introduces the following threats:
 
-| Severidad | Recurso | Regla | STRIDE | Mitigación |
+| Severity | Resource | Rule | STRIDE | Mitigation |
 |---|---|---|---|---|
-| 🔴 Critical | `aws_s3_bucket.uploads` | TMAC-AWS-S3-001 | Info Disclosure | Cambiar ACL a `private` |
-| 🟠 High | `aws_security_group.web` | TMAC-AWS-SG-001 | Tampering | Restringir puerto 22 |
+| 🔴 Critical | `aws_s3_bucket.uploads` | TMAC-AWS-S3-001 | Info Disclosure | Change ACL to `private` |
+| 🟠 High | `aws_security_group.web` | TMAC-AWS-SG-001 | Tampering | Restrict port 22 |
 
-**Estado:** ❌ Bloqueado — se detectaron hallazgos Critical.
-Revisa el [reporte completo](artifacts/tmac-report.html) para más detalles.
+**Status:** ❌ Blocked — Critical findings were detected.
+Review the [full report](artifacts/tmac-report.html) for more details.
 ```
 
-**Publicación y distribución:**
-- Publicación en PyPI (`pip install tmac`)
-- Fórmula Homebrew para macOS/Linux
-- Imagen Docker oficial (`docker run tmac-security/tmac scan`)
-- GitHub Action en el Marketplace
-- GitLab CI template en el repositorio oficial
-- Plugin para pre-commit hooks
+**Publishing and distribution:**
+- Publishing on PyPI (`pip install tmac`)
+- Homebrew formula for macOS/Linux
+- Official Docker image (`docker run tmac-security/tmac scan`)
+- GitHub Action on the Marketplace
+- GitLab CI template in the official repository
+- Plugin for pre-commit hooks
 
-**Plus vs ThreatMitigator:** ellos tienen una Action que genera SARIF. TMAC tiene un agente que *comenta en el PR* con un threat model narrativo del diff — no solo un archivo de resultados.
+**Plus vs ThreatMitigator:** they have an Action that generates SARIF. TMAC has an agent that *comments on the PR* with a narrative threat model of the diff — not just a results file.
 
 ---
 
-## Arquitectura de Plataforma — Modelo SonarQube para Threat Modeling
+## Platform Architecture — SonarQube Model for Threat Modeling
 
-> Esta sección describe la arquitectura de la plataforma TMAC a partir de v1.6.0.
-> El modelo de referencia es SonarQube/SonarCloud: un scanner ligero que corre en CI/CD
-> y envía resultados a un servidor central que mantiene el historial completo.
+> This section describes the TMAC platform architecture starting from v1.6.0.
+> The reference model is SonarQube/SonarCloud: a lightweight scanner that runs in CI/CD
+> and sends results to a central server that maintains the complete history.
 
-### Componentes
+### Components
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  REPOSITORIO DEL USUARIO                                        │
+│  USER REPOSITORY                                                │
 │                                                                 │
-│  push .tf → GitHub Actions / GitLab CI / Jenkins / cualquier   │
+│  push .tf → GitHub Actions / GitLab CI / Jenkins / any          │
 │                    │                                            │
 │                    ▼                                            │
-│         tmac-scanner (CLI ligero)                               │
-│         ├── detecta archivos .tf cambiados en el diff           │
-│         ├── ejecuta análisis STRIDE (delta-only o full)         │
-│         ├── genera ScanResult (JSON/SARIF)                      │
-│         └── envía resultado al TMAC Server via HTTP POST        │
+│         tmac-scanner (lightweight CLI)                          │
+│         ├── detects .tf files changed in the diff               │
+│         ├── runs STRIDE analysis (delta-only or full)           │
+│         ├── generates ScanResult (JSON/SARIF)                   │
+│         └── sends result to the TMAC Server via HTTP POST       │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼ HTTP POST /api/v1/scans
 ┌─────────────────────────────────────────────────────────────────┐
-│  TMAC SERVER (self-hosted o SaaS)                               │
+│  TMAC SERVER (self-hosted or SaaS)                              │
 │                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │  API REST    │  │  Base de     │  │  Motor de            │  │
-│  │  /api/v1/    │  │  datos       │  │  notificaciones      │  │
-│  │  scans       │  │  (bitácora)  │  │  (Slack/Teams/email) │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
+│  │  API REST    │  │  Database    │  │  Notifications       │   │
+│  │  /api/v1/    │  │              │  │  engine              │   │
+│  │  scans       │  │  (log)       │  │  (Slack/Teams/email) │   │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  TMAC DASHBOARD (panel web)                              │   │
-│  │  ├── Vista organización: riesgo agregado multi-repo      │   │
-│  │  ├── Vista repositorio: historial por rama y por push    │   │
-│  │  ├── Vista push: threats encontrados en ese commit       │   │
-│  │  ├── Bitácora de mitigaciones: qué se resolvió y cuándo  │   │
-│  │  └── Tendencias: riesgo acumulado por sprint/semana      │   │
+│  │  TMAC DASHBOARD (web panel)                              │   │
+│  │  ├── Organization view: aggregated multi-repo risk       │   │
+│  │  ├── Repository view: history per branch and per push    │   │
+│  │  ├── Push view: threats found in that commit             │   │
+│  │  ├── Mitigation log: what was resolved and when          │   │
+│  │  └── Trends: accumulated risk per sprint/week            │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Bitácora por repo / rama / push
+### Log by repo / branch / push
 
-Cada scan queda registrado con el siguiente modelo de datos:
+Each scan is recorded with the following data model:
 
 ```json
 {
@@ -250,7 +250,7 @@ Cada scan queda registrado con el siguiente modelo de datos:
 }
 ```
 
-El dashboard muestra esta bitácora como una línea de tiempo por rama:
+The dashboard shows this log as a timeline per branch:
 
 ```
 main        ──●──────────●──────────●──────────●──
@@ -263,19 +263,19 @@ feature/rds ──────────●──────────●�
                        5 threats  3 resolved
 ```
 
-### tmac-scanner — Script compatible con cualquier CI/CD
+### tmac-scanner — Script compatible with any CI/CD
 
-Similar al `sonar-scanner`, TMAC provee un script ligero que se instala una vez
-y se invoca desde cualquier pipeline. No requiere configuración compleja.
+Similar to `sonar-scanner`, TMAC provides a lightweight script that is installed once
+and is invoked from any pipeline. It does not require complex configuration.
 
-**Instalación:**
+**Installation:**
 ```bash
 pip install tmac[scanner]
 # o
 docker pull tmac-security/tmac-scanner:latest
 ```
 
-**Uso básico (cualquier CI/CD):**
+**Basic usage (any CI/CD):**
 ```bash
 tmac-scanner \
   --dir ./infra \
@@ -284,21 +284,21 @@ tmac-scanner \
   --repo $CI_PROJECT_PATH \
   --branch $CI_COMMIT_BRANCH \
   --commit $CI_COMMIT_SHA \
-  --delta-only                    # analiza solo archivos cambiados en el push
+  --delta-only                    # analyzes only files changed in the push
 ```
 
-**Variables de entorno (alternativa a flags):**
+**Environment variables (alternative to flags):**
 ```bash
 TMAC_SERVER_URL=https://tmac.miempresa.com
-TMAC_TOKEN=<token-de-proyecto>
+TMAC_TOKEN=<project-token>
 TMAC_REPO=org/infra-repo
 TMAC_BRANCH=main
 TMAC_COMMIT=abc123
 ```
 
-**Compatibilidad CI/CD:**
+**CI/CD compatibility:**
 
-| Plataforma | Método | Template oficial |
+| Platform | Method | Official template |
 |---|---|---|
 | GitHub Actions | `uses: tmac-security/tmac-action@v1` | ✅ Marketplace |
 | GitLab CI | `include: tmac-security/tmac-ci` | ✅ Template |
@@ -307,9 +307,9 @@ TMAC_COMMIT=abc123
 | Azure DevOps | Task extension | ✅ Marketplace |
 | Bitbucket Pipelines | `pipe: tmac-security/tmac-scanner` | ✅ Pipe |
 | Pre-commit hook | `repo: tmac-security/tmac` | ✅ Hook |
-| Docker (cualquier CI) | `docker run tmac-security/tmac-scanner` | ✅ Universal |
+| Docker (any CI) | `docker run tmac-security/tmac-scanner` | ✅ Universal |
 
-**Ejemplo GitHub Actions completo:**
+**Complete GitHub Actions example:**
 ```yaml
 name: TMAC Threat Modeling
 on: [push, pull_request]
@@ -320,7 +320,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # necesario para delta-only
+          fetch-depth: 0          # required for delta-only
 
       - uses: tmac-security/tmac-action@v1
         with:
@@ -329,10 +329,10 @@ jobs:
           token: ${{ secrets.TMAC_TOKEN }}
           fail-on: high
           delta-only: true
-          comment-pr: true        # comenta en el PR con las amenazas del diff
+          comment-pr: true        # comments on the PR with the threats in the diff
 ```
 
-**Ejemplo GitLab CI completo:**
+**Complete GitLab CI example:**
 ```yaml
 include:
   - project: tmac-security/tmac-ci
@@ -342,12 +342,12 @@ variables:
   TMAC_SERVER_URL: https://tmac.miempresa.com
   TMAC_FAIL_ON: high
   TMAC_DELTA_ONLY: "true"
-  TMAC_COMMENT_MR: "true"         # comenta en el MR con las amenazas del diff
+  TMAC_COMMENT_MR: "true"         # comments on the MR with the threats in the diff
 ```
 
-### Modelo de despliegue
+### Deployment model
 
-**Self-hosted (como SonarQube):**
+**Self-hosted (like SonarQube):**
 ```bash
 # docker-compose.yml
 services:
@@ -365,9 +365,9 @@ services:
       API_URL: http://tmac-server:8080
 ```
 
-**SaaS (como SonarCloud):**
-- `app.tmac.security` — plan gratuito para repos públicos
-- Plan team para organizaciones privadas
+**SaaS (like SonarCloud):**
+- `app.tmac.security` — free plan for public repos
+- Team plan for private organizations
 - SSO via GitHub OAuth / GitLab OAuth / SAML
 
 ---
@@ -376,238 +376,238 @@ services:
 
 ### v1.7.0 — Live Infrastructure / AWS Runtime *(Ixtla, Q4 2027)*
 
-Análisis de infraestructura en vivo via AWS SDK, sin necesidad de archivos IaC.
+Analysis of live infrastructure via the AWS SDK, without the need for IaC files.
 
-Capacidades nuevas:
-- Conexión via Boto3 para leer el estado real de recursos AWS
-- Detección de drift entre IaC y estado real en AWS
-- Análisis de recursos creados manualmente (fuera de Terraform)
-- Soporte para AWS Organizations (escaneo multi-cuenta)
+New capabilities:
+- Connection via Boto3 to read the real state of AWS resources
+- Drift detection between IaC and the real state in AWS
+- Analysis of manually created resources (outside Terraform)
+- Support for AWS Organizations (multi-account scanning)
 
 ---
 
-### v1.8.0 — TMAC Dashboard — Panel Web Multi-Repositorio *(Ixtla, Q1 2028)*
+### v1.8.0 — TMAC Dashboard — Multi-Repository Web Panel *(Ixtla, Q1 2028)*
 
-**Paradigma**: TMAC como plataforma de seguridad centralizada para equipos.
+**Paradigm**: TMAC as a centralized security platform for teams.
 
-Un panel web que agrega los resultados de todos los repositorios de la organización, muestra tendencias de riesgo, y permite a los equipos de seguridad tener visibilidad completa sin revisar cada PR manualmente.
+A web panel that aggregates the results of all the organization's repositories, shows risk trends, and lets security teams have complete visibility without reviewing each PR manually.
 
-**Plus vs ThreatMitigator:** ellos no tienen dashboard. TMAC se convierte en una plataforma, no solo una herramienta.
+**Plus vs ThreatMitigator:** they do not have a dashboard. TMAC becomes a platform, not just a tool.
 
-Capacidades nuevas:
+New capabilities:
 
 **Backend (`tmac-server`):**
-- API REST para recibir resultados de scans desde GitHub Actions / GitLab CI
-- Almacenamiento de histórico de scans por repositorio y rama
-- Autenticación via GitHub OAuth / GitLab OAuth
-- Webhooks para notificaciones (Slack, Teams, PagerDuty)
+- REST API to receive scan results from GitHub Actions / GitLab CI
+- Storage of scan history per repository and branch
+- Authentication via GitHub OAuth / GitLab OAuth
+- Webhooks for notifications (Slack, Teams, PagerDuty)
 
 **Frontend (`tmac-dashboard`):**
-- Panel principal: resumen de riesgo por organización
-- Vista por repositorio: histórico de findings, tendencia de riesgo
-- Vista por regla: qué reglas se disparan más, en qué repos
-- Vista por desarrollador: quién introduce más amenazas (gamificación opcional)
-- Gráficas de tendencia: riesgo acumulado por sprint/semana
-- Exportación a PDF para reportes ejecutivos y auditorías
+- Main panel: risk summary per organization
+- Per-repository view: history of findings, risk trend
+- Per-rule view: which rules trigger the most, in which repos
+- Per-developer view: who introduces the most threats (optional gamification)
+- Trend charts: accumulated risk per sprint/week
+- PDF export for executive reports and audits
 
-**Integración con el agente de PR (v1.6):**
-- El agente de PR envía los resultados al dashboard automáticamente
-- El dashboard muestra el historial de cada PR con sus findings
-- Alertas configurables: "si el riesgo del repo X supera umbral Y, notificar a Z"
+**Integration with the PR agent (v1.6):**
+- The PR agent sends the results to the dashboard automatically
+- The dashboard shows the history of each PR with its findings
+- Configurable alerts: "if the risk of repo X exceeds threshold Y, notify Z"
 
-**Self-hosted y SaaS:**
-- Imagen Docker para self-hosting (`docker-compose up tmac-dashboard`)
-- Opción SaaS en `app.tmac.security` (roadmap futuro)
+**Self-hosted and SaaS:**
+- Docker image for self-hosting (`docker-compose up tmac-dashboard`)
+- SaaS option at `app.tmac.security` (future roadmap)
 
 ---
 
-### v1.9.0 — AI-Powered Auto-Remediation en PR *(Ixtla, Q2 2028)*
+### v1.9.0 — AI-Powered Auto-Remediation in PR *(Ixtla, Q2 2028)*
 
-**Paradigma**: el agente no solo detecta amenazas, también propone el fix directamente en el PR.
+**Paradigm**: the agent not only detects threats, it also proposes the fix directly in the PR.
 
-Capacidades nuevas:
-- Análisis de findings con LLM para generar código Terraform corregido
-- Sugerencia de fix inline en el comentario del PR (GitHub Suggestions API)
-- PR automático con el parche propuesto cuando el desarrollador lo aprueba
-- Privacidad: solo se envía metadata del finding al LLM, nunca el código fuente
-- Soporte para OpenAI GPT-4o, Anthropic Claude, y modelos locales via Ollama
-- Integración con GitHub Copilot y Amazon Q
+New capabilities:
+- Analysis of findings with an LLM to generate corrected Terraform code
+- Inline fix suggestion in the PR comment (GitHub Suggestions API)
+- Automatic PR with the proposed patch when the developer approves it
+- Privacy: only the finding metadata is sent to the LLM, never the source code
+- Support for OpenAI GPT-4o, Anthropic Claude, and local models via Ollama
+- Integration with GitHub Copilot and Amazon Q
 
-**Ejemplo de sugerencia inline en PR:**
+**Example of an inline suggestion in a PR:**
 ```diff
 - acl = "public-read"
 + acl = "private"
 ```
-> 💡 TMAC sugiere este cambio para resolver TMAC-AWS-S3-001 (Critical).
-> [Aplicar sugerencia] [Ver explicación completa]
+> 💡 TMAC suggests this change to resolve TMAC-AWS-S3-001 (Critical).
+> [Apply suggestion] [See full explanation]
 
 ---
 
-## Phase 4: MCP Server + Agente Conversacional — Mitla (v2.0.0 – v2.1.0)
+## Phase 4: MCP Server + Conversational Agent — Mitla (v2.0.0 – v2.1.0)
 
-Esta fase convierte TMAC en una herramienta conversacional. Un MCP server expone las capacidades del engine como herramientas que cualquier agente LLM puede invocar. El agente razona sobre los resultados, hace preguntas, y construye el modelo de amenazas de forma interactiva.
+This phase turns TMAC into a conversational tool. An MCP server exposes the engine capabilities as tools that any LLM agent can invoke. The agent reasons about the results, asks questions, and builds the threat model interactively.
 
 ---
 
 ### v2.0.0 — TMAC MCP Server *(Mitla, Q3 2028)*
 
-**Paradigma**: TMAC como herramienta invocable por agentes LLM via Model Context Protocol.
+**Paradigm**: TMAC as a tool invokable by LLM agents via the Model Context Protocol.
 
-El MCP server expone el engine de v1.x como tools estructuradas. Con solo los findings individuales como contexto, el LLM ya puede construir un TM narrativo útil, razonando sobre relaciones que el engine aún no detecta automáticamente.
+The MCP server exposes the v1.x engine as structured tools. With only the individual findings as context, the LLM can already build a useful narrative TM, reasoning about relationships that the engine does not yet detect automatically.
 
-Capacidades nuevas:
-- `tmac-mcp` server implementado con el SDK oficial de MCP (Python)
-- Tools expuestas:
+New capabilities:
+- `tmac-mcp` server implemented with the official MCP SDK (Python)
+- Exposed tools:
   - `scan(directory, exclude, rules_dir)` → `ScanResult`
   - `get_findings(severity_filter, rule_id)` → `List[Finding]`
   - `get_rules(cloud, service)` → `List[ThreatRule]`
-  - `explain_finding(finding_id)` → descripción detallada con mitigación
-  - `generate_report(format, output_path)` → archivo de reporte
-  - `get_dashboard_summary(repo)` → resumen del dashboard para el repo
-- Compatible con Claude Desktop, Kiro, Cursor y cualquier cliente MCP
-- Instalable via `uvx tmac-mcp` o `pip install tmac[mcp]`
+  - `explain_finding(finding_id)` → detailed description with mitigation
+  - `generate_report(format, output_path)` → report file
+  - `get_dashboard_summary(repo)` → dashboard summary for the repo
+- Compatible with Claude Desktop, Kiro, Cursor, and any MCP client
+- Installable via `uvx tmac-mcp` or `pip install tmac[mcp]`
 
-Flujo de uso:
+Usage flow:
 ```
-Usuario: "Haz un threat model de ./infra"
-Agente:  scan("./infra") → 12 findings
-         get_findings(severity="critical") → 3 findings críticos
-         "Basado en los findings, tu arquitectura tiene estos riesgos..."
-         [genera TM narrativo con STRIDE, mitigaciones y prioridades]
+User:  "Do a threat model of ./infra"
+Agent:  scan("./infra") → 12 findings
+         get_findings(severity="critical") → 3 critical findings
+         "Based on the findings, your architecture has these risks..."
+         [generates narrative TM with STRIDE, mitigations, and priorities]
 ```
 
 ---
 
-### v2.1.0 — MCP con grafo de dependencias *(Mitla, Q4 2028)*
+### v2.1.0 — MCP with dependency graph *(Mitla, Q4 2028)*
 
-Una vez que v2.2.0 construye el grafo de referencias, el MCP server lo expone como tools adicionales. El agente ya tiene datos estructurales reales y puede hacer TM completo sin inferir relaciones.
+Once v2.2.0 builds the reference graph, the MCP server exposes it as additional tools. The agent then has real structural data and can do complete TM without inferring relationships.
 
-Capacidades nuevas (sobre v2.0.0):
-- Tools adicionales:
-  - `get_resource_graph()` → grafo dirigido de dependencias entre recursos
-  - `get_dependencies(resource_id)` → recursos que dependen de / son usados por este recurso
-  - `trace_path(source, target)` → todos los caminos entre dos recursos
-  - `get_trust_boundaries()` → trust boundaries inferidos de la topología de red
-  - `get_dfd()` → Data Flow Diagram en formato texto/JSON
+New capabilities (on top of v2.0.0):
+- Additional tools:
+  - `get_resource_graph()` → directed graph of dependencies between resources
+  - `get_dependencies(resource_id)` → resources that depend on / are used by this resource
+  - `trace_path(source, target)` → all paths between two resources
+  - `get_trust_boundaries()` → trust boundaries inferred from the network topology
+  - `get_dfd()` → Data Flow Diagram in text/JSON format
 
-Flujo de uso:
+Usage flow:
 ```
-Usuario: "¿Puede alguien desde internet llegar a mi RDS?"
-Agente:  get_resource_graph() → grafo completo
+User:  "Can anyone from the internet reach my RDS?"
+Agent:  get_resource_graph() → complete graph
          trace_path("internet_gateway", "aws_db_instance.prod")
-         → [IGW → ALB → Lambda → RDS] con SGs y roles en cada arista
-         "Sí, existe este camino: IGW → ALB (puerto 443) → Lambda
-          (rol con rds:Connect) → RDS. El SG del RDS permite
-          tráfico desde la subnet de Lambda. Recomendación: ..."
+         → [IGW → ALB → Lambda → RDS] with SGs and roles on each edge
+         "Yes, this path exists: IGW → ALB (port 443) → Lambda
+          (role with rds:Connect) → RDS. The RDS SG allows
+          traffic from the Lambda subnet. Recommendation: ..."
 ```
 
 ---
 
-## Phase 5: Threat Modeling Real — Mitla → Copal (v2.2.0 – v3.5.0)
+## Phase 5: Real Threat Modeling — Mitla → Copal (v2.2.0 – v3.5.0)
 
-Esta fase transforma TMAC de un linter de seguridad en una herramienta de **Threat Modeling real y automatizado**. El objetivo es detectar amenazas que emergen de la combinación de recursos, flujos de datos y trust boundaries.
-
----
-
-### v2.2.0 — Resolución de referencias y grafo básico *(Mitla, post-Q4 2028)*
-
-**Paradigma**: recursos conectados por referencias explícitas de Terraform.
-
-Capacidades nuevas:
-- Resolución de referencias HCL (`resource_type.name.attribute`) entre archivos
-- Construcción de un grafo dirigido de dependencias entre recursos
-- Reglas de dos nodos: condiciones que involucran un recurso y sus dependencias directas
-- Visualización del grafo en el dashboard (v1.8) y en el reporte HTML
-
-Ejemplo de amenaza detectable:
-> "La función `aws_lambda_function.api` está asociada al `aws_security_group.open_sg` que permite tráfico desde `0.0.0.0/0`"
+This phase transforms TMAC from a security linter into a **real and automated Threat Modeling** tool. The goal is to detect threats that emerge from the combination of resources, data flows, and trust boundaries.
 
 ---
 
-### v2.5.0 — Grafo completo + reglas multi-nodo *(Mitla)*
+### v2.2.0 — Reference resolution and basic graph *(Mitla, post-Q4 2028)*
 
-**Paradigma**: traversal de grafo para detectar amenazas emergentes.
+**Paradigm**: resources connected by explicit Terraform references.
 
-Capacidades nuevas:
-- Grafo completo con aristas tipadas (usa, depende-de, expone, accede-a)
-- DSL de reglas multi-nodo (traversals sobre el grafo, inspirado en Cypher)
-- Inferencia de trust boundaries desde topología de red (VPC, subnets, SGs)
+New capabilities:
+- Resolution of HCL references (`resource_type.name.attribute`) across files
+- Construction of a directed dependency graph between resources
+- Two-node rules: conditions that involve a resource and its direct dependencies
+- Visualization of the graph in the dashboard (v1.8) and in the HTML report
 
-Ejemplos de amenazas detectables:
-> "La `aws_lambda_function.processor` tiene un rol IAM con `Resource: *` y acceso de red al `aws_db_instance.prod` — posible exfiltración de datos (STRIDE-I)"
-
----
-
-### v2.8.0 — DFDs automáticos y trust boundaries *(Mitla)*
-
-Capacidades nuevas:
-- Generación automática de DFDs desde el grafo de recursos
-- Trust boundaries inferidos desde VPCs, subnets públicas/privadas, SGs
-- Export de DFDs en formato compatible con Threat Dragon / draw.io
-- DFDs visibles en el dashboard (v1.8) por repositorio
+Example of a detectable threat:
+> "The function `aws_lambda_function.api` is associated with the `aws_security_group.open_sg` that allows traffic from `0.0.0.0/0`"
 
 ---
 
-### v3.0.0 — STRIDE sobre flujos: TM completo automatizado *(Copal)*
+### v2.5.0 — Complete graph + multi-node rules *(Mitla)*
 
-**Paradigma**: Threat Modeling completo equivalente a OWASP Threat Dragon o Microsoft TMT, pero automatizado desde el código. Lo que hace un threat modeler humano en 8-40 horas, ejecutado en segundos.
+**Paradigm**: graph traversal to detect emergent threats.
 
-Capacidades nuevas:
-- STRIDE aplicado a flujos entre componentes (no solo a recursos aislados)
-- Generación de árbol de amenazas por flujo
-- Integración con MITRE ATT&CK Cloud y CWE
-- Reportes de TM formales compatibles con ISO 27001 / SOC2
-- El agente de PR (v1.6) ahora comenta con TM completo sobre el diff
+New capabilities:
+- Complete graph with typed edges (uses, depends-on, exposes, accesses)
+- Multi-node rule DSL (traversals over the graph, inspired by Cypher)
+- Inference of trust boundaries from network topology (VPC, subnets, SGs)
 
-Ejemplo de amenaza detectable:
-> "Flujo `aws_api_gateway_rest_api.public` → `aws_lambda_function.handler`: sin autenticación → Spoofing (STRIDE-S), Elevation of Privilege (STRIDE-E)"
+Examples of detectable threats:
+> "The `aws_lambda_function.processor` has an IAM role with `Resource: *` and network access to `aws_db_instance.prod` — possible data exfiltration (STRIDE-I)"
 
 ---
 
-### v3.5.0 — TM conversacional completo *(Copal)*
+### v2.8.0 — Automatic DFDs and trust boundaries *(Mitla)*
 
-El MCP server (v2.1) + el grafo completo (v2.5) + STRIDE sobre flujos (v3.0) se combinan en la experiencia final: un agente conversacional que puede responder cualquier pregunta de threat modeling sobre tu infraestructura.
+New capabilities:
+- Automatic generation of DFDs from the resource graph
+- Trust boundaries inferred from VPCs, public/private subnets, SGs
+- Export of DFDs in a format compatible with Threat Dragon / draw.io
+- DFDs visible in the dashboard (v1.8) per repository
+
+---
+
+### v3.0.0 — STRIDE over flows: complete automated TM *(Copal)*
+
+**Paradigm**: Complete Threat Modeling equivalent to OWASP Threat Dragon or Microsoft TMT, but automated from the code. What a human threat modeler does in 8-40 hours, executed in seconds.
+
+New capabilities:
+- STRIDE applied to flows between components (not just to isolated resources)
+- Generation of a threat tree per flow
+- Integration with MITRE ATT&CK Cloud and CWE
+- Formal TM reports compatible with ISO 27001 / SOC2
+- The PR agent (v1.6) now comments with a complete TM over the diff
+
+Example of a detectable threat:
+> "Flow `aws_api_gateway_rest_api.public` → `aws_lambda_function.handler`: without authentication → Spoofing (STRIDE-S), Elevation of Privilege (STRIDE-E)"
+
+---
+
+### v3.5.0 — Complete conversational TM *(Copal)*
+
+The MCP server (v2.1) + the complete graph (v2.5) + STRIDE over flows (v3.0) combine into the final experience: a conversational agent that can answer any threat modeling question about your infrastructure.
 
 ```
-Usuario: "¿Cuáles son los 3 caminos de ataque más críticos en mi arquitectura?"
-Agente:  [traversal del grafo completo]
-         [STRIDE sobre cada flujo]
-         "Los 3 caminos más críticos son:
-          1. Internet → API GW → Lambda (sin auth) → RDS (sin cifrado en tránsito)
-          2. S3 público → datos de clientes expuestos directamente
-          3. IAM role con Resource:* → acceso irrestricto a todos los buckets"
+User:  "What are the 3 most critical attack paths in my architecture?"
+Agent:  [traversal of the complete graph]
+         [STRIDE over each flow]
+         "The 3 most critical paths are:
+          1. Internet → API GW → Lambda (no auth) → RDS (no encryption in transit)
+          2. Public S3 → customer data exposed directly
+          3. IAM role with Resource:* → unrestricted access to all buckets"
 ```
 
 ---
 
-## Codenames por versión mayor
+## Codenames per major version
 
-| Versión mayor | Codename | Descripción |
+| Major version | Codename | Description |
 |---|---|---|
 | v1.x | **Ixtla** | Foundation, CI/CD Native, Platform |
-| v2.x | **Mitla** | MCP + Agente, TM Real con grafo |
-| v3.x | **Copal** | TM completo con STRIDE sobre flujos |
+| v2.x | **Mitla** | MCP + Agent, Real TM with graph |
+| v3.x | **Copal** | Complete TM with STRIDE over flows |
 
 ---
 
-## Resumen de versiones
+## Summary of versions
 
-| Versión | Codename | Fase | Capacidad clave | Plus vs competencia | Timeline |
+| Version | Codename | Phase | Key capability | Plus vs competition | Timeline |
 |---|---|---|---|---|---|
-| v1.0.0 | Ixtla | Foundation | Análisis estático Terraform + SARIF | Base sólida con STRIDE nativo | Q1 2026 |
-| v1.1.0 | Ixtla | Foundation | tfplan.json — delta de riesgo por PR | Nadie analiza el *cambio* con STRIDE | Q2 2026 |
-| v1.2.0 | Ixtla | Expansion | AWS CloudFormation | Multi-IaC con mismo engine | Q3 2026 |
-| v1.3.0 | Ixtla | Expansion | Kubernetes RBAC + Pod Security | STRIDE en K8s | Q4 2026 |
-| v1.4.0 | Ixtla | Expansion | Azure Bicep / multicloud | Multi-cloud con STRIDE | Q1 2027 |
-| v1.5.0 | Ixtla | Expansion | Docker Compose / microservicios | STRIDE en compose | Q2 2027 |
-| v1.6.0 | Ixtla | CI/CD Native | **Agente en PR — comenta amenazas del diff** | Nadie comenta TM narrativo en PRs | Q3 2027 |
-| v1.7.0 | Ixtla | Platform | AWS Runtime / live infra + drift | IaC vs estado real | Q4 2027 |
-| v1.8.0 | Ixtla | Platform | **Dashboard web multi-repo** | Panel centralizado de riesgo | Q1 2028 |
-| v1.9.0 | Ixtla | Platform | AI auto-remediation en PR | Fix sugerido inline en el PR | Q2 2028 |
-| v2.0.0 | Mitla | MCP + Agente | MCP server — agente conversacional | TMAC invocable por cualquier LLM | Q3 2028 |
-| v2.1.0 | Mitla | MCP + Agente | MCP con grafo de dependencias | TM conversacional con datos reales | Q4 2028 |
-| v2.2.0 | Mitla | TM Real | Resolución de referencias + grafo básico | Amenazas emergentes de combinaciones | post-2028 |
-| v2.5.0 | Mitla | TM Real | Grafo completo + reglas multi-nodo | Traversal de grafo para TM | post-2028 |
-| v2.8.0 | Mitla | TM Real | DFDs automáticos + trust boundaries | DFDs desde código, no desde diagramas | post-2028 |
-| v3.0.0 | Copal | TM Real | STRIDE sobre flujos — TM completo | Workshop de TM en segundos | post-2028 |
-| v3.5.0 | Copal | TM Real | TM conversacional completo | Cualquier pregunta de TM respondida | post-2028 |
+| v1.0.0 | Ixtla | Foundation | Static Terraform analysis + SARIF | Solid base with native STRIDE | Q1 2026 |
+| v1.1.0 | Ixtla | Foundation | tfplan.json — risk delta per PR | No one analyzes the *change* with STRIDE | Q2 2026 |
+| v1.2.0 | Ixtla | Expansion | AWS CloudFormation | Multi-IaC with the same engine | Q3 2026 |
+| v1.3.0 | Ixtla | Expansion | Kubernetes RBAC + Pod Security | STRIDE in K8s | Q4 2026 |
+| v1.4.0 | Ixtla | Expansion | Azure Bicep / multicloud | Multi-cloud with STRIDE | Q1 2027 |
+| v1.5.0 | Ixtla | Expansion | Docker Compose / microservices | STRIDE in compose | Q2 2027 |
+| v1.6.0 | Ixtla | CI/CD Native | **Agent in PR — comments threats in the diff** | No one comments narrative TM on PRs | Q3 2027 |
+| v1.7.0 | Ixtla | Platform | AWS Runtime / live infra + drift | IaC vs real state | Q4 2027 |
+| v1.8.0 | Ixtla | Platform | **Multi-repo web dashboard** | Centralized risk panel | Q1 2028 |
+| v1.9.0 | Ixtla | Platform | AI auto-remediation in PR | Suggested fix inline in the PR | Q2 2028 |
+| v2.0.0 | Mitla | MCP + Agent | MCP server — conversational agent | TMAC invokable by any LLM | Q3 2028 |
+| v2.1.0 | Mitla | MCP + Agent | MCP with dependency graph | Conversational TM with real data | Q4 2028 |
+| v2.2.0 | Mitla | Real TM | Reference resolution + basic graph | Threats emerging from combinations | post-2028 |
+| v2.5.0 | Mitla | Real TM | Complete graph + multi-node rules | Graph traversal for TM | post-2028 |
+| v2.8.0 | Mitla | Real TM | Automatic DFDs + trust boundaries | DFDs from code, not from diagrams | post-2028 |
+| v3.0.0 | Copal | Real TM | STRIDE over flows — complete TM | TM workshop in seconds | post-2028 |
+| v3.5.0 | Copal | Real TM | Complete conversational TM | Any TM question answered | post-2028 |

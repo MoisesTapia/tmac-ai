@@ -1,0 +1,33 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.safe",
+      "type": "aws_s3_bucket",
+      "name": "safe",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "acl": "private",
+          "bucket": "my-safe-bucket",
+          "server_side_encryption_configuration": {
+            "rule": {
+              "apply_server_side_encryption_by_default": {
+                "sse_algorithm": "aws:kms"
+              }
+            }
+          },
+          "logging": {
+            "target_bucket": "my-log-bucket",
+            "target_prefix": "s3-access-logs/"
+          },
+          "object_lock_enabled": true,
+          "force_destroy": false,
+          "tags": {}
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

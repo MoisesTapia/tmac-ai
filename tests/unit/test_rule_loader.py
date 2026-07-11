@@ -1,5 +1,5 @@
 """
-Tests unitarios para RuleLoader — validación de schema y logging estructurado.
+Unit tests for RuleLoader — schema validation and structured logging.
 Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 9.1
 """
 import pytest
@@ -47,12 +47,12 @@ def _write_yaml(tmp_path: Path, filename: str, data: dict) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# 3.1 — Validación de campos obligatorios
+# 3.1 — Validation of required fields
 # ---------------------------------------------------------------------------
 
 def test_file_missing_version_emits_warning_and_is_skipped(tmp_path, caplog):
-    """Req 6.1, 6.2: archivo sin 'version' emite warning y es omitido."""
-    data = {"rules": [_make_valid_rule_data()]}  # sin 'version'
+    """Req 6.1, 6.2: a file without 'version' emits a warning and is skipped."""
+    data = {"rules": [_make_valid_rule_data()]}  # no 'version'
     yaml_file = _write_yaml(tmp_path, "rules.yaml", data)
 
     loader = RuleLoader()
@@ -66,7 +66,7 @@ def test_file_missing_version_emits_warning_and_is_skipped(tmp_path, caplog):
 
 
 def test_rule_missing_id_emits_warning_and_is_skipped(tmp_path, caplog):
-    """Req 6.3: regla sin campo 'id' emite warning y es omitida."""
+    """Req 6.3: a rule without the 'id' field emits a warning and is skipped."""
     bad_rule = _make_valid_rule_data()
     del bad_rule["id"]
     data = _make_valid_file_data(rules=[bad_rule])
@@ -83,7 +83,7 @@ def test_rule_missing_id_emits_warning_and_is_skipped(tmp_path, caplog):
 
 
 def test_successful_load_returns_threat_rules(tmp_path):
-    """Req 6.1–6.4: carga exitosa retorna lista de ThreatRule con todos los campos."""
+    """Req 6.1–6.4: a successful load returns a list of ThreatRule with all fields."""
     data = _make_valid_file_data()
     yaml_file = _write_yaml(tmp_path, "rules.yaml", data)
 
@@ -102,7 +102,7 @@ def test_successful_load_returns_threat_rules(tmp_path):
 
 
 def test_no_print_calls_in_rule_loader(tmp_path, capsys):
-    """Req 6.4: RuleLoader no usa print(), usa logging."""
+    """Req 6.4: RuleLoader does not use print(), it uses logging."""
     # Trigger a warning path (missing version)
     data = {"rules": [_make_valid_rule_data()]}
     yaml_file = _write_yaml(tmp_path, "rules.yaml", data)
@@ -117,11 +117,11 @@ def test_no_print_calls_in_rule_loader(tmp_path, capsys):
 
 
 # ---------------------------------------------------------------------------
-# 3.2 — Propagación de tags al Finding
+# 3.2 — Propagation of tags to the Finding
 # ---------------------------------------------------------------------------
 
 def test_tags_propagated_from_rule_to_finding():
-    """Req 9.1: tags de la regla se propagan al Finding producido por el Matcher."""
+    """Req 9.1: rule tags are propagated to the Finding produced by the Matcher."""
     rule = ThreatRule(
         id="TMAC-TEST-001",
         name="Test Rule",
@@ -149,7 +149,7 @@ def test_tags_propagated_from_rule_to_finding():
 
 
 def test_empty_tags_propagated_to_finding():
-    """Req 9.1: tags vacíos también se propagan correctamente."""
+    """Req 9.1: empty tags are also propagated correctly."""
     rule = ThreatRule(
         id="TMAC-TEST-002",
         name="Test Rule 2",
@@ -177,7 +177,7 @@ def test_empty_tags_propagated_to_finding():
 
 
 # ---------------------------------------------------------------------------
-# Property 11: RuleLoader es idempotente respecto al orden de archivos
+# Property 11: RuleLoader is idempotent with respect to file order
 # Validates: Requirements 6.5
 # ---------------------------------------------------------------------------
 
@@ -193,8 +193,8 @@ def test_empty_tags_propagated_to_finding():
 def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
     """
     **Validates: Requirements 6.5**
-    Property 11: RuleLoader es idempotente respecto al orden de archivos.
-    Cargar los mismos archivos YAML en cualquier orden produce el mismo conjunto de ThreatRule.
+    Property 11: RuleLoader is idempotent with respect to file order.
+    Loading the same YAML files in any order produces the same set of ThreatRule.
     """
     import tempfile
     import os
@@ -219,7 +219,7 @@ def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
 
 
 # ---------------------------------------------------------------------------
-# Property 17: Finding.tags se propaga desde ThreatRule.tags
+# Property 17: Finding.tags is propagated from ThreatRule.tags
 # Validates: Requirements 9.1
 # ---------------------------------------------------------------------------
 
@@ -234,8 +234,8 @@ def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
 def test_property_17_finding_tags_propagated_from_rule(tags):
     """
     **Validates: Requirements 9.1**
-    Property 17: Finding.tags se propaga desde ThreatRule.tags.
-    Para cualquier ThreatRule con campo tags, el Finding producido debe tener el mismo valor.
+    Property 17: Finding.tags is propagated from ThreatRule.tags.
+    For any ThreatRule with a tags field, the produced Finding must have the same value.
     """
     rule = ThreatRule(
         id="TMAC-PROP-017",

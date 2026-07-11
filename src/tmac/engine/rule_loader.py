@@ -16,11 +16,9 @@ class RuleLoader:
     def load_rules(self, extra_rules_dir: Optional[str] = None) -> List[ThreatRule]:
         rules: Dict[str, ThreatRule] = {}
 
-        # Load built-in rules
+        # Load built-in rules (threats.yaml + threats_extended.yaml, etc.)
         base_dir = Path(__file__).parent.parent / "rules" / "aws"
-        threats_file = base_dir / "threats.yaml"
-
-        if threats_file.exists():
+        for threats_file in sorted(base_dir.glob("threats*.yaml")):
             self._load_file(threats_file, rules)
 
         # Optional custom rules

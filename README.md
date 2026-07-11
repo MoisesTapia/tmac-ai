@@ -1,264 +1,123 @@
-# TMAC (Threat Modeling as Code)
+<div align="center">
 
-TMAC es una herramienta de análisis estático de seguridad para Infraestructura como Código (IaC).
-Automatiza el modelado de amenazas identificando vulnerabilidades en código Terraform antes del despliegue,
-usando el framework STRIDE.
+# 🛡️ TMAC — Threat Modeling as Code
 
-## Características principales (v1.0.0 "Ixtla")
+**Static security analysis for Infrastructure as Code, powered by the STRIDE framework.**
 
-- **Análisis de Terraform:** Escaneo automático de archivos `.tf`.
-- **Motor de reglas YAML:** Reglas de amenazas fuertemente tipadas y validadas con Pydantic.
-- **Framework STRIDE:** Categorización automática de hallazgos (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
-- **Múltiples formatos de reporte:** HTML, Markdown y JSON/SARIF.
-- **Integración CI/CD:** Exit codes estructurados basados en severidad para romper el pipeline ante amenazas críticas.
-- **Ejecución offline:** Sin envío de datos a APIs externas.
+![Version](https://img.shields.io/badge/version-1.6.0%20%22Ixtla%22-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-green)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Rules](https://img.shields.io/badge/rules-520%2B-orange)
 
-## Requisitos
+</div>
 
-- **Python 3.10+**
-- [Poetry](https://python-poetry.org/) (recomendado) o `pip`
+TMAC automates threat modeling by identifying vulnerabilities in Terraform code **before deployment**. It scans the full infrastructure state, analyzes the risk delta of a plan, renders architecture diagrams, and now lives directly in your repository as a native CI/CD security agent — all offline, with no data sent to external APIs.
 
-## Instalación
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [Examples](#examples)
+- [Rule Catalog](#rule-catalog)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Key Features
+
+- **Terraform analysis (`tmac scan`)** — static scan of `.tf` files against **520+ STRIDE rules** covering **105 AWS resource types**.
+- **Risk delta analysis (`tmac plan`)** — detects threats only in the resources a Terraform plan will create, modify, or destroy. Answers: *"what new risk does this PR introduce?"*
+- **Native CI/CD agent (`tmac ci`)** — analyzes only the `.tf` files changed in a push/PR, posts a narrative comment on the PR/MR, and uploads the report as an artifact.
+- **Architecture diagrams (`tmac diagram`)** — builds the dependency graph between resources and exports it to Mermaid, Graphviz (DOT), draw.io (XML), or image (PNG/SVG/PDF).
+- **YAML rule engine** — declarative, strongly-typed threat rules validated with Pydantic.
+- **STRIDE categorization** — Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege.
+- **Multiple report formats** — HTML, Markdown, and JSON/SARIF 2.1.0.
+- **Structured exit codes** — breaks the pipeline on critical threats.
+- **Offline by design** — no telemetry, no external API calls.
+
+## Installation
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/tmac-security/tmac.git
-cd tmac
+# From PyPI (recommended)
+pip install tmac
 
-# Instalar con Poetry
-poetry install
-
-# O con pip en un entorno virtual
-python -m venv venv
-source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
+# From source
+git clone https://github.com/MoisesTapia/tmac-ai.git && cd tmac-ai
 pip install -e .
+
+# Docker
+docker run --rm -v $(pwd)/infra:/scan tmac-security/tmac:latest scan --dir /scan
 ```
 
-## Uso
+> Full installation options (Poetry, Docker, pre-commit) in [DOCS/INSTALLATION.md](DOCS/INSTALLATION.md).
 
-### Análisis básico
+## Quick Start
 
 ```bash
-tmac scan
+# Scan a Terraform directory
+tmac scan --dir ./infra
+
+# Analyze the risk delta of a plan
+terraform plan -out=plan.bin && terraform show -json plan.bin > plan.json
+tmac plan --plan-file plan.json --fail-on critical
+
+# Native CI/CD scan (changed files only)
+tmac ci --dir ./infra --base-ref main --head-ref HEAD --fail-on high
+
+# Render an architecture diagram
+tmac diagram --dir ./infra --simplify --group --format png --output arch.png
 ```
 
-Escanea el directorio actual y genera un reporte HTML (`tmac-report.html`).
+> See [DOCS/EXAMPLES.md](DOCS/EXAMPLES.md) for basic, intermediate, and advanced usage.
 
-### Opciones del CLI (`tmac scan`)
+## Documentation
 
-| Opción | Abreviación | Descripción | Por defecto |
-| :--- | :--- | :--- | :--- |
-| `--dir` | `-d` | Directorio a escanear con archivos `.tf`. | `.` |
-| `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | `html` |
-| `--output` | `-o` | Ruta del archivo de reporte. | `tmac-report.[fmt]` |
-| `--rules-dir` | | Directorio de reglas YAML adicionales. | (reglas internas) |
-| `--config` | | Ruta al archivo de configuración. | `.tmac.yaml` |
-| `--fail-on` | | Severidad mínima para exit code 1. | `critical` |
-| `--severity` | | Severidad mínima a incluir en el reporte. | `all` |
-| `--exclude` | `-e` | Patrón glob a excluir (repetible). | — |
-| `--no-color` | | Deshabilita colores ANSI en la salida. | `False` |
-| `--verbose` | `-v` | Habilita logging de debug. | `False` |
-| `--quiet` | `-q` | Suprime la salida de terminal. | `False` |
+Full documentation lives in the [`DOCS/`](DOCS/README.md) directory.
 
-### Ejemplos prácticos
+| Document | Description |
+| :--- | :--- |
+| [Installation](DOCS/INSTALLATION.md) | Requirements, pip, Poetry, Docker, and pre-commit. |
+| [Command reference](DOCS/COMMANDS.md) | Complete guide to `scan`, `plan`, `ci`, and `diagram`. |
+| [Examples](DOCS/EXAMPLES.md) | Basic, intermediate, and advanced usage — console and CI/CD. |
+| [CI/CD integration](DOCS/CICD.md) | GitHub Actions, GitLab CI, Docker, and pre-commit pipelines. |
+| [Rule catalog](DOCS/RULES.md) | The 520 rules by service and severity. |
+| [Writing rules](DOCS/WRITING_RULES.md) | Rule format, condition operators, and custom rules. |
+| [Architecture](DOCS/ARCHITECTURE.md) | Project layout and the full-state vs. risk-delta model. |
+| [AWS STRIDE mapping](DOCS/aws_stride_mapping.md) | How AWS services map to STRIDE categories. |
+| [Roadmap](ROADMAP.md) | Vision and future versions. |
+
+## Examples
+
+The [`examples/`](examples/) directory contains ready-to-use Terraform architectures:
+
+| Example | Description |
+| :--- | :--- |
+| `examples/ecommerce/` | Serverless microservices: API Gateway → Lambda → DynamoDB, EventBridge, SQS. |
+| `examples/enterprise/` | Multi-AZ, multi-region enterprise architecture: VPC, ALB+WAF, Aurora, Cognito, Route53 failover. |
 
 ```bash
-# Escanear carpeta específica, reporte Markdown, fallar en High o superior
-tmac scan --dir ./infra/prod --report md --output security_report.md --fail-on high
-
-# Excluir directorio .terraform y módulos de terceros
-tmac scan --dir ./infra --exclude .terraform --exclude "**/.terraform/**"
-
-# Salida sin colores para logs de CI
-tmac scan --dir ./infra --no-color --report json
-
-# Modo verbose para debugging
-tmac scan --dir ./infra --verbose
+tmac scan --dir examples/enterprise --report html --output report.html --diagram
 ```
 
-## Códigos de salida (Exit Codes)
+## Rule Catalog
 
-| Código | Condición |
+TMAC v1.6.0 includes **520 rules** covering **105 AWS resource types**.
+
+| Severity | Rules |
 | :--- | :--- |
-| `0` | Escaneo completado sin hallazgos Critical o High (o por debajo del threshold `--fail-on`). |
-| `1` | Se detectaron hallazgos con severidad **Critical**. |
-| `2` | Se detectaron hallazgos **High** pero ninguno Critical. |
-| `3` | Error de ejecución: directorio inaccesible, configuración inválida, o error de parseo. |
+| 🔴 Critical | 24 |
+| 🟠 High | 56 |
+| 🟡 Medium | 121 |
+| 🟢 Low | 106 |
+| 🔵 Info | 213 |
 
-## Ignorar falsos positivos (`tmac:ignore`)
+See the [complete rule catalog](DOCS/RULES.md) for the full breakdown by service.
 
-Suprime hallazgos específicos con comentarios en tus archivos `.tf`:
+## Contributing
 
-```hcl
-# Ignorar todas las reglas para este recurso
-# tmac:ignore
-resource "aws_s3_bucket" "public_assets" {
-  bucket = "public-assets-bucket"
-}
+Contributions are welcome. See the [contribution guide](CONTRIBUTING.md) for how to add rules and run the tests, and [Writing rules](DOCS/WRITING_RULES.md) for the rule format.
 
-# Ignorar solo una regla específica
-# tmac:ignore[TMAC-AWS-S3-001]
-resource "aws_s3_bucket" "another_bucket" {
-  bucket = "another-bucket"
-}
+## License
 
-# Ignorar múltiples reglas específicas
-# tmac:ignore[TMAC-AWS-S3-001]
-# tmac:ignore[TMAC-AWS-S3-002]
-resource "aws_s3_bucket" "yet_another" {
-  bucket = "yet-another-bucket"
-}
-```
-
-## Estructura de reglas (`threats.yaml`)
-
-Las reglas siguen el formato `TMAC-{CLOUD}-{SERVICE}-{NNN}`:
-
-```yaml
-version: "1.0"
-rules:
-  - id: TMAC-AWS-S3-001
-    name: "S3 Bucket con Acceso Público (ACL)"
-    resource_type: "aws_s3_bucket"
-    check:
-      attribute: "acl"
-      condition: "in"
-      values: ["public-read", "public-read-write"]
-    severity: "Critical"
-    stride: "Information Disclosure"
-    description: "Descripción de la amenaza."
-    mitigation: "Pasos de mitigación."
-    references:
-      - "https://docs.aws.amazon.com/..."
-    tags: ["s3", "public-access"]
-```
-
-### Operadores de condición disponibles
-
-| Operador | Descripción |
-| :--- | :--- |
-| `equals` | El atributo es igual al valor. |
-| `not_equals` | El atributo no es igual al valor. |
-| `in` | El atributo está en la lista de valores. |
-| `not_in` | El atributo no está en la lista de valores. |
-| `contains` | El atributo contiene el valor (string o lista). |
-| `not_contains` | El atributo no contiene el valor. |
-| `regex` | El atributo coincide con la expresión regular. |
-| `exists` | El atributo existe en el recurso. |
-| `not_exists` | El atributo no existe en el recurso. |
-
-## Configuración (`.tmac.yaml`)
-
-```yaml
-scan:
-  exclude:
-    - ".terraform"
-    - "**/.terraform/**"
-    - "modules/third-party/**"
-
-report:
-  format: html
-```
-
-## Integración CI/CD
-
-### GitHub Actions
-
-```yaml
-name: TMAC Security Scan
-
-on:
-  pull_request:
-    paths:
-      - "**.tf"
-
-jobs:
-  tmac-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install TMAC
-        run: pip install -e .
-
-      - name: Run TMAC scan
-        run: |
-          tmac scan \
-            --dir ./infra \
-            --exclude .terraform \
-            --report json \
-            --output tmac-results.json \
-            --fail-on high \
-            --no-color
-
-      - name: Upload SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: tmac-results.json
-```
-
-### GitLab CI
-
-```yaml
-tmac-security-scan:
-  stage: test
-  image: python:3.10-slim
-  before_script:
-    - pip install -e .
-  script:
-    - tmac scan
-        --dir ./infra
-        --exclude .terraform
-        --report json
-        --output tmac-results.json
-        --fail-on high
-        --no-color
-  artifacts:
-    when: always
-    paths:
-      - tmac-results.json
-    reports:
-      sast: tmac-results.json
-  rules:
-    - changes:
-        - "**/*.tf"
-```
-
-## Arquitectura
-
-```
-src/tmac/
-├── cli.py          # Interfaz CLI (Click) — parsea args, delega al Scanner
-├── scanner.py      # Orquestador del pipeline de escaneo
-├── config.py       # Carga y validación de .tmac.yaml
-├── models/         # Modelos Pydantic (Finding, ScanResult, ResourceModel)
-├── parsers/        # TerraformParser — extrae ResourceModel de archivos .tf
-├── engine/         # RuleLoader, Matcher, Evaluator
-├── reporters/      # HTMLReporter, MarkdownReporter, JSONReporter (SARIF)
-└── templates/      # Plantillas Jinja2 para HTML y Markdown
-```
-
-## Reglas incluidas (v1.0.0)
-
-| ID | Servicio | Nombre | Severidad |
-| :--- | :--- | :--- | :--- |
-| TMAC-AWS-S3-001 | S3 | Bucket con ACL pública | Critical |
-| TMAC-AWS-S3-002 | S3 | Bucket sin encriptación SSE | High |
-| TMAC-AWS-S3-003 | S3 | Bucket sin logging de acceso | Medium |
-| TMAC-AWS-IAM-001 | IAM | Comodín `*` en Resource de política | High |
-| TMAC-AWS-IAM-002 | IAM | Usuario con política inline | Medium |
-| TMAC-AWS-SG-001 | Security Groups | Puerto SSH (22) abierto al mundo | High |
-| TMAC-AWS-SG-002 | Security Groups | Puerto RDP (3389) abierto al mundo | Critical |
-| TMAC-AWS-RDS-001 | RDS | Base de datos sin encriptación | Medium |
-| TMAC-AWS-RDS-002 | RDS | Instancia con acceso público | High |
-| TMAC-AWS-CW-001 | CloudTrail | Trail deshabilitado o sin logging | High |
-
-## Licencia
-
-MIT — ver [LICENSE](LICENSE) para más detalles.
+MIT — see [LICENSE](LICENSE) for details.

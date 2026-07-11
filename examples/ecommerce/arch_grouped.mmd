@@ -1,0 +1,53 @@
+graph TD
+    subgraph checkout["checkout"]
+        aws_cloudwatch_event_bus_checkout["aws_cloudwatch_event_bus<br/>checkout"]
+        aws_cloudwatch_event_rule_checkout["aws_cloudwatch_event_rule<br/>checkout"]
+        aws_cloudwatch_event_target_checkout_to_sqs["aws_cloudwatch_event_target<br/>checkout_to_sqs"]
+    end
+    subgraph product["product"]
+        aws_apigatewayv2_integration_product["aws_apigatewayv2_integration<br/>product"]
+        aws_apigatewayv2_route_product["aws_apigatewayv2_route<br/>product"]
+        aws_dynamodb_table_product["aws_dynamodb_table<br/>product"]
+        aws_lambda_function_product["aws_lambda_function<br/>product"]
+    end
+    subgraph basket["basket"]
+        aws_apigatewayv2_integration_basket["aws_apigatewayv2_integration<br/>basket"]
+        aws_apigatewayv2_route_basket["aws_apigatewayv2_route<br/>basket"]
+        aws_dynamodb_table_basket["aws_dynamodb_table<br/>basket"]
+        aws_lambda_function_basket["aws_lambda_function<br/>basket"]
+    end
+    subgraph order["order"]
+        aws_apigatewayv2_integration_order["aws_apigatewayv2_integration<br/>order"]
+        aws_apigatewayv2_route_order["aws_apigatewayv2_route<br/>order"]
+        aws_dynamodb_table_order["aws_dynamodb_table<br/>order"]
+        aws_lambda_event_source_mapping_order_sqs["aws_lambda_event_source_mapping<br/>order_sqs"]
+        aws_lambda_function_order["aws_lambda_function<br/>order"]
+        aws_sqs_queue_order_dlq["aws_sqs_queue<br/>order_dlq"]
+        aws_sqs_queue_order_queue["aws_sqs_queue<br/>order_queue"]
+    end
+    subgraph shared["shared"]
+        aws_apigatewayv2_api_main["aws_apigatewayv2_api<br/>main"]
+    end
+    aws_cloudwatch_event_rule_checkout -->|event_bus_name| aws_cloudwatch_event_bus_checkout
+    aws_cloudwatch_event_target_checkout_to_sqs -->|rule| aws_cloudwatch_event_rule_checkout
+    aws_cloudwatch_event_target_checkout_to_sqs -->|event_bus_name| aws_cloudwatch_event_bus_checkout
+    aws_cloudwatch_event_target_checkout_to_sqs -->|arn| aws_sqs_queue_order_queue
+    aws_apigatewayv2_integration_product -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_integration_product -->|integration_uri| aws_lambda_function_product
+    aws_apigatewayv2_route_product -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_route_product -->|target| aws_apigatewayv2_integration_product
+    aws_apigatewayv2_integration_basket -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_integration_basket -->|integration_uri| aws_lambda_function_basket
+    aws_apigatewayv2_route_basket -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_route_basket -->|target| aws_apigatewayv2_integration_basket
+    aws_apigatewayv2_integration_order -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_integration_order -->|integration_uri| aws_lambda_function_order
+    aws_apigatewayv2_route_order -->|api_id| aws_apigatewayv2_api_main
+    aws_apigatewayv2_route_order -->|target| aws_apigatewayv2_integration_order
+    aws_lambda_function_product -->|environment| aws_dynamodb_table_product
+    aws_lambda_function_basket -->|environment| aws_cloudwatch_event_bus_checkout
+    aws_lambda_function_basket -->|environment| aws_dynamodb_table_basket
+    aws_lambda_function_order -->|environment| aws_dynamodb_table_order
+    aws_lambda_event_source_mapping_order_sqs -->|event_source_arn| aws_sqs_queue_order_queue
+    aws_lambda_event_source_mapping_order_sqs -->|function_name| aws_lambda_function_order
+    aws_sqs_queue_order_queue -->|redrive_policy| aws_sqs_queue_order_dlq

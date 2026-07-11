@@ -19,7 +19,7 @@ class Finding(BaseModel):
 
 class ScanMetadata(BaseModel):
     tool_name: str = "TMAC"
-    version: str = "1.0.0"
+    version: str = "1.6.0"
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     scanned_directory: str
     execution_time_seconds: float = 0.0
@@ -39,3 +39,4 @@ class ScanResult(BaseModel):
     findings: List[Finding]
     files_scanned: int = 0
     rules_loaded: int = 0
+    files_failed: int = 0  # count of .tf files that could not be parsed (returned [] for non-empty content)

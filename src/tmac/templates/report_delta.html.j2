@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TMAC Delta Risk Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #f4f7f9;
+            --bg-card: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --primary: #3182ce;
+            --primary-dark: #2b6cb0;
+            --sev-critical: #e53e3e;
+            --sev-critical-bg: #fff5f5;
+            --sev-high: #dd6b20;
+            --sev-high-bg: #fffaf0;
+            --sev-medium: #d69e2e;
+            --sev-medium-bg: #fffff0;
+            --sev-low: #38a169;
+            --sev-low-bg: #f0fff4;
+            --sev-info: #3182ce;
+            --sev-info-bg: #ebf8ff;
+            --bg-table-head: #f7fafc;
+            --bg-table-hover: #f7fafc;
+            --bg-details: #f8fafc;
+            --delta-create: #38a169;
+            --delta-create-bg: #f0fff4;
+            --delta-update: #d69e2e;
+            --delta-update-bg: #fffff0;
+            --delta-delete: #718096;
+            --delta-delete-bg: #f7fafc;
+            --delta-introduced: #e53e3e;
+            --delta-introduced-bg: #fff5f5;
+            --delta-resolved: #38a169;
+            --delta-resolved-bg: #f0fff4;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --primary: #3b82f6;
+            --primary-dark: #60a5fa;
+            --sev-critical: #fca5a5;
+            --sev-critical-bg: #7f1d1d;
+            --sev-high: #fdba74;
+            --sev-high-bg: #7c2d12;
+            --sev-medium: #fde047;
+            --sev-medium-bg: #713f12;
+            --sev-low: #86efac;
+            --sev-low-bg: #14532d;
+            --sev-info: #93c5fd;
+            --sev-info-bg: #1e3a8a;
+            --bg-table-head: #0f172a;
+            --bg-table-hover: #0f172a;
+            --bg-details: #020617;
+            --delta-create: #86efac;
+            --delta-create-bg: #14532d;
+            --delta-update: #fde047;
+            --delta-update-bg: #713f12;
+            --delta-delete: #94a3b8;
+            --delta-delete-bg: #1e293b;
+            --delta-introduced: #fca5a5;
+            --delta-introduced-bg: #7f1d1d;
+            --delta-resolved: #86efac;
+            --delta-resolved-bg: #14532d;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+
+        .header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 40px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo {
+            background: var(--primary);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+        }
+
+        .metadata { text-align: right; font-size: 0.85rem; color: var(--text-muted); }
+        .metadata div { margin-bottom: 4px; }
+        .metadata strong { color: var(--text-main); font-weight: 600; }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-left: 20px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .theme-toggle:hover { background: var(--bg-table-hover); }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-main);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08); }
+        .stat-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; color: var(--text-main); line-height: 1; }
+
+        .card-critical { border-top: 4px solid var(--sev-critical); }
+        .card-critical .stat-value { color: var(--sev-critical); }
+        .card-high { border-top: 4px solid var(--sev-high); }
+        .card-high .stat-value { color: var(--sev-high); }
+        .card-medium { border-top: 4px solid var(--sev-medium); }
+        .card-medium .stat-value { color: var(--sev-medium); }
+        .card-introduced { border-top: 4px solid var(--delta-introduced); }
+        .card-introduced .stat-value { color: var(--delta-introduced); }
+        .card-resolved { border-top: 4px solid var(--delta-resolved); }
+        .card-resolved .stat-value { color: var(--delta-resolved); }
+
+        /* Delta Summary Section */
+        .delta-summary {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+
+        .delta-summary-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+        }
+
+        .delta-resources {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-critical { background: var(--sev-critical-bg); color: var(--sev-critical); border: 1px solid var(--sev-critical); }
+        .badge-high { background: var(--sev-high-bg); color: var(--sev-high); border: 1px solid var(--sev-high); }
+        .badge-medium { background: var(--sev-medium-bg); color: var(--sev-medium); border: 1px solid var(--sev-medium); }
+        .badge-low { background: var(--sev-low-bg); color: var(--sev-low); border: 1px solid var(--sev-low); }
+        .badge-info { background: var(--sev-info-bg); color: var(--sev-info); border: 1px solid var(--sev-info); }
+        .badge-stride { background: var(--bg-body); color: var(--text-muted); border: 1px solid var(--border-color); margin-right: 4px; }
+
+        /* Delta-specific badges */
+        .badge-introduced {
+            background: var(--delta-introduced-bg);
+            color: var(--delta-introduced);
+            border: 1px solid var(--delta-introduced);
+            font-size: 0.85rem;
+            padding: 6px 14px;
+        }
+
+        .badge-resolved {
+            background: var(--delta-resolved-bg);
+            color: var(--delta-resolved);
+            border: 1px solid var(--delta-resolved);
+            font-size: 0.85rem;
+            padding: 6px 14px;
+        }
+
+        .badge-delta {
+            background: var(--bg-body);
+            color: var(--text-main);
+            border: 2px solid var(--border-color);
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            font-weight: 700;
+        }
+
+        .badge-delta-positive {
+            background: var(--delta-introduced-bg);
+            color: var(--delta-introduced);
+            border: 2px solid var(--delta-introduced);
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            font-weight: 700;
+        }
+
+        .badge-delta-negative {
+            background: var(--delta-resolved-bg);
+            color: var(--delta-resolved);
+            border: 2px solid var(--delta-resolved);
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            font-weight: 700;
+        }
+
+        /* Change action badges for findings */
+        .badge-create {
+            background: var(--delta-create-bg);
+            color: var(--delta-create);
+            border: 1px solid var(--delta-create);
+        }
+
+        .badge-update {
+            background: var(--delta-update-bg);
+            color: var(--delta-update);
+            border: 1px solid var(--delta-update);
+        }
+
+        .badge-delete {
+            background: var(--delta-delete-bg);
+            color: var(--delta-delete);
+            border: 1px solid var(--delta-delete);
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            overflow: hidden;
+            margin-bottom: 20px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+
+        th {
+            background-color: var(--bg-table-head);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        .finding-group { display: none; }
+        .finding-group.active-page { display: table-row-group; }
+        .finding-row { cursor: pointer; transition: background-color 0.15s ease; }
+        .finding-row:hover { background-color: var(--bg-table-hover); }
+        .details-row td { padding: 0; border-bottom: none; }
+        .details-row.active td { border-bottom: 1px solid var(--border-color); }
+
+        .finding-details {
+            display: none;
+            background-color: var(--bg-details);
+            padding: 24px;
+            border-left: 4px solid var(--primary);
+            box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.02);
+        }
+
+        .finding-details.show { display: block; animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .details-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .detail-block h4 { margin: 0 0 8px 0; color: var(--text-main); font-size: 1rem; }
+        .detail-block p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .detail-block code { background-color: var(--bg-card); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; color: var(--text-main); }
+
+        .code-block {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-top: 8px;
+        }
+
+        .resource-name { font-weight: 600; color: var(--primary-dark); }
+        .resource-type { font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 2px; }
+        .file-path { font-family: monospace; font-size: 0.85rem; background: var(--bg-body); padding: 2px 6px; border-radius: 4px; color: var(--text-muted); border: 1px solid var(--border-color); }
+
+        .value-change {
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .value-before { color: var(--delta-introduced); text-decoration: line-through; margin-right: 6px; }
+        .value-after { color: var(--delta-resolved); }
+        .value-arrow { color: var(--text-muted); margin: 0 4px; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .empty-state-icon { font-size: 48px; margin-bottom: 20px; }
+        .empty-state h3 { margin: 0 0 10px 0; color: var(--sev-low); }
+
+        .approval-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 2px solid var(--delta-resolved);
+        }
+
+        .approval-state-icon { font-size: 64px; margin-bottom: 20px; }
+        .approval-state h3 { margin: 0 0 10px 0; color: var(--delta-resolved); font-size: 1.5rem; }
+        .approval-state p { color: var(--text-muted); margin: 0; font-size: 1rem; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .page-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .page-btn:hover:not(:disabled) { background: var(--bg-table-hover); }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .page-info { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; }
+    </style>
+
+    <script>
+        const itemsPerPage = 6;
+        let currentPage = 1;
+        let totalItems = 0;
+        let totalPages = 0;
+
+        function initPagination() {
+            const groups = document.querySelectorAll('.finding-group');
+            totalItems = groups.length;
+            totalPages = Math.ceil(totalItems / itemsPerPage);
+            if (totalItems > 0) {
+                renderPage(1);
+            } else {
+                const pag = document.getElementById('pagination-ctrls');
+                if (pag) pag.style.display = 'none';
+            }
+        }
+
+        function renderPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            document.querySelectorAll('.finding-details.show').forEach(el => el.classList.remove('show'));
+            document.querySelectorAll('.details-row.active').forEach(el => el.classList.remove('active'));
+            const groups = document.querySelectorAll('.finding-group');
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            groups.forEach((group, index) => {
+                if (index >= startIndex && index < endIndex) {
+                    group.classList.add('active-page');
+                } else {
+                    group.classList.remove('active-page');
+                }
+            });
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('btn-prev').disabled = currentPage === 1;
+            document.getElementById('btn-next').disabled = currentPage === totalPages;
+        }
+
+        function toggleDetails(id) {
+            const row = document.getElementById('details-row-' + id);
+            const content = document.getElementById('details-content-' + id);
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                row.classList.remove('active');
+            } else {
+                document.querySelectorAll('.finding-details.show').forEach(el => el.classList.remove('show'));
+                document.querySelectorAll('.details-row.active').forEach(el => el.classList.remove('active'));
+                content.classList.add('show');
+                row.classList.add('active');
+            }
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('tmac-theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else if (savedTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            updateThemeButton();
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const nextTheme = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            localStorage.setItem('tmac-theme', nextTheme);
+            updateThemeButton();
+        }
+
+        function updateThemeButton() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const btn = document.getElementById('theme-toggle-btn');
+            if (btn) btn.innerHTML = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initPagination();
+        });
+    </script>
+</head>
+<body>
+
+    <header class="header">
+        <div class="header-content">
+            <div class="brand">
+                <span class="brand-logo">TMAC</span>
+                <h1>Delta Risk Report</h1>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <div class="metadata">
+                    <div><strong>Generated:</strong> {{ result.metadata.timestamp }}</div>
+                    <div><strong>Plan file:</strong> {{ result.plan_file }}</div>
+                    <div><strong>Execution:</strong> {{ "%.2f"|format(result.metadata.execution_time_seconds) }}s</div>
+                </div>
+                <button id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()">🌙 Dark Mode</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <h2 class="section-title">Delta Summary</h2>
+
+        <!-- Delta summary badges: introduced, resolved, net RiskDelta -->
+        <div class="delta-summary">
+            <span class="delta-summary-label">Risk Delta:</span>
+            <span class="badge badge-introduced">
+                ⬆ {{ result.findings_introduced }} introduced
+            </span>
+            <span class="badge badge-resolved">
+                ⬇ {{ result.findings_resolved }} resolved
+            </span>
+            {% set risk_delta = result.findings_introduced - result.findings_resolved %}
+            {% if risk_delta > 0 %}
+            <span class="badge badge-delta-positive">
+                RiskDelta: +{{ risk_delta }}
+            </span>
+            {% elif risk_delta < 0 %}
+            <span class="badge badge-delta-negative">
+                RiskDelta: {{ risk_delta }}
+            </span>
+            {% else %}
+            <span class="badge badge-delta">
+                RiskDelta: 0
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Resource change counts -->
+        <div class="delta-resources">
+            <span class="delta-summary-label">Resources:</span>
+            <span class="badge badge-create">✚ {{ result.resources_created }} created</span>
+            <span class="badge badge-update">✎ {{ result.resources_updated }} modified</span>
+            <span class="badge badge-delete">✖ {{ result.resources_deleted }} deleted</span>
+        </div>
+
+        <h2 class="section-title">Executive Summary</h2>
+        <div class="dashboard">
+            <div class="stat-card card-introduced">
+                <div class="stat-title">Introduced</div>
+                <div class="stat-value">{{ result.findings_introduced }}</div>
+            </div>
+            <div class="stat-card card-resolved">
+                <div class="stat-title">Resolved</div>
+                <div class="stat-value">{{ result.findings_resolved }}</div>
+            </div>
+            <div class="stat-card card-critical">
+                <div class="stat-title">Critical</div>
+                <div class="stat-value">{{ result.statistics.critical }}</div>
+            </div>
+            <div class="stat-card card-high">
+                <div class="stat-title">High</div>
+                <div class="stat-value">{{ result.statistics.high }}</div>
+            </div>
+            <div class="stat-card card-medium">
+                <div class="stat-title">Medium</div>
+                <div class="stat-value">{{ result.statistics.medium }}</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Delta Findings</h2>
+
+        {% if result.findings_introduced == 0 %}
+        <!-- Approval state: no threats introduced — renders without template errors -->
+        <div class="approval-state">
+            <div class="approval-state-icon">✅</div>
+            <h3>Plan Approved — No New Threats Introduced</h3>
+            <p>This plan does not introduce any new security findings.
+            {% if result.findings_resolved > 0 %}
+            It resolves {{ result.findings_resolved }} existing threat(s).
+            {% endif %}
+            </p>
+        </div>
+
+        {% else %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="10%">Change</th>
+                        <th width="10%">Severity</th>
+                        <th width="30%">Resource</th>
+                        <th width="15%">Rule ID</th>
+                        <th width="15%">STRIDE</th>
+                        <th width="20%">Changed Attribute</th>
+                    </tr>
+                </thead>
+                <tbody id="findings-container">
+                    {% for finding in result.findings %}
+                    <tbody class="finding-group">
+                        <tr class="finding-row" onclick="toggleDetails('{{ loop.index }}')">
+                            <td>
+                                {% if finding.change_action.value == 'create' %}
+                                <span class="badge badge-create">NEW</span>
+                                {% elif finding.change_action.value in ('update', 'replace') %}
+                                <span class="badge badge-update">MODIFIED</span>
+                                {% elif finding.change_action.value == 'delete' %}
+                                <span class="badge badge-delete">REMOVED</span>
+                                {% else %}
+                                <span class="badge badge-update">{{ finding.change_action.value | upper }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ finding.severity | lower }}">{{ finding.severity }}</span>
+                            </td>
+                            <td>
+                                <span class="resource-name">{{ finding.resource_name }}</span>
+                                <span class="resource-type">{{ finding.resource_type }}</span>
+                            </td>
+                            <td><strong>{{ finding.rule_id }}</strong></td>
+                            <td>
+                                {% set stride_list = [finding.stride] if finding.stride is string else finding.stride %}
+                                {% for s in stride_list %}
+                                <span class="badge badge-stride">{{ s }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% if finding.changed_attribute %}
+                                <span class="value-change">
+                                    <code>{{ finding.changed_attribute }}</code>
+                                    {% if finding.value_before is not none and finding.value_after is not none %}
+                                    <br>
+                                    <span class="value-before">{{ finding.value_before }}</span>
+                                    <span class="value-arrow">→</span>
+                                    <span class="value-after">{{ finding.value_after }}</span>
+                                    {% elif finding.value_after is not none %}
+                                    <br><span class="value-after">{{ finding.value_after }}</span>
+                                    {% elif finding.value_before is not none %}
+                                    <br><span class="value-before">{{ finding.value_before }}</span>
+                                    {% endif %}
+                                </span>
+                                {% else %}
+                                <span class="file-path">{{ finding.file_path | truncate(35, true) }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr id="details-row-{{ loop.index }}" class="details-row">
+                            <td colspan="6">
+                                <div id="details-content-{{ loop.index }}" class="finding-details">
+                                    <div class="details-grid">
+                                        <div class="detail-block">
+                                            <h4>Rule Definition: {{ finding.rule_name }}</h4>
+                                            <p>{{ finding.description }}</p>
+                                        </div>
+                                        <div class="detail-block">
+                                            <h4>Violation Trigger</h4>
+                                            <p>Matched attribute: <code>{{ finding.matched_attribute }}</code></p>
+                                        </div>
+                                        {% if finding.changed_attribute %}
+                                        <div class="detail-block">
+                                            <h4>Change Context</h4>
+                                            <p>
+                                                Attribute: <code>{{ finding.changed_attribute }}</code><br>
+                                                {% if finding.value_before is not none %}
+                                                Before: <code>{{ finding.value_before }}</code><br>
+                                                {% endif %}
+                                                {% if finding.value_after is not none %}
+                                                After: <code>{{ finding.value_after }}</code>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        {% endif %}
+                                        <div class="detail-block">
+                                            <h4>Recommended Mitigation</h4>
+                                            <div class="code-block">{{ finding.mitigation }}</div>
+                                        </div>
+                                        {% if finding.references %}
+                                        <div class="detail-block">
+                                            <h4>References</h4>
+                                            <ul style="margin: 0; padding-left: 20px; color: var(--primary);">
+                                                {% for ref in finding.references %}
+                                                <li><a href="{{ ref }}" target="_blank" style="color: var(--primary); text-decoration: none;">{{ ref }}</a></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination" id="pagination-ctrls">
+            <button class="page-btn" id="btn-prev" onclick="renderPage(currentPage - 1)">← Previous</button>
+            <span class="page-info" id="page-info">Page 1 of 1</span>
+            <button class="page-btn" id="btn-next" onclick="renderPage(currentPage + 1)">Next →</button>
+        </div>
+
+        {% endif %}
+
+    </main>
+</body>
+</html>

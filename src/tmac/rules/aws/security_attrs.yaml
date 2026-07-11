@@ -1,0 +1,64 @@
+# =====================================================================
+# Security-relevant attributes per resource type (curated layer)
+# =====================================================================
+# For each resource type, `attributes` lists the attributes whose
+# presence/value matters in threat modeling. If an attribute is not
+# defined on the resource, the metadata document marks it as
+# "<not defined>" — a useful signal for threat modeling.
+#
+# `satellites` maps resources that contribute security configuration to
+# ANOTHER resource (e.g. flow logs live in aws_flow_log, not aws_vpc).
+# The extractor enriches the target resource with the indicated label.
+#
+# This file is editable: add types or attributes without touching the code.
+version: "1.0"
+
+security_attrs:
+  aws_s3_bucket:
+    - acl
+    - versioning
+    - server_side_encryption_configuration
+  aws_db_instance:
+    - storage_encrypted
+    - publicly_accessible
+    - kms_key_id
+    - iam_database_authentication_enabled
+  aws_instance:
+    - associate_public_ip_address
+    - metadata_options
+    - ebs_optimized
+  aws_security_group:
+    - ingress
+    - egress
+  aws_vpc:
+    - cidr_block
+    - enable_dns_support
+  aws_subnet:
+    - map_public_ip_on_launch
+    - cidr_block
+  aws_ebs_volume:
+    - encrypted
+    - kms_key_id
+  aws_efs_file_system:
+    - encrypted
+    - kms_key_id
+  aws_sqs_queue:
+    - kms_master_key_id
+  aws_sns_topic:
+    - kms_master_key_id
+  aws_dynamodb_table:
+    - server_side_encryption
+    - point_in_time_recovery
+  aws_lambda_function:
+    - kms_key_arn
+    - vpc_config
+  aws_cloudwatch_event_bus:
+    - kms_key_identifier
+
+satellites:
+  aws_flow_log: "VPC Flow Logs"
+  aws_s3_bucket_server_side_encryption_configuration: "S3 Encryption"
+  aws_s3_bucket_logging: "S3 Access Logging"
+  aws_s3_bucket_versioning: "S3 Versioning"
+  aws_s3_bucket_public_access_block: "S3 Public Access Block"
+  aws_cloudtrail: "CloudTrail Logging"

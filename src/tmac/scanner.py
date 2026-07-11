@@ -28,6 +28,7 @@ class Scanner:
         exclude_patterns: Optional[List[str]] = None,
         min_severity: str = "all",
         verbose: bool = False,
+        include_paths: Optional[List[str]] = None,
     ) -> ScanResult:
         start = time.time()
         exclude_patterns = exclude_patterns or []
@@ -46,10 +47,14 @@ class Scanner:
         cfg_exclude = cfg.get("scan", {}).get("exclude", [])
         all_excludes = list(exclude_patterns) + cfg_exclude
 
-        # Discover .tf files, applying exclude patterns
+        # Build the include set (resolved absolute paths) when include_paths is provided
+        include_set = {str(Path(p).resolve()) for p in include_paths} if include_paths is not None else None
+
+        # Discover .tf files, applying include restriction and exclude patterns
         tf_files = [
             f for f in scan_path.rglob("*.tf")
-            if not _is_excluded(f, all_excludes)
+            if (include_set is None or str(f.resolve()) in include_set)
+            and not _is_excluded(f, all_excludes)
         ]
         logger.debug("Discovered %d .tf files in %s", len(tf_files), directory)
 
@@ -57,9 +62,20 @@ class Scanner:
         parser = TerraformParser()
         all_resources = []
         combined_ignore_map: dict = {}
+        files_failed = 0
 
         for tf_file in tf_files:
             resources = parser.parse(str(tf_file))
+            # Detect parse failure: non-empty file that returned no resources
+            # (parser.parse returns [] on error per its implementation)
+            if not resources:
+                try:
+                    file_size = tf_file.stat().st_size
+                except OSError:
+                    file_size = 0
+                if file_size > 0:
+                    # Non-empty file that yielded nothing — treat as parse failure
+                    files_failed += 1
             all_resources.extend(resources)
             for res_name, rules_list in parser.get_ignore_map(str(tf_file)).items():
                 existing = combined_ignore_map.get(res_name, [])
@@ -104,6 +120,7 @@ class Scanner:
             findings=findings,
             files_scanned=len(tf_files),
             rules_loaded=len(rules),
+            files_failed=files_failed,
         )
 
 
