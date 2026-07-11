@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tmac"
-version = "1.0.0"
+version = "1.6.0"
 description = "Threat Modeling as Code - Automated static analysis for infrastructure as code"
 authors = ["TMAC Security Team"]
 readme = "README.md"

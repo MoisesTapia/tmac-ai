@@ -1,0 +1,103 @@
+name: 'TMAC – Threat Modeling as Code'
+description: >
+  Run a CI-native STRIDE delta scan against changed Terraform files, publish a
+  PR comment with the findings summary, and upload the report artifact.
+author: 'TMAC'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+# Minimal permission set (R4.7):
+# - pull-requests: write  → publish PR comment
+# - contents: read        → checkout / read .tf files
+permissions:
+  pull-requests: write
+  contents: read
+
+inputs:
+  dir:
+    description: >
+      Directory to scan (relative to the workspace root).
+      Accepts any path string relative to $GITHUB_WORKSPACE.
+    required: false
+    default: '.'
+
+  fail-on:
+    description: >
+      Severity threshold for a non-zero exit code.
+      Accepted values: critical, high, medium, low.
+    required: false
+    default: 'high'
+
+  delta-only:
+    description: >
+      Restrict analysis to the .tf files changed in this pull request.
+      Accepted values: true, false.
+    required: false
+    default: 'true'
+
+  comment:
+    description: >
+      Publish a PR comment with the findings summary.
+      Accepted values: true, false.
+    required: false
+    default: 'true'
+
+  report-format:
+    description: >
+      Output format for the generated report artifact.
+      Accepted values: Markdown, html, json.
+    required: false
+    default: 'Markdown'
+
+  output:
+    description: >
+      Output file path for the report (relative to the workspace root).
+      Defaults to the standard workspace output location when omitted.
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run TMAC CI scan
+      id: tmac-ci
+      shell: bash
+      # continue-on-error so that the artifact upload step always runs (R5.10)
+      continue-on-error: true
+      env:
+        # Pass action inputs as environment variables to the entrypoint
+        TMAC_INPUT_DIR: ${{ inputs.dir }}
+        TMAC_INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        TMAC_INPUT_DELTA_ONLY: ${{ inputs.delta-only }}
+        TMAC_INPUT_COMMENT: ${{ inputs.comment }}
+        TMAC_INPUT_REPORT_FORMAT: ${{ inputs.report-format }}
+        TMAC_INPUT_OUTPUT: ${{ inputs.output }}
+        # GitHub CI context exposed to the runner
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+      run: ${{ github.action_path }}/ci/github/entrypoint.sh
+
+    - name: Upload TMAC report artifact
+      # Always upload regardless of the scan exit code (R5.10)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tmac-report
+        # Path resolves to the output file determined by the entrypoint
+        path: ${{ github.workspace }}/tmac-report.*
+        if-no-files-found: warn
+
+    - name: Propagate exit code
+      # Re-fail the step if the scan step reported a failure (R5.11, R5.12)
+      shell: bash
+      run: |
+        if [ "${{ steps.tmac-ci.outcome }}" = "failure" ]; then
+          exit 1
+        fi

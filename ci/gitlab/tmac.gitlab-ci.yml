@@ -1,0 +1,101 @@
+# TMAC GitLab CI Template
+#
+# Includable via the GitLab `include` directive.  Defines a single runnable
+# `tmac` job that works without any modification of the including file.
+#
+# Usage in .gitlab-ci.yml:
+#
+#   include:
+#     - project: '<your-namespace>/tmac-ai'
+#       file: '/ci/gitlab/tmac.gitlab-ci.yml'
+#
+# Override any variable at the project, group, or job level:
+#
+#   variables:
+#     TMAC_FAIL_ON: "medium"
+#     TMAC_DELTA_ONLY: "false"
+#
+# Requirements: R6.1, R6.2, R6.3, R6.4, R6.5, R6.6, R6.7, R6.8, R6.9
+
+# ---------------------------------------------------------------------------
+# CI/CD variable defaults (R6.3, R6.4)
+# All four match the GitHub Action defaults exactly (R6.2).
+# ---------------------------------------------------------------------------
+variables:
+  # Directory to scan (relative to the repository root)
+  TMAC_DIR: "."
+  # Severity threshold for a non-zero exit code: critical | high | medium | low
+  TMAC_FAIL_ON: "high"
+  # Restrict analysis to files changed in the MR (true | false)
+  TMAC_DELTA_ONLY: "true"
+  # Publish a comment on the MR (true | false)
+  TMAC_COMMENT: "true"
+
+# ---------------------------------------------------------------------------
+# tmac job (R6.1 — at least one runnable job, no modification required)
+# ---------------------------------------------------------------------------
+tmac:
+  image: python:3.11-slim
+
+  # Install TMAC from PyPI (R8.1 / R8.2 guarantee `pip install tmac` works)
+  before_script:
+    - pip install --quiet tmac
+
+  script:
+    # Build the delta-only flag
+    - |
+      if [ "$TMAC_DELTA_ONLY" = "true" ]; then
+        DELTA_FLAG="--delta-only"
+      else
+        DELTA_FLAG="--no-delta-only"
+      fi
+
+    # Build the comment flag; only enable commenting inside an MR pipeline
+    # (R6.5, R6.9 — gate MR comment publishing to merge_request_event context)
+    - |
+      if [ "$TMAC_COMMENT" = "true" ] && [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        COMMENT_FLAG="--comment"
+      else
+        COMMENT_FLAG="--no-comment"
+      fi
+
+    # Run TMAC and capture the exit code so we can handle publish failures
+    # separately from findings-based failures (R6.6, R6.8).
+    #
+    # CI_JOB_TOKEN is automatically available in every GitLab CI job and is
+    # picked up by the runner via secrets.read_token() — it is never passed
+    # on the command line (R4.2).
+    - |
+      tmac ci \
+        --dir "$TMAC_DIR" \
+        --fail-on "$TMAC_FAIL_ON" \
+        $DELTA_FLAG \
+        $COMMENT_FLAG \
+        --base-ref "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-HEAD~1}" \
+        --head-ref "${CI_COMMIT_SHA:-HEAD}" \
+        --output tmac-report.md \
+        --report md
+      TMAC_EXIT=$?
+
+    # If only the publish step failed, the runner still exited non-zero for
+    # that reason alone.  The runner itself catches PublishError/
+    # PublishPermissionError/NoPullRequestContext and returns the
+    # findings-based code, so we simply propagate whatever the runner returned.
+    # (R6.6 — publish failure must NOT change the findings-based exit code.)
+    - exit $TMAC_EXIT
+
+  # Keep the report artifact regardless of job outcome (R6.7)
+  artifacts:
+    name: "tmac-report-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - tmac-report.md
+    when: always          # retain even when the job fails (R6.7)
+    expire_in: 30 days
+
+  # Rules controlling when the job runs and when it publishes (R6.5, R6.9)
+  rules:
+    # Run on every MR pipeline — comment publishing is enabled by default
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run on branch pushes — comment publishing is automatically skipped
+    # because COMMENT_FLAG will be --no-comment (R6.9)
+    - if: '$CI_COMMIT_BRANCH'

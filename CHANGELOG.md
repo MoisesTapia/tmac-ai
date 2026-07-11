@@ -2,8 +2,35 @@
 
 All notable changes to this project are documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.6.0] — "Ixtla" — 2026-07-09
+
+### Added
+
+- **`tmac ci` subcommand**: new CLI command that orchestrates the complete CI/CD flow: detects changed `.tf` files between two git refs → scans only those files → writes the report artifact → formats a narrative comment → publishes it on the GitHub or GitLab PR/MR.
+- **`src/tmac/ci/` package**: new CI layer package with the following modules:
+  - `git_diff.py`: `changed_tf_files(base_ref, head_ref)` + `GitRefError` to detect which `.tf` files changed between two refs.
+  - `secrets.py`: `read_token()` reads `GITHUB_TOKEN` / `CI_JOB_TOKEN` / `TMAC_TOKEN` from the environment; `redact(text)` replaces any token occurrence in output strings with `***REDACTED***`.
+  - `comment.py`: `CommentFormatter.format()` renders the idempotent Markdown comment with the MARKER, executive summary, severity breakdown, findings table, `BLOCKED/WARNING/APPROVED` badge, and artifact reference. Supports intelligent size-based truncation.
+  - `publisher.py`: `GitHubCommentPublisher` and `GitLabCommentPublisher` with idempotent find-or-update behavior through an injectable `HttpTransport`.
+  - `runner.py`: `CIRunner.run()` orchestrates the complete flow. Handles `PublishError`, `PublishPermissionError`, and `NoPullRequestContext` without altering the findings-based exit code.
+- **`action.yml`**: official composite GitHub Action with inputs `dir`, `fail-on`, `delta-only`, `comment`, `report-format`, `output`; permissions limited to `pull-requests: write, contents: read`; artifact uploaded with `if: always()`.
+- **`ci/github/entrypoint.sh`**: Action entrypoint; validates inputs (invalid values → descriptive error + exit 3), maps flags, publishes comment only on `pull_request` events, propagates the `tmac ci` exit code unchanged.
+- **`ci/gitlab/tmac.gitlab-ci.yml`**: includable GitLab CI template with `TMAC_DIR/FAIL_ON/DELTA_ONLY/COMMENT` variables, `artifacts: when: always`, `rules:` that gate comments to `merge_request_event`.
+- **`Dockerfile`**: official image based on `python:3.11-slim`, `ENTRYPOINT ["tmac"]`, non-root user.
+- **`.pre-commit-hooks.yaml`**: hook `id: tmac` running `tmac scan` against staged `.tf` files; automatically skipped when no `.tf` files are staged.
+- **`Scanner.include_paths`**: new optional parameter in `Scanner.run_scan()` to restrict analysis to a subset of paths — fully backward-compatible (default `None`).
+- **Tests**: `tests/property/test_ci_properties.py` with Properties 5–19 from the design; `tests/test_distribution_artifacts.py` with 28 configuration smoke tests; `tests/test_integration_distribution.py` with pre-commit and Docker integration tests.
+- **`pyproject.toml`**: version bumped to `1.6.0`; `ScanMetadata.version` updated to `"1.6.0"`.
+
+### Changed
+
+- **`src/tmac/cli.py`**: added the `ci` subcommand; `@click.version_option` updated to `"1.6.0"`.
+- **`src/tmac/scanner.py`**: added `include_paths: Optional[List[str]] = None` to `run_scan()`.
 
 ---
 
@@ -127,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[1.1.0]: https://github.com/tmac-security/tmac/releases/tag/v1.1.0
-[1.0.0]: https://github.com/tmac-security/tmac/releases/tag/v1.0.0
-[Unreleased]: https://github.com/tmac-security/tmac/compare/v1.1.0...HEAD
+[1.6.0]: https://github.com/MoisesTapia/tmac-ai/releases/tag/v1.6.0
+[1.1.0]: https://github.com/MoisesTapia/tmac-ai/releases/tag/v1.1.0
+[1.0.0]: https://github.com/MoisesTapia/tmac-ai/releases/tag/v1.0.0
+[Unreleased]: https://github.com/MoisesTapia/tmac-ai/compare/v1.6.0...HEAD

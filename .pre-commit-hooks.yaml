@@ -1,0 +1,14 @@
+- id: tmac
+  name: TMAC – Terraform Threat Model Scan
+  description: >
+    Runs `tmac scan` against staged Terraform files and blocks the commit when
+    any finding meets or exceeds the configured Fail_On_Threshold (R10.1, R10.2,
+    R10.5). The hook exits 0 when no finding reaches the threshold (R10.3) and is
+    automatically skipped by pre-commit when no staged `.tf` files are present
+    (R10.4). CLI exit 3 (execution error) is non-zero and therefore also blocks
+    the commit (R10.5).
+  entry: tmac scan
+  language: python
+  files: \.tf$
+  pass_filenames: false
+  args: []

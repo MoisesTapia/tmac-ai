@@ -1,11 +1,12 @@
 # TMAC Documentation
 
-Complete documentation for TMAC (Threat Modeling as Code).
+Complete documentation for TMAC v1.6.0 (Threat Modeling as Code).
 
-## Getting started
+## Getting Started
 
-- [Installation](INSTALLATION.md) — requirements and setup with Poetry or pip.
-- [Command reference](COMMANDS.md) — full guide to `scan`, `plan`, and `diagram`.
+- [Installation](INSTALLATION.md) — pip, Poetry, Docker, and pre-commit.
+- [Examples](EXAMPLES.md) — basic, intermediate, and advanced usage in the console and in CI/CD.
+- [Command reference](COMMANDS.md) — complete guide to `scan`, `plan`, `ci`, and `diagram`.
 
 ## Reference
 
@@ -15,12 +16,12 @@ Complete documentation for TMAC (Threat Modeling as Code).
 
 ## Guides
 
-- [CI/CD integration](CICD.md) — GitHub Actions and GitLab CI pipelines.
-- [Examples](EXAMPLES.md) — sample Terraform architectures to try the tool.
+- [CI/CD integration](CICD.md) — official GitHub Action, GitLab CI template, Docker, and pre-commit.
 - [Architecture](ARCHITECTURE.md) — project layout and the full-state vs. risk-delta model.
 
 ## Project
 
 - [Product requirements (PRD)](PRD_TMAC_Extended.md) — extended product specification.
 - [Roadmap](../ROADMAP.md) — vision and future versions.
+- [Changelog](../CHANGELOG.md) — history of changes per version.
 - [Contributing](../CONTRIBUTING.md) — how to add rules and run the tests.
