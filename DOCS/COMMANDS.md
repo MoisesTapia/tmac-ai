@@ -1,6 +1,6 @@
 # Command Reference — TMAC v1.6.0
 
-TMAC exposes four subcommands through the `tmac` CLI:
+TMAC exposes five subcommands through the `tmac` CLI:
 
 ```bash
 tmac [--version] [--help] <command> [options]
@@ -19,7 +19,7 @@ See [DOCS/EXAMPLES.md](EXAMPLES.md) for step-by-step usage examples at each leve
 
 ## tmac scan
 
-Scans a directory of `.tf` files and evaluates every resource against the STRIDE rule catalog.
+Scans a directory of `.tf` files and evaluates every resource against the STRIDE rule catalog (**1,075+ rules**, **269 resource types**, **178 services**).
 
 ```bash
 tmac scan [options]

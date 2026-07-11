@@ -55,6 +55,12 @@ debug.py
 DOCS/*.docx
 DOCS/threats.yaml
 
+# VSCode extension — build artifacts (not versioned)
+node_modules/
+out/
+*.vsix
+package-lock.json
+
 # Kiro (local only — must not be versioned)
 # Kiro (local only — no debe versionarse)
 .kiro/

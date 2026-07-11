@@ -1,0 +1,35 @@
+src/**
+test/**
+node_modules/**
+**/*.map
+**/*.ts
+!out/**/*.js
+.vscode/**
+.github/**
+.kiro/**
+fixtures/**
+*.config.js
+tsconfig.json
+.vscodeignore
+.gitignore
+# Keep images/ in the package (icon.png, tmac-activity-icon.svg)
+images/*.svg
+!images/tmac-activity-icon.svg
+# Explicitly exclude heavy folders and Python/CI artifacts
+.hypothesis/**
+venv/**
+tests/**
+ci/**
+DOCS/**
+examples/**
+*.vsix
+.pytest_cache/**
+.pre-commit-hooks.yaml
+.tmac.yaml
+action.yml
+Dockerfile
+pyproject.toml
+requirements.txt
+CONTRIBUTING.md
+ROADMAP.md
+out/test/**

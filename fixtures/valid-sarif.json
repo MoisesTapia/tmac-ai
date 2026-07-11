@@ -1,0 +1,93 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "tmac",
+          "version": "1.0.0"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "TMAC-AWS-S3-001",
+          "level": "error",
+          "message": {
+            "text": "S3 bucket has public ACL enabled, exposing data to the internet."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/workspace/infra/s3.tf",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 12,
+                  "startColumn": 3
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "critical",
+            "stride": "Tampering",
+            "mitigation": "Set `acl = \"private\"` and enable bucket policy to restrict access."
+          }
+        },
+        {
+          "ruleId": "TMAC-AWS-IAM-007",
+          "level": "warning",
+          "message": {
+            "text": "IAM policy grants wildcard (*) resource permissions which may allow privilege escalation."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "modules/iam/main.tf",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 34,
+                  "startColumn": 5
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "medium",
+            "stride": "Elevation of Privilege",
+            "mitigation": "Restrict IAM policy resources to specific ARNs instead of using wildcard."
+          }
+        },
+        {
+          "ruleId": "TMAC-AWS-CW-003",
+          "level": "note",
+          "message": {
+            "text": "CloudWatch log group does not have a retention policy configured."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "modules/storage/main.tf",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 8,
+                  "startColumn": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "info",
+            "stride": "Information Disclosure",
+            "mitigation": "Add `retention_in_days` to the CloudWatch log group resource."
+          }
+        }
+      ]
+    }
+  ]
+}

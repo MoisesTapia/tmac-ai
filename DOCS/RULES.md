@@ -1,17 +1,17 @@
-# Rule Catalog — TMAC v1.1.0
+# Rule Catalog — TMAC v1.6.0
 
-TMAC includes **520 rules** covering **105 AWS resource types**, organized by service. Each rule follows the format `TMAC-AWS-{SERVICE}-{NNN}`.
+TMAC includes **1,075 rules** covering **269 AWS resource types** across **178 services**, organized by service. Each rule follows the format `TMAC-AWS-{SERVICE}-{NNN}`.
 
 ## Summary by severity
 
 | Severity | Rules |
 | :--- | :--- |
-| Critical | 24 |
-| High | 56 |
-| Medium | 121 |
-| Low | 106 |
-| Info | 213 |
-| **Total** | **520** |
+| 🔴 Critical | 81 |
+| 🟠 High | 268 |
+| 🟡 Medium | 278 |
+| 🟢 Low | 145 |
+| 🔵 Info | 303 |
+| **Total** | **1,075** |
 
 ## Rules by service
 

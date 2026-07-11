@@ -1,0 +1,152 @@
+{
+  "name": "tmac-vscode-plugin",
+  "displayName": "TMAC — Threat Modeling as Code",
+  "description": "Inline security threat analysis for Terraform files using the TMAC CLI.",
+  "version": "0.1.0",
+  "publisher": "tmac",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moisestapia/tmac-ai"
+  },
+  "homepage": "https://github.com/moisestapia/tmac-ai#readme",
+  "bugs": {
+    "url": "https://github.com/moisestapia/tmac-ai/issues"
+  },
+  "keywords": [
+    "terraform",
+    "security",
+    "threat-modeling",
+    "sarif",
+    "tmac",
+    "devsecops",
+    "stride"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:terraform",
+    "onCommand:tmac.scanWorkspace",
+    "onCommand:tmac.clearDiagnostics",
+    "onCommand:tmac.showOutput",
+    "onCommand:tmac.openSettings",
+    "workspaceContains:**/*.tf"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "tmac.scanWorkspace",
+        "title": "TMAC: Scan Workspace"
+      },
+      {
+        "command": "tmac.clearDiagnostics",
+        "title": "TMAC: Clear Diagnostics"
+      },
+      {
+        "command": "tmac.showOutput",
+        "title": "TMAC: Show Output Channel"
+      },
+      {
+        "command": "tmac.openSettings",
+        "title": "TMAC: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "TMAC",
+      "properties": {
+        "tmac.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the tmac binary. Leave empty to use system PATH."
+        },
+        "tmac.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan the workspace when a .tf file is saved."
+        },
+        "tmac.scanDelay": {
+          "type": "number",
+          "default": 1000,
+          "description": "Debounce delay in milliseconds between save events and scan execution."
+        },
+        "tmac.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Glob patterns of paths to exclude from scanning."
+        },
+        "tmac.failOn": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "default": "critical",
+          "description": "Minimum severity threshold passed to tmac scan --fail-on."
+        },
+        "tmac.enableQuickFixes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Register a CodeActionProvider to show inline quick-fix suggestions."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tmac-sidebar",
+          "title": "TMAC",
+          "icon": "images/tmac-activity-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "tmacThreats",
+          "name": "TMAC Threats",
+          "when": "workspaceHasOpenFolders"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "build:watch": "npm run build -- --watch",
+    "compile": "tsc --noEmit",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:integration": "node ./out/test/integration/runTest.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.2.0",
+    "@types/jest": "^29.5.12",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^2.26.1",
+    "esbuild": "^0.21.5",
+    "fast-check": "^3.19.0",
+    "jest": "^29.7.0",
+    "mocha": "^10.8.2",
+    "ts-jest": "^29.1.5",
+    "typescript": "^5.4.5"
+  }
+}
