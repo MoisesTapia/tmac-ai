@@ -10,7 +10,10 @@ Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from pathlib import PurePath
+from urllib.parse import quote
 
 from tmac.delta.models import ChangeAction, DeltaFinding
 from tmac.engine.severity import SEVERITY_LEVELS
@@ -57,6 +60,32 @@ class CommentContext:
     max_length: int  # Platform maximum comment length (R2.13)
     introduced: int  # Newly introduced threat count (R2.1)
     resolved: int  # Resolved threat count (R2.1)
+    repo_url: str = ""  # Base GitHub repo URL for generating file links (optional)
+    ref: str = "HEAD"  # Git ref the file links point at (the PR head, not the default branch)
+    source_root: str = ""  # Scanned directory; finding paths are made relative to it
+
+
+def _md_cell(text: str) -> str:
+    """Make text safe inside a Markdown table cell / code span of the PR comment.
+
+    Resource names and file paths come from the code under review, so they must not be
+    able to break the table or inject Markdown/HTML into the comment.
+    """
+    return str(text).replace("\r", " ").replace("\n", " ").replace("|", "\\|").replace("`", "'")
+
+
+def _repo_relative(file_path: str, source_root: str) -> str:
+    """POSIX path relative to the scanned directory (or as given, minus a leading ./)."""
+    if not file_path:
+        return ""
+    path = file_path
+    if source_root and os.path.isabs(path):
+        try:
+            path = os.path.relpath(path, source_root)
+        except ValueError:  # different drive on Windows
+            pass
+    posix = PurePath(path).as_posix()
+    return posix.removeprefix("./")
 
 
 # ---------------------------------------------------------------------------
@@ -112,26 +141,89 @@ class CommentFormatter:
             )
             lines.append("")
 
-        # Findings section
+        # Findings section — grouped by severity, each group collapsible
         lines.append("### Findings")
         if not ordered:
             lines.append("")
             lines.append("✅ No findings")
         else:
-            lines.append("| Severity | Resource | Rule | Action |")
-            lines.append("|----------|----------|------|--------|")
-            for finding in ordered:
-                sev_lower = finding.severity.lower()
-                sev_emoji = _SEVERITY_EMOJI.get(sev_lower, "")
-                resource = f"`{finding.resource_type}.{finding.resource_name}`"
-                rule = f"`{finding.rule_id}`"
-                action = self._action_label(finding)
-                lines.append(f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |")
+            lines.extend(self._render_collapsible_groups(ordered, ctx))
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")
 
         return "\n".join(lines)
+
+    def _render_collapsible_groups(
+        self, rows: list[Finding], ctx: CommentContext | None = None
+    ) -> list[str]:
+        """Render findings grouped by severity, each group in a <details> block."""
+        groups: dict[str, list[Finding]] = {sev: [] for sev in _SEVERITY_ORDER}
+        for f in rows:
+            key = f.severity.lower()
+            if key in groups:
+                groups[key].append(f)
+
+        lines: list[str] = []
+        for sev in _SEVERITY_ORDER:
+            group = groups[sev]
+            if not group:
+                continue
+            emoji = _SEVERITY_EMOJI[sev]
+            count = len(group)
+            label = f"{emoji} {sev.capitalize()} — {count} finding{'s' if count != 1 else ''}"
+            lines.append("")
+            lines.append("<details>")
+            lines.append(f"<summary>{label}</summary>")
+            lines.append("")
+            # Plan (delta) findings keep the NEW / MODIFIED / REMOVED action column.
+            with_action = any(isinstance(f, DeltaFinding) for f in group)
+            if with_action:
+                lines.append("| Resource | Rule | Action | File | STRIDE | Mitigation |")
+                lines.append("|----------|------|--------|------|--------|------------|")
+            else:
+                lines.append("| Resource | Rule | File | STRIDE | Mitigation |")
+                lines.append("|----------|------|------|--------|------------|")
+            for f in group:
+                # Resource names and paths come from the scanned (possibly untrusted) code.
+                resource = f"`{_md_cell(f.resource_type)}.{_md_cell(f.resource_name)}`"
+                rule = f"`{_md_cell(f.rule_id)}`"
+                stride = _md_cell(f.stride if isinstance(f.stride, str) else ", ".join(f.stride))
+                mitigation = _md_cell(f.mitigation)[:120]
+                # File + line: link to GitHub if repo_url available, otherwise plain text
+                file_ref = self._file_ref(f, ctx)
+                if with_action:
+                    action = self._action_label(f)
+                    lines.append(
+                        f"| {resource} | {rule} | {action} | {file_ref} | {stride} | {mitigation} |"
+                    )
+                else:
+                    lines.append(f"| {resource} | {rule} | {file_ref} | {stride} | {mitigation} |")
+            lines.append("")
+            lines.append("</details>")
+
+        return lines
+
+    def _file_ref(self, finding: Finding, ctx: CommentContext | None) -> str:
+        """Return a file:line reference, linked to GitHub when repo_url is set."""
+        if isinstance(finding, DeltaFinding):
+            # Plan findings carry the resource address, not a source file.
+            return f"`{_md_cell(finding.file_path)}`" if finding.file_path else ""
+
+        rel_path = _repo_relative(finding.file_path or "", ctx.source_root if ctx else "")
+        if not rel_path:
+            return ""
+        line = finding.line_number
+        label = f"{rel_path}:{line}" if line > 0 else rel_path
+        if ctx and ctx.repo_url:
+            # e.g. https://github.com/owner/repo/blob/<pr-head>/examples/file.tf#L31
+            anchor = f"#L{line}" if line > 0 else ""
+            url = (
+                f"{ctx.repo_url.rstrip('/')}/blob/{quote(ctx.ref or 'HEAD', safe='')}/"
+                f"{quote(rel_path)}{anchor}"
+            )
+            return f"[`{_md_cell(label)}`]({url})"
+        return f"`{_md_cell(label)}`"
 
     # ------------------------------------------------------------------
     # Internal helpers (unit-tested directly)
@@ -266,15 +358,7 @@ class CommentFormatter:
             lines.append("")
             lines.append("✅ No findings")
         else:
-            lines.append("| Severity | Resource | Rule | Action |")
-            lines.append("|----------|----------|------|--------|")
-            for finding in rows:
-                sev_lower = finding.severity.lower()
-                sev_emoji = _SEVERITY_EMOJI.get(sev_lower, "")
-                resource = f"`{finding.resource_type}.{finding.resource_name}`"
-                rule = f"`{finding.rule_id}`"
-                action = self._action_label(finding)
-                lines.append(f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |")
+            lines.extend(self._render_collapsible_groups(rows, ctx))
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")

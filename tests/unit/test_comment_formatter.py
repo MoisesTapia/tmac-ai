@@ -89,7 +89,7 @@ class TestHeadingsPresent:
         assert "Severity" in rendered, "Heading 'Severity' missing"
         assert "Resource" in rendered, "Heading 'Resource' missing"
         assert "Rule" in rendered, "Heading 'Rule' missing"
-        assert "Action" in rendered, "Heading 'Action' missing"
+        assert "File" in rendered, "Heading 'File' missing"
 
     def test_headings_present_in_severity_breakdown(self):
         """The Severity heading must appear in the breakdown table even with no findings."""
@@ -109,7 +109,7 @@ class TestHeadingsPresent:
         assert "Severity" in rendered
         assert "Resource" in rendered
         assert "Rule" in rendered
-        assert "Action" in rendered
+        assert "File" in rendered
 
 
 class TestEmptyFindingSet:
@@ -269,3 +269,60 @@ class TestTruncation:
         kept, omitted = formatter._truncate([], ctx)
         assert kept == []
         assert omitted == 0
+
+
+# ---------------------------------------------------------------------------
+# Collapsible groups, file links and Markdown safety
+# ---------------------------------------------------------------------------
+
+
+def _file_finding(file_path: str, line: int = 12, **kwargs) -> Finding:
+    finding = _make_finding(**kwargs)
+    return finding.model_copy(update={"file_path": file_path, "line_number": line})
+
+
+class TestCollapsibleGroupsAndLinks:
+    def test_findings_are_grouped_in_details_blocks(self):
+        findings = [_make_finding(severity="Critical"), _make_finding(severity="High")]
+        rendered = CommentFormatter().format(_make_scan_result(findings), _default_ctx())
+        assert rendered.count("<details>") == 2
+        assert "Critical — 1 finding" in rendered and "High — 1 finding" in rendered
+
+    def test_link_points_at_pr_head_with_repo_relative_path(self, tmp_path):
+        source = tmp_path / "infra"
+        f = _file_finding(str(source / "net" / "main.tf"))
+        ctx = _default_ctx(
+            repo_url="https://github.com/o/r", ref="feature/x", source_root=str(source)
+        )
+        rendered = CommentFormatter().format(_make_scan_result([f]), ctx)
+        assert "[`net/main.tf:12`](https://github.com/o/r/blob/feature%2Fx/net/main.tf#L12)" in (
+            rendered
+        )
+
+    def test_leading_dot_dirs_are_kept_and_line_zero_has_no_anchor(self):
+        f = _file_finding("./.github/infra/main.tf", line=0)
+        ctx = _default_ctx(repo_url="https://github.com/o/r", ref="abc123")
+        rendered = CommentFormatter().format(_make_scan_result([f]), ctx)
+        assert "(https://github.com/o/r/blob/abc123/.github/infra/main.tf)" in rendered
+
+    def test_without_repo_url_the_path_is_plain_text(self):
+        f = _file_finding("main.tf")
+        rendered = CommentFormatter().format(_make_scan_result([f]), _default_ctx())
+        assert "`main.tf:12`" in rendered and "](" not in rendered.split("### Findings")[1]
+
+    def test_untrusted_names_cannot_break_the_table(self):
+        f = _file_finding(
+            "evil|x.tf",
+            resource_name="x` | ✅ **APPROVED** |\n| y",
+        )
+        rendered = CommentFormatter().format(_make_scan_result([f]), _default_ctx())
+        row = next(line for line in rendered.splitlines() if "aws_s3_bucket." in line)
+        assert row.count(" | ") == 4  # 5 cells; injected pipes are escaped ("\|")
+        assert "\n| y" not in rendered and "`x`" not in rendered
+
+    def test_plan_findings_keep_action_column_and_are_not_linked(self):
+        f = _make_finding(change_action=ChangeAction.create)
+        ctx = _default_ctx(repo_url="https://github.com/o/r")
+        rendered = CommentFormatter().format(_make_scan_result([f]), ctx)
+        assert "| Resource | Rule | Action | File |" in rendered
+        assert "/blob/" not in rendered
