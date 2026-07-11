@@ -45,4 +45,5 @@ mypy_errors.txt
 debug.py
 
 # Kiro (local only — must not be versioned)
+# Kiro (local only — no debe versionarse)
 .kiro/
