@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitLab CI template installed an unrelated package**: the PyPI name `tmac` belongs to a different project, and the template ran `pip install tmac` with the job's `CI_JOB_TOKEN` available. It now installs this repository's archive at `TMAC_REF`. The docs no longer recommend `pip install tmac`.
 - **HTML reports**: Jinja2 autoescape for every value (resource names, file paths and custom-rule text were rendered raw, and so was the embedded Mermaid diagram), and `references` links are restricted to `http(s)` with `rel="noopener noreferrer"`.
 - **Fail closed**: an unparseable IaC file or an invalid/unreadable rule no longer passes as a clean scan. `scan`, `cfn`, `plan` and `ci` write the report (with an *Incomplete scan* banner; SARIF `executionSuccessful: false`; a note in the PR/MR comment) and exit `3`. `--lenient` restores warn-only behaviour.
-- **Dependencies**: hash-locked `requirements*.txt` generated from `requirements*.in` with `uv pip compile`, audited with `pip-audit`; `python-hcl2` capped `<5` (v5+ changes its output format and silently produced 0 findings). The Docker image installs from the lockfile; third-party GitHub Actions are pinned to commit SHAs.
+- **Dependencies**: hash-locked `requirements*.txt` generated from `requirements*.in` with `uv pip compile`, audited with `pip-audit`; `python-hcl2` pinned to a major version (its serialization format changes between majors). The Docker image installs from the lockfile; third-party GitHub Actions are pinned to commit SHAs.
 
 ### Added
 
@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Modern HCL no longer fails to parse**: TMAC now uses `python-hcl2` 8.x (with options that keep values unquoted, as before). 4.x rejected valid code such as a conditional inside an object followed by more keys, so real modules (e.g. `terraform-aws-eks`) stopped the scan with exit 3. `jsonencode(...)` values now keep their HCL text, so policy regex rules match them: 3 more true positives on the bundled examples (`IAMRP-007` ×2, `SMVER-001`).
 - **Attribute paths through nested blocks** (block inside block, e.g. `rule.apply_server_side_encryption_by_default.sse_algorithm`) resolved to nothing: `not_exists` rules fired on resources that declare the attribute and `equals` rules never fired (6 false positives and 1 missed finding on the bundled examples).
 - `TMAC-AWS-CB-003` flagged CodeBuild variables stored in Secrets Manager; it now flags `PLAINTEXT` ones only.
 - `TMAC-AWS-SHIELD-004`, `SHIELD-006` and `SECHUB-008` are not shipped: they need cross-resource correlation (they would flag every other Shield protection / Security Hub subscription) and never fired before (they used the then-missing `not_regex`).

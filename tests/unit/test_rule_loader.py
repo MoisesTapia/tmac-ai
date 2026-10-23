@@ -207,8 +207,14 @@ def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
     Loading the same YAML files in any order produces the same set of ThreatRule.
     """
     import tempfile
+    from unittest.mock import patch
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    # Only the extra directory matters here; skipping the ~1,100 built-in rules keeps
+    # each Hypothesis example fast.
+    with (
+        tempfile.TemporaryDirectory() as tmp_dir,
+        patch("tmac.engine.rule_loader.BUILTIN_RULE_DIRS", ()),
+    ):
         tmp_path = Path(tmp_dir)
         for suffix in rule_id_suffixes:
             rule_id = f"TMAC-TEST-{suffix}"
