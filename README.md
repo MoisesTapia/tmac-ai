@@ -1,12 +1,15 @@
 # TMAC (Threat Modeling as Code)
 
 TMAC es una herramienta de análisis estático de seguridad para Infraestructura como Código (IaC).
-Automatiza el modelado de amenazas identificando vulnerabilidades en código Terraform antes del despliegue,
+Automatiza el modelado de amenazas identificando vulnerabilidades en código Terraform / OpenTofu y en
+templates de AWS CloudFormation antes del despliegue,
 usando el framework STRIDE.
 
 ## Características principales (v1.1.0 "Ixtla")
 
-- **Análisis de Terraform:** Escaneo automático de archivos `.tf`.
+- **Análisis de Terraform y OpenTofu:** Escaneo automático de archivos `.tf` y `.tofu`.
+- **Análisis de AWS CloudFormation (`tmac cfn`):** Templates YAML y JSON, con soporte de funciones
+  intrínsecas (`!Ref`, `!Sub`, `!GetAtt`, …) y 43 reglas STRIDE propias.
 - **Análisis de delta de riesgo (`tmac plan`):** Detecta amenazas STRIDE exclusivamente en los recursos que el plan de Terraform va a crear, modificar o destruir — sin analizar el estado completo.
 - **Motor de reglas YAML:** Reglas de amenazas fuertemente tipadas y validadas con Pydantic.
 - **Framework STRIDE:** Categorización automática de hallazgos (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
@@ -44,6 +47,11 @@ tmac scan
 ```
 
 Escanea el directorio actual y genera un reporte HTML (`tmac-report.html`).
+
+Se analizan los archivos `.tf` y `.tofu` (OpenTofu). Si existen `x.tf` y `x.tofu` en el mismo
+directorio, se usa solo `x.tofu`, igual que OpenTofu. Nunca se recorren `.git`, `.terraform`,
+`node_modules`, `.terragrunt-cache`, `.aws-sam`, entornos virtuales (`venv`, `.venv`) ni cachés de
+herramientas; para analizar uno de ellos, pásalo directamente con `--dir`.
 
 ### Opciones del CLI (`tmac scan`)
 
@@ -99,7 +107,7 @@ tmac plan --plan-file plan.json
 
 | Opción | Abreviación | Descripción | Requerido |
 | :--- | :--- | :--- | :--- |
-| `--plan-file` | `-p` | Ruta al `tfplan.json` generado por `terraform show -json`. | **Sí** |
+| `--plan-file` | `-p` | Ruta al plan JSON generado por `terraform show -json` o `tofu show -json`. | **Sí** |
 | `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | No |
 | `--output` | `-o` | Ruta del archivo de reporte. | No |
 | `--rules-dir` | | Directorio de reglas YAML adicionales. | No |
@@ -153,6 +161,118 @@ Ejemplo de resumen en Markdown:
 | NUEVO     | aws_s3_bucket.data   | TMAC-AWS-S3-001  | Critical  | Information Disclosure | acl: private → public-read    |
 | MODIFICADO| aws_s3_bucket.logs   | TMAC-AWS-S3-002  | High      | Information Disclosure | server_side_encryption: AES256 → (none) |
 ```
+
+---
+
+## tmac cfn — AWS CloudFormation
+
+Analiza templates de AWS CloudFormation (YAML y JSON) con las mismas severidades, categorías STRIDE,
+reportes y códigos de salida que `tmac scan`:
+
+```bash
+tmac cfn --dir ./templates
+tmac cfn --dir ./templates --report md --output cfn.md --fail-on high --severity medium
+```
+
+`tmac cfn` acepta las mismas opciones que `tmac scan` (`--dir`, `--report`, `--output`, `--rules-dir`,
+`--config`, `--fail-on`, `--severity`, `--exclude`, `--lenient`, `--quiet`, `--no-color`, `--verbose`). El
+reporte por defecto es `tmac-cfn-report.{fmt}`.
+
+### Archivos analizados
+
+Se recorren los archivos `.yaml`, `.yml`, `.json` y `.template`, y solo se analizan los que parecen
+templates de CloudFormation (contienen `AWSTemplateFormatVersion` o un `Type: AWS::…`). Los manifiestos
+de Kubernetes, los `package.json` o las plantillas de Helm se ignoran sin generar errores. El formato
+(YAML o JSON) se detecta por el contenido, no por la extensión. Para analizar la salida de AWS CDK, usa
+`tmac cfn --dir cdk.out`.
+
+```yaml
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  DataBucket:                      # LogicalId → nombre del recurso en el reporte
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Env}-data"
+      AccessControl: PublicRead    # → TMAC-CFN-S3-001 (Critical)
+```
+
+Un template que parece de CloudFormation pero no se puede leer (YAML o JSON inválido, recurso sin
+`Type`, más de 5 MB) hace que el escaneo termine con código `3` (ver *Códigos de salida*).
+
+### Funciones intrínsecas
+
+`!Ref`, `!Sub`, `!GetAtt`, `!If`, `!Join` y el resto (en forma corta o larga, `Fn::…`) se conservan
+como valores cuyo contenido solo se conoce al desplegar: cuentan como **presentes** para `exists` /
+`not_exists`, pero **ninguna comparación dispara un hallazgo** sobre ellos. Por ejemplo,
+`Encrypted: !Ref EncryptVolumes` no se reporta como volumen sin cifrar.
+
+### Ignorar hallazgos en CloudFormation
+
+```yaml
+Resources:
+  # tmac:ignore                      ← todas las reglas de este recurso
+  PublicAssets:
+    Type: AWS::S3::Bucket
+
+  # tmac:ignore[TMAC-CFN-S3-003]     ← solo esa regla (se pueden apilar varias líneas)
+  Logs:
+    Type: AWS::S3::Bucket
+
+  Website:  # tmac:ignore[TMAC-CFN-S3-004]   ← también en la misma línea
+    Type: AWS::S3::Bucket
+
+  JsonFriendly:                      # Metadata funciona también en templates JSON
+    Type: AWS::S3::Bucket
+    Metadata:
+      tmac:
+        ignore: ["TMAC-CFN-S3-002"]  # o "*"
+```
+
+### Reglas CloudFormation y equivalencias con Terraform
+
+| Servicio | Tipo CloudFormation | Tipo Terraform | Reglas |
+| :--- | :--- | :--- | :--- |
+| S3 | `AWS::S3::Bucket` | `aws_s3_bucket` | S3-001 … S3-005 |
+| IAM | `AWS::IAM::Policy`, `AWS::IAM::ManagedPolicy` | `aws_iam_policy` | IAM-001, 002, 005, 007, 008 |
+| IAM | `AWS::IAM::Role` | `aws_iam_role` | IAM-003, 004, 009 |
+| IAM | `AWS::IAM::User` | `aws_iam_user` | IAM-006 |
+| Security Groups | `AWS::EC2::SecurityGroup` | `aws_security_group` | SG-001 … SG-003 |
+| VPC | `AWS::EC2::VPC` | `aws_vpc` | VPC-001 |
+| EC2 | `AWS::EC2::Instance`, `AWS::EC2::LaunchTemplate`, `AWS::EC2::Volume` | `aws_instance`, `aws_launch_template`, `aws_ebs_volume` | EC2-001 … EC2-004 |
+| RDS | `AWS::RDS::DBInstance` | `aws_db_instance` | RDS-001 … RDS-005 |
+| DynamoDB | `AWS::DynamoDB::Table` | `aws_dynamodb_table` | DDB-001 … DDB-003 |
+| KMS | `AWS::KMS::Key` | `aws_kms_key` | KMS-001 … KMS-003 |
+| Lambda | `AWS::Lambda::Function` | `aws_lambda_function` | LMD-001 … LMD-003 |
+| CloudTrail | `AWS::CloudTrail::Trail` | `aws_cloudtrail` | CW-001 … CW-003 |
+| API Gateway | `AWS::ApiGateway::Method`, `AWS::ApiGateway::Stage` | `aws_api_gateway_method`, `aws_api_gateway_stage` | APIGW-001 … APIGW-003 |
+| CloudFormation | `AWS::CloudFormation::Stack` | — | STACK-001 |
+
+Todas las reglas tienen el prefijo `TMAC-CFN-` (por ejemplo `TMAC-CFN-S3-001`). El catálogo completo,
+con descripción y mitigación, está en [`src/tmac/rules/cfn/threats.yaml`](src/tmac/rules/cfn/threats.yaml).
+
+### GitHub Actions — `tmac cfn`
+
+```yaml
+- name: TMAC CloudFormation scan
+  run: tmac cfn --dir ./templates --report json --output tmac-cfn.json --fail-on high
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: tmac-cfn.json
+```
+
+### Limitaciones conocidas
+
+- **Funciones intrínsecas sin resolver:** los valores de `!Ref`, `!Sub`, `Parameters`, `Mappings` y
+  `Conditions` no se evalúan (ver arriba); una configuración insegura que dependa de un parámetro no
+  se detecta. La resolución llegará con el grafo de dependencias (v2.2.0).
+- **Sin correlación entre recursos:** cada recurso se evalúa por separado. Por eso `TMAC-CFN-VPC-001`
+  usa el tag `FlowLogs=enabled` como workaround (igual que `TMAC-AWS-VPC-001`), un
+  `AWS::S3::BucketPolicy` no se relaciona con su bucket, y en Security Groups el puerto y el CIDR se
+  comprueban por separado entre todas las reglas de ingreso del grupo.
+- **Recursos no cubiertos en v1.2.0:** `AWS::IAM::AccessKey`, las políticas inline de
+  `AWS::IAM::User`, `AWS::RDS::DBCluster`, `AWS::Serverless::*` (SAM) y los servicios fuera de los 11
+  de la tabla.
 
 ---
 
@@ -417,16 +537,21 @@ tmac-security-scan:
 
 ```
 src/tmac/
-├── cli.py          # Interfaz CLI (Click) — subcomandos `scan` y `plan`
-├── scanner.py      # Orquestador del pipeline de escaneo (tmac scan)
+├── cli.py          # Interfaz CLI (Click) — subcomandos `scan`, `cfn` y `plan`
+├── scanner.py      # Scanner genérico: recibe el parser (Terraform o CloudFormation)
 ├── config.py       # Carga y validación de .tmac.yaml
 ├── models/         # Modelos Pydantic (Finding, ScanResult, ResourceModel)
-├── parsers/        # TerraformParser (.tf) y TfplanParser (tfplan.json)
+├── parsers/        # TerraformParser (.tf/.tofu), CloudFormationParser y TfplanParser
 ├── delta/          # DeltaScanner, DeltaFinding, DeltaScanResult, PlannedChange
 ├── engine/         # RuleLoader, Matcher, Evaluator
 ├── reporters/      # HTMLReporter, MarkdownReporter, JSONReporter (SARIF)
+├── rules/          # aws/threats.yaml (Terraform) y cfn/threats.yaml (CloudFormation)
 └── templates/      # Plantillas Jinja2 para HTML y Markdown (scan + delta)
 ```
+
+Para soportar un formato de IaC nuevo basta con un parser que herede de `BaseParser` (declara
+`file_patterns`, `can_parse()` y `parse_strict()`) y su archivo de reglas; el `Scanner`, el motor
+de reglas y los reportes se reutilizan sin cambios.
 
 ## Reglas incluidas (v1.0.0)
 

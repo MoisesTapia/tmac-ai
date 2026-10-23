@@ -80,7 +80,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [Unreleased]
+## [Unreleased] — v1.2.0 "Ixtla" (CloudFormation + OpenTofu)
 
 ### Security
 
@@ -90,12 +90,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
+- **AWS CloudFormation — `tmac cfn`**: analiza templates YAML y JSON (`.yaml`, `.yml`, `.json`, `.template`). Solo procesa archivos que parecen templates CFN; el resto de YAML/JSON (Kubernetes, Helm, `package.json`, …) se ignora. Mismas opciones, reportes y códigos de salida que `tmac scan`; reporte por defecto `tmac-cfn-report.{fmt}`.
+- **`CloudFormationParser`**: funciones intrínsecas (`!Ref`, `!Sub`, `!GetAtt`, `Fn::…`) normalizadas a valores no resueltos; números de línea exactos (YAML y JSON); `tmac:ignore` por comentario (arriba o en la línea del LogicalId) o por `Metadata: {tmac: {ignore: [...]}}` (también en JSON); límites contra archivos > 5 MB y bombas de alias YAML; `serialize()` / `serialize_to_yaml()` para round-trip.
+- **43 reglas CloudFormation** (`src/tmac/rules/cfn/threats.yaml`, prefijo `TMAC-CFN-`): S3 (5), IAM (9), Security Groups (3), VPC (1), EC2 (4), RDS (5), DynamoDB (3), KMS (3), Lambda (3), CloudTrail (3), API Gateway (3) y nested stacks (1). Incluye tabla de equivalencias con los tipos de Terraform.
+- **OpenTofu**: `tmac scan` analiza `.tofu` además de `.tf` (si existen `x.tf` y `x.tofu`, se usa `x.tofu`, como OpenTofu); `tmac plan` acepta planes de `tofu show -json` y `--source-dir` lee los `.tofu`.
 - `--lenient` en `scan` y `plan`: solo advierte sobre escaneos incompletos.
 - `tmac plan --source-dir DIR`: aplica los comentarios `tmac:ignore` de los `.tf` a los cambios del plan (global y por regla).
 - `tmac plan --config`: aplica `report.format`, `report.fail_on` y `scan.rules_dir`.
 - Validación de reglas al cargarlas: `severity`, `stride` y `condition` restringidos a valores válidos (sin distinguir mayúsculas), `regex` compilado y valores obligatorios salvo `exists`/`not_exists`.
 - `Scanner(parser=...)`: escáner independiente del formato; los parsers declaran `file_patterns`, `can_parse()` y `parse_strict()`.
-- CI en GitHub Actions (tests 3.11–3.13 + Windows, smoke test 3.10, `pip-audit` semanal, lint informativo) y Dependabot para Actions.
+- CI en GitHub Actions (tests 3.11–3.13 + Windows, smoke test 3.10 de `scan` y `cfn`, `pip-audit` semanal, lint obligatorio) y Dependabot para Actions.
+
+### Changed
+
+- El descubrimiento de archivos ya no entra en `.git`, `.terraform`, `.terragrunt-cache`, `node_modules`, `.aws-sam`, `venv`/`.venv` ni cachés de herramientas (antes `.terraform` se escaneaba salvo que se excluyera; sus módulos de terceros generaban hallazgos ajenos). Un directorio pasado directamente con `--dir` sí se analiza.
+- Motor de reglas: un valor no resuelto (función intrínseca de CloudFormation) cuenta como presente pero nunca produce hallazgos en comparaciones; `not_contains` evalúa la colección completa y trata un atributo ausente como "no contiene". Sin cambios en los resultados de Terraform.
+- `RuleLoader` carga `aws/threats.yaml` y `cfn/threats.yaml` (144 reglas). Cada regla solo aplica a su `resource_type`, así que los resultados de `tmac scan` no cambian.
 
 ### Fixed
 
@@ -110,7 +120,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Planned
 
-- v1.2.0: Soporte para AWS CloudFormation templates.
+- v1.3.0: Kubernetes Security.
 
 ---
 
