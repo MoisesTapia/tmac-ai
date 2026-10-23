@@ -1,8 +1,10 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from pydantic import BaseModel, Field
 
 # IgnoreMap: resource key (name, or address for tfplan) → ["*"] (global) or ["RULE-ID-1", ...]
 IgnoreMap = Dict[str, List[str]]
+# Same, keyed by (resource_type, resource_name).
+ResourceIgnoreMap = Dict[Tuple[str, str], List[str]]
 
 class ResourceModel(BaseModel):
     resource_type: str

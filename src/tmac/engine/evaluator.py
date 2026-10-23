@@ -57,6 +57,10 @@ class Evaluator:
 
         return matched
 
+    def resolve_attribute(self, attribute_path: str, attributes: Dict[str, Any]) -> Any:
+        """Resolve a dotted attribute path; values from repeated blocks come back as a list."""
+        return self._get_attribute_value(attribute_path, attributes)
+
     def _get_attribute_value(self, attribute_path: str, attributes: Dict[str, Any]) -> Any:
         parts = attribute_path.split(".")
         current: Any = attributes

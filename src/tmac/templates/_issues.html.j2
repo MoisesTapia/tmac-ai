@@ -1,0 +1,11 @@
+{% if result.issues %}
+        <div role="alert" style="border: 1px solid #d97706; border-left: 4px solid #d97706; background: rgba(217, 119, 6, 0.08); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
+            <strong>⚠ Incomplete scan — {{ result.issues|length }} issue(s).</strong>
+            Results may be missing findings for the files and rules below.
+            <ul style="margin: 8px 0 0; padding-left: 20px;">
+                {% for issue in result.issues %}
+                <li><code>{{ issue.kind }}</code> — {{ issue.message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+{% endif %}

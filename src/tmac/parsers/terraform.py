@@ -2,14 +2,13 @@ import hcl2
 import logging
 import re
 from io import StringIO
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from tmac.parsers.base import BaseParser
-from tmac.models.resource import IgnoreMap, ResourceModel
+from tmac.parsers.base import BaseParser, ParseError
+from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
 
 logger = logging.getLogger(__name__)
 
-# Like IgnoreMap, but keyed by (resource_type, resource_name) — unique within a file.
-ResourceIgnoreMap = Dict[Tuple[str, str], List[str]]
 LineMap = Dict[Tuple[str, str], int]
 
 
@@ -28,34 +27,62 @@ class TerraformParser(BaseParser):
     file_patterns = ("*.tf",)
 
     def parse(self, file_path: str) -> List[ResourceModel]:
-        resources: List[ResourceModel] = []
+        """Lenient parse: logs a warning and returns [] if the file cannot be parsed."""
+        try:
+            return self.parse_strict(file_path)
+        except ParseError as e:
+            logger.warning("%s", e)
+            return []
+
+    def parse_strict(self, file_path: str) -> List[ResourceModel]:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-
             line_map, ignores = self._prescan_resources(content)
-
             parsed = hcl2.load(StringIO(content))  # type: ignore
-
-            if "resource" in parsed:
-                for block in parsed["resource"]:
-                    for res_type, res_dict in block.items():
-                        for res_name, res_attrs in res_dict.items():
-                            key = (res_type, res_name)
-                            resources.append(
-                                ResourceModel(
-                                    resource_type=res_type,
-                                    name=res_name,
-                                    attributes=res_attrs,
-                                    source_file=file_path,
-                                    line_number=line_map.get(key, 0),
-                                    ignored_rules=ignores.get(key, []),
-                                )
-                            )
-            return resources
         except Exception as e:
-            logger.warning("Failed to parse %s: %s", file_path, e)
-            return []
+            raise ParseError(f"Failed to parse {file_path}: {e}") from e
+
+        resources: List[ResourceModel] = []
+        if "resource" in parsed:
+            for block in parsed["resource"]:
+                for res_type, res_dict in block.items():
+                    for res_name, res_attrs in res_dict.items():
+                        key = (res_type, res_name)
+                        resources.append(
+                            ResourceModel(
+                                resource_type=res_type,
+                                name=res_name,
+                                attributes=res_attrs,
+                                source_file=file_path,
+                                line_number=line_map.get(key, 0),
+                                ignored_rules=ignores.get(key, []),
+                            )
+                        )
+        return resources
+
+    def get_resource_ignores(self, file_path: str) -> ResourceIgnoreMap:
+        """Return tmac:ignore suppressions keyed by (resource_type, resource_name)."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            _, ignores = self._prescan_resources(content)
+            return ignores
+        except Exception as e:
+            logger.warning("Failed to read ignore map from %s: %s", file_path, e)
+            return {}
+
+    def collect_resource_ignores(self, directory: str) -> ResourceIgnoreMap:
+        """Merge tmac:ignore suppressions from every .tf file under ``directory``.
+
+        Used by ``tmac plan --source-dir``: plan JSON carries no comments, so
+        suppressions are matched to planned changes by (resource_type, resource_name).
+        """
+        merged: ResourceIgnoreMap = {}
+        for tf_file in sorted(Path(directory).rglob("*.tf")):
+            for key, rule_ids in self.get_resource_ignores(str(tf_file)).items():
+                merged[key] = merge_ignores(merged.get(key, []), rule_ids)
+        return merged
 
     def get_ignore_map(self, file_path: str) -> IgnoreMap:
         """Return the ignore_map for a file without full parsing."""

@@ -1,92 +1,106 @@
 import logging
 import os
 import sys
+from typing import Any, Dict, List, NoReturn, Optional
 
 import click
+from click.core import ParameterSource
 
+from tmac import __version__
+from tmac.config import ConfigError, load_config
 from tmac.delta.scanner import DeltaScanError, DeltaScanner
 from tmac.graph.service import DiagramError, DiagramService
 from tmac.graph.diagrams import IMAGE_FORMATS, render_graph, render_image
 from tmac.graph.grouping import group_by_name
 from tmac.graph.metadata import render_metadata
 from tmac.engine.severity import SEVERITY_LEVELS
+from tmac.models.finding import Finding, ScanResult
+from tmac.parsers.terraform import TerraformParser
 from tmac.reporters import get_reporter
 from tmac.scanner import ScanError, Scanner
 
+SEVERITY_CHOICES = ["critical", "high", "medium", "low", "info"]
+MAX_ISSUES_SHOWN = 10
+
 
 @click.group()
-@click.version_option(version="1.6.0", prog_name="TMAC")
+@click.version_option(version=__version__, prog_name="TMAC")
 def cli() -> None:
     """TMAC (Threat Modeling as Code) - Static Analysis for IaC."""
     pass
 
 
 @cli.command()
-@click.option("--dir", "-d", "directory", default=".", type=click.Path(exists=True), help="Directory to scan.")
+@click.option("--dir", "-d", "directory", type=click.Path(), help="Directory to scan (default: scan.dir from config, else '.').")
 @click.option("--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format.")
 @click.option("--output", "-o", type=click.Path(), help="Output file path.")
 @click.option("--rules-dir", type=click.Path(exists=True), help="Additional rules directory.")
 @click.option("--config", type=click.Path(), default=".tmac.yaml", help="Configuration file path.")
-@click.option("--fail-on", type=click.Choice(["critical", "high", "medium", "low", "info"]), help="Severity threshold for exit 1.")
-@click.option("--severity", type=click.Choice(["all", "critical", "high", "medium", "low", "info"]), help="Minimum severity to show.")
+@click.option("--fail-on", type=click.Choice(SEVERITY_CHOICES), help="Severity threshold for exit 1.")
+@click.option("--severity", type=click.Choice(["all"] + SEVERITY_CHOICES), help="Minimum severity to show.")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
 @click.option("--exclude", "-e", "exclude", multiple=True, type=click.STRING, help="Glob patterns to exclude (repeatable).")
+@click.option("--lenient", is_flag=True, help="Don't exit 3 when files can't be parsed or rules are invalid.")
 @click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output.")
 @click.option("--diagram", "with_diagram", is_flag=True, help="Embed an architecture diagram (Mermaid) in HTML/MD reports.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+@click.pass_context
 def scan(
-    directory: str,
-    report: str,
-    output: str,
-    rules_dir: str,
+    ctx: click.Context,
+    directory: Optional[str],
+    report: Optional[str],
+    output: Optional[str],
+    rules_dir: Optional[str],
     config: str,
-    fail_on: str,
-    severity: str,
+    fail_on: Optional[str],
+    severity: Optional[str],
     quiet: bool,
     exclude: tuple,
+    lenient: bool,
     no_color: bool,
     with_diagram: bool,
     verbose: bool,
 ) -> None:
     """Scan infrastructure code for security threats."""
-    if verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
-    if no_color:
-        os.environ["NO_COLOR"] = "1"
+    _setup(verbose, no_color)
+    cfg = _load_cli_config(ctx, config)
+    scan_cfg, report_cfg = cfg.get("scan", {}), cfg.get("report", {})
 
-    fmt = report or "html"
+    # Precedence: CLI flag > .tmac.yaml > built-in default
+    fmt = report or report_cfg.get("format", "html")
     out_file = output or f"tmac-report.{fmt}"
-    threshold = (fail_on or "critical").lower()
-    min_sev = severity or "all"
+    threshold = fail_on or report_cfg.get("fail_on", "critical")
+    min_sev = severity or report_cfg.get("severity", "all")
+    target_dir = directory or scan_cfg.get("dir") or "."
 
     try:
         result = Scanner().run_scan(
-            directory=directory,
+            directory=target_dir,
             rules_dir=rules_dir,
             exclude_patterns=list(exclude),
             min_severity=min_sev,
             verbose=verbose,
+            config=cfg,
         )
     except ScanError as exc:
-        click.echo(str(exc), err=True)
-        sys.exit(3)
+        _fail(str(exc))
 
     # Build the architecture diagram only when requested and for HTML/MD reports.
     diagram_src: str | None = None
     if with_diagram and fmt in ("html", "md"):
         try:
-            graph = DiagramService().build_graph(directory, exclude_patterns=list(exclude), simplify=True)
+            graph = DiagramService().build_graph(
+                target_dir, exclude_patterns=list(exclude), simplify=True
+            )
             diagram_src = render_graph(graph, "mermaid")
         except DiagramError as exc:
             click.echo(f"Warning: could not generate the diagram: {exc}", err=True)
 
-    report_content = get_reporter(fmt).generate(result, diagram=diagram_src)
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write(report_content)
-
+    _write_report(result, fmt, out_file, diagram=diagram_src)
     if not quiet:
         click.echo(f"Scan complete: {result.statistics.total_findings} findings. Report saved to {out_file}")
 
+    _check_issues(result, lenient)
     _exit_with_code(result.findings, threshold)
 
 
@@ -95,46 +109,56 @@ def scan(
 @click.option("--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format.")
 @click.option("--output", "-o", type=click.Path(), help="Output file path.")
 @click.option("--rules-dir", type=click.Path(exists=True), help="Additional rules directory.")
-@click.option("--fail-on", type=click.Choice(["critical", "high", "medium", "low", "info"]), help="Severity threshold for exit 1.")
+@click.option("--config", type=click.Path(), default=".tmac.yaml", help="Configuration file path.")
+@click.option("--source-dir", type=click.Path(exists=True, file_okay=False), help="Directory with the plan's .tf sources, to apply their tmac:ignore comments.")
+@click.option("--fail-on", type=click.Choice(SEVERITY_CHOICES), help="Severity threshold for exit 1.")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
+@click.option("--lenient", is_flag=True, help="Don't exit 3 when rules are invalid.")
 @click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+@click.pass_context
 def plan(
+    ctx: click.Context,
     plan_file: str,
-    report: str,
-    output: str,
-    rules_dir: str,
-    fail_on: str,
+    report: Optional[str],
+    output: Optional[str],
+    rules_dir: Optional[str],
+    config: str,
+    source_dir: Optional[str],
+    fail_on: Optional[str],
     quiet: bool,
+    lenient: bool,
     no_color: bool,
     verbose: bool,
 ) -> None:
     """Analyze a tfplan.json to detect the STRIDE risk delta."""
-    if verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
-    if no_color:
-        os.environ["NO_COLOR"] = "1"
+    _setup(verbose, no_color)
+    cfg = _load_cli_config(ctx, config)
+    report_cfg = cfg.get("report", {})
 
-    fmt = report or "html"
+    fmt = report or report_cfg.get("format", "html")
     out_file = output or f"tmac-delta-report.{fmt}"
-    threshold = (fail_on or "critical").lower()
+    threshold = fail_on or report_cfg.get("fail_on", "critical")
+    resource_ignores = TerraformParser().collect_resource_ignores(source_dir) if source_dir else None
 
     try:
-        result = DeltaScanner().run(plan_file=plan_file, rules_dir=rules_dir, verbose=verbose)
+        result = DeltaScanner().run(
+            plan_file=plan_file,
+            rules_dir=rules_dir or cfg.get("scan", {}).get("rules_dir"),
+            verbose=verbose,
+            resource_ignores=resource_ignores,
+        )
     except DeltaScanError as exc:
-        click.echo(str(exc), err=True)
-        sys.exit(3)
+        _fail(str(exc))
 
-    report_content = get_reporter(fmt).generate(result)
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write(report_content)
-
+    _write_report(result, fmt, out_file)
     if not quiet:
         click.echo(
             f"Delta scan complete: {result.findings_introduced} threats introduced, "
             f"{result.findings_resolved} resolved. Report saved to {out_file}"
         )
 
+    _check_issues(result, lenient)
     _exit_with_code(result.findings, threshold)
 
 
@@ -283,7 +307,51 @@ def ci(
     sys.exit(exit_code)
 
 
-def _exit_with_code(findings: list, threshold: str) -> None:
+def _setup(verbose: bool, no_color: bool) -> None:
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+    if no_color:
+        os.environ["NO_COLOR"] = "1"
+
+def _fail(message: str) -> NoReturn:
+    """Exit 3: the scan could not run, or its results cannot be trusted."""
+    click.echo(message, err=True)
+    sys.exit(3)
+
+
+def _load_cli_config(ctx: click.Context, config_path: str) -> Dict[str, Any]:
+    """Load .tmac.yaml. A missing default file is fine; a missing explicit --config is an error."""
+    explicit = ctx.get_parameter_source("config") == ParameterSource.COMMANDLINE
+    if explicit and not os.path.isfile(config_path):
+        _fail(f"Config file not found: {config_path}")
+    try:
+        return load_config(config_path)
+    except ConfigError as exc:
+        _fail(str(exc))
+
+
+def _write_report(
+    result: ScanResult, fmt: str, out_file: str, diagram: Optional[str] = None
+) -> None:
+    report_content = get_reporter(fmt).generate(result, diagram=diagram)
+    with open(out_file, "w", encoding="utf-8") as f:
+        f.write(report_content)
+
+
+def _check_issues(result: ScanResult, lenient: bool) -> None:
+    """Report scan issues on stderr; unless lenient, an incomplete scan exits 3 (fail closed)."""
+    if not result.issues:
+        return
+    click.echo(f"Warning: the scan is incomplete ({len(result.issues)} issue(s)):", err=True)
+    for issue in result.issues[:MAX_ISSUES_SHOWN]:
+        click.echo(f"  [{issue.kind}] {issue.message}", err=True)
+    if len(result.issues) > MAX_ISSUES_SHOWN:
+        click.echo(f"  ... and {len(result.issues) - MAX_ISSUES_SHOWN} more (see the report)", err=True)
+    if not lenient:
+        _fail("Failing with exit code 3 because results may be missing findings (use --lenient to ignore).")
+
+
+def _exit_with_code(findings: List[Finding], threshold: str) -> NoReturn:
     """Determine and apply exit code based on findings and threshold."""
     threshold_val = SEVERITY_LEVELS.get(threshold, SEVERITY_LEVELS["critical"])
     max_sev = max((SEVERITY_LEVELS.get(f.severity.lower(), -1) for f in findings), default=-1)

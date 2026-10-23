@@ -67,6 +67,22 @@ class JSONReporter(BaseReporter):
                     }
                 },
                 "results": results,
+                # Unparseable files / invalid rules: SARIF consumers (e.g. GitHub code
+                # scanning) see the run as unsuccessful instead of trusting a clean result.
+                "invocations": [{
+                    "executionSuccessful": not result.issues,
+                    "toolExecutionNotifications": [
+                        {
+                            "level": "error",
+                            "descriptor": {"id": f"tmac/{issue.kind}-error"},
+                            "message": {"text": issue.message},
+                            "locations": [{
+                                "physicalLocation": {"artifactLocation": {"uri": issue.file_path}}
+                            }],
+                        }
+                        for issue in result.issues
+                    ],
+                }],
             }],
         }
 

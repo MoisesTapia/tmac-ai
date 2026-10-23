@@ -1,0 +1,8 @@
+{% if result.issues %}
+> [!WARNING]
+> **Incomplete scan — {{ result.issues|length }} issue(s).** Results may be missing findings for:
+{% for issue in result.issues %}
+> - `{{ issue.kind }}` — {{ issue.message }}
+{% endfor %}
+
+{% endif %}

@@ -2,14 +2,14 @@ import fnmatch
 import logging
 import time
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 from tmac.config import ConfigError, load_config
 from tmac.engine.matcher import Matcher
 from tmac.engine.rule_loader import RuleLoader
 from tmac.engine.severity import filter_by_min_severity
-from tmac.models.finding import ScanMetadata, ScanResult, ScanStatistics
-from tmac.parsers.base import BaseParser
+from tmac.models.finding import ScanIssue, ScanMetadata, ScanResult, ScanStatistics
+from tmac.parsers.base import BaseParser, ParseError
 from tmac.parsers.terraform import TerraformParser
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,10 @@ class Scanner:
         min_severity: str = "all",
         verbose: bool = False,
         include_paths: Optional[List[str]] = None,
+        config: Optional[Dict[str, Any]] = None,
     ) -> ScanResult:
+        """Run the scan. ``config`` is an already-loaded .tmac.yaml; when None, the
+        default ./.tmac.yaml is loaded."""
         start = time.time()
         exclude_patterns = exclude_patterns or []
 
@@ -51,10 +54,13 @@ class Scanner:
             raise ScanError(f"Directory not accessible: {directory}")
 
         # Load config (may raise ConfigError → caller converts to ScanError)
-        try:
-            cfg = load_config()
-        except ConfigError as e:
-            raise ScanError(str(e)) from e
+        if config is not None:
+            cfg = config
+        else:
+            try:
+                cfg = load_config()
+            except ConfigError as e:
+                raise ScanError(str(e)) from e
 
         cfg_exclude = cfg.get("scan", {}).get("exclude", [])
         all_excludes = list(exclude_patterns) + cfg_exclude
@@ -70,28 +76,22 @@ class Scanner:
             len(files), ", ".join(self.parser.file_patterns), directory,
         )
 
-        # Parse resources (tmac:ignore suppressions travel on each ResourceModel)
+        # Parse resources (tmac:ignore suppressions travel on each ResourceModel).
+        # Unparseable files are recorded, not silently treated as empty.
         all_resources = []
-        files_failed = 0
-
+        issues: List[ScanIssue] = []
         for file in files:
-            resources = self.parser.parse(str(file))
-            # Detect parse failure: non-empty file that returned no resources
-            # (parser.parse returns [] on error per its implementation)
-            if not resources:
-                try:
-                    file_size = file.stat().st_size
-                except OSError:
-                    file_size = 0
-                if file_size > 0:
-                    # Non-empty file that yielded nothing — treat as parse failure
-                    files_failed += 1
-            all_resources.extend(resources)
+            try:
+                all_resources.extend(self.parser.parse_strict(str(file)))
+            except ParseError as e:
+                logger.warning("%s", e)
+                issues.append(ScanIssue(kind="parse", file_path=str(file), message=str(e)))
 
         # Load rules
         extra_dir = rules_dir or cfg.get("scan", {}).get("rules_dir")
         loader = RuleLoader()
         rules = loader.load_rules(extra_dir)
+        issues.extend(loader.issues)
         logger.debug("Loaded %d rules", len(rules))
 
         # Match
@@ -107,7 +107,9 @@ class Scanner:
             findings=findings,
             files_scanned=len(files),
             rules_loaded=len(rules),
-            files_failed=files_failed,
+            # Kept for v1.6 consumers (CI runner): number of unparseable files.
+            files_failed=sum(1 for i in issues if i.kind == "parse"),
+            issues=issues,
         )
 
     def _discover_files(
