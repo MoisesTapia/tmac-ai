@@ -4,6 +4,7 @@ from io import StringIO
 from pathlib import Path
 
 import hcl2
+from hcl2.utils import SerializationOptions
 
 from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
 from tmac.parsers.base import BaseParser, ParseError
@@ -11,6 +12,15 @@ from tmac.parsers.base import BaseParser, ParseError
 logger = logging.getLogger(__name__)
 
 LineMap = dict[tuple[str, str], int]
+
+# python-hcl2 >= 5 keeps HCL quoting and adds block markers by default; these options give
+# plain values ("web", not '"web"') so rules compare against what the user wrote.
+_HCL_OPTIONS = SerializationOptions(
+    with_comments=False,
+    explicit_blocks=False,
+    preserve_heredocs=False,
+    strip_string_quotes=True,
+)
 
 
 def merge_ignores(existing: list[str], new: list[str]) -> list[str]:
@@ -46,7 +56,7 @@ class TerraformParser(BaseParser):
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
             line_map, ignores = self._prescan_resources(content)
-            parsed = hcl2.load(StringIO(content))  # type: ignore
+            parsed = hcl2.load(StringIO(content), serialization_options=_HCL_OPTIONS)
         except Exception as e:
             raise ParseError(f"Failed to parse {file_path}: {e}") from e
 

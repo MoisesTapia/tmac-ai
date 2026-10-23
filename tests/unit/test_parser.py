@@ -364,3 +364,64 @@ resource "aws_s3_bucket" "clean" {
     parser = TerraformParser()
     _, ignore_map = parser._prescan(content)
     assert "clean" not in ignore_map
+
+
+# ---------------------------------------------------------------------------
+# Attribute values (python-hcl2 >= 8 serialization)
+# ---------------------------------------------------------------------------
+
+
+def test_attribute_values_are_unquoted(tmp_path):
+    content = """\
+resource "aws_security_group" "web" {
+  name    = "web"
+  count   = 2
+  tags    = { Name = "web", Env = var.env }
+  ingress {
+    from_port   = 22
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  heredoc = <<EOT
+line "quoted"
+EOT
+  ref     = aws_s3_bucket.b.id
+  interp  = "${var.x}-suffix"
+  empty   = ""
+  esc     = "a\\"b"
+}
+"""
+    [res] = TerraformParser().parse_strict(_make_tf(tmp_path, content))
+    attrs = res.attributes
+    assert (res.resource_type, res.name) == ("aws_security_group", "web")
+    assert attrs["name"] == "web"
+    assert attrs["count"] == 2
+    assert attrs["tags"] == {"Name": "web", "Env": "${var.env}"}
+    assert attrs["ingress"] == [{"from_port": 22, "cidr_blocks": ["0.0.0.0/0"]}]
+    assert attrs["heredoc"].strip() == 'line "quoted"'
+    assert attrs["ref"] == "${aws_s3_bucket.b.id}"
+    assert attrs["interp"] == "${var.x}-suffix"
+    assert attrs["empty"] == ""
+    assert attrs["esc"] == 'a"b'
+    assert "__is_block__" not in attrs
+
+
+def test_modern_hcl_expressions_parse(tmp_path):
+    # A conditional inside an object followed by more keys (as in terraform-aws-eks)
+    # was a syntax error for python-hcl2 4.x.
+    content = """\
+resource "aws_s3_bucket" "b" {
+  bucket = "b"
+  tags = {
+    cidr = var.ip_family == "ipv6" ? try(local.cfg.v6, "") : try(local.cfg.v4, "")
+
+    name = "b"
+  }
+  dynamic "rule" {
+    for_each = var.rules
+    content { id = rule.key }
+  }
+}
+"""
+    [res] = TerraformParser().parse_strict(_make_tf(tmp_path, content))
+    assert res.attributes["tags"]["name"] == "b"
+    assert "rule" in res.attributes["dynamic"][0]
