@@ -3,23 +3,25 @@ Unit tests for TMAC reporters: HTMLReporter, MarkdownReporter.
 
 Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5
 """
-from typing import Any, Dict, List, Union
+
+from typing import Any
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from markupsafe import escape
 
 from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
 from tmac.reporters.html import HTMLReporter
 from tmac.reporters.markdown import MarkdownReporter
 
-
 # ---------------------------------------------------------------------------
 # Helpers / Factories
 # ---------------------------------------------------------------------------
 
+
 def _make_finding(**kwargs) -> Finding:
-    defaults: Dict[str, Any] = dict(
+    defaults: dict[str, Any] = dict(
         rule_id="TMAC-AWS-S3-001",
         rule_name="S3 Public ACL",
         severity="Critical",
@@ -36,7 +38,7 @@ def _make_finding(**kwargs) -> Finding:
     return Finding(**defaults)
 
 
-def _make_scan_result(findings: List[Finding] = None, **kwargs) -> ScanResult:
+def _make_scan_result(findings: list[Finding] = None, **kwargs) -> ScanResult:
     if findings is None:
         findings = [_make_finding()]
     return ScanResult(
@@ -53,6 +55,7 @@ def _make_scan_result(findings: List[Finding] = None, **kwargs) -> ScanResult:
 # ---------------------------------------------------------------------------
 # HTMLReporter — Requirements 8.1, 8.2, 8.4
 # ---------------------------------------------------------------------------
+
 
 class TestHTMLReporter:
     def test_generates_valid_html_structure(self):
@@ -179,9 +182,15 @@ class TestMarkdownReporter:
 # Validates: Requirements 8.1, 8.2
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
-@given(stride_value=st.one_of(st.text(min_size=1, max_size=50), st.lists(st.text(min_size=1, max_size=50), min_size=1, max_size=5)))
-def test_property_15_html_reporter_stride_as_badges(stride_value: Union[str, List[str]]):
+@given(
+    stride_value=st.one_of(
+        st.text(min_size=1, max_size=50),
+        st.lists(st.text(min_size=1, max_size=50), min_size=1, max_size=5),
+    )
+)
+def test_property_15_html_reporter_stride_as_badges(stride_value: str | list[str]):
     """
     **Property 15: HTMLReporter renders stride as a list of badges**
 
@@ -233,9 +242,9 @@ def test_property_16_markdown_reporter_severity_emoji(severity: str):
     reporter = MarkdownReporter()
     output = reporter.generate(result)
     expected_emoji = _SEVERITY_EMOJI_MAP[severity]
-    assert expected_emoji in output, (
-        f"Expected emoji {expected_emoji!r} for severity {severity!r} not found in output"
-    )
+    assert (
+        expected_emoji in output
+    ), f"Expected emoji {expected_emoji!r} for severity {severity!r} not found in output"
 
 
 # ---------------------------------------------------------------------------
@@ -296,18 +305,21 @@ class TestJSONReporter:
         assert len(results) == len(findings)
         assert [r["ruleId"] for r in results] == [f.rule_id for f in findings]
 
-    @pytest.mark.parametrize("severity,expected_level", [
-        ("critical", "error"),
-        ("Critical", "error"),
-        ("high", "error"),
-        ("High", "error"),
-        ("medium", "warning"),
-        ("Medium", "warning"),
-        ("low", "note"),
-        ("Low", "note"),
-        ("info", "none"),
-        ("Info", "none"),
-    ])
+    @pytest.mark.parametrize(
+        "severity,expected_level",
+        [
+            ("critical", "error"),
+            ("Critical", "error"),
+            ("high", "error"),
+            ("High", "error"),
+            ("medium", "warning"),
+            ("Medium", "warning"),
+            ("low", "note"),
+            ("Low", "note"),
+            ("info", "none"),
+            ("Info", "none"),
+        ],
+    )
     def test_severity_to_sarif_level_mapping(self, severity: str, expected_level: str):
         """TMAC severity maps to correct SARIF level. (Req 7.5)"""
         reporter = JSONReporter()
@@ -333,16 +345,35 @@ class TestJSONReporter:
 # ---------------------------------------------------------------------------
 
 _VALID_SEVERITIES = ["Critical", "High", "Medium", "Low", "Info"]
-_VALID_STRIDES = ["Spoofing", "Tampering", "Repudiation", "Information Disclosure", "Denial of Service", "Elevation of Privilege"]
+_VALID_STRIDES = [
+    "Spoofing",
+    "Tampering",
+    "Repudiation",
+    "Information Disclosure",
+    "Denial of Service",
+    "Elevation of Privilege",
+]
 
 _finding_strategy = st.builds(
     _make_finding,
     rule_id=st.from_regex(r"TMAC-AWS-[A-Z0-9]+-\d{3}", fullmatch=True),
-    rule_name=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd", "Zs"))),
+    rule_name=st.text(
+        min_size=1,
+        max_size=50,
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd", "Zs")),
+    ),
     severity=st.sampled_from(_VALID_SEVERITIES),
     stride=st.sampled_from(_VALID_STRIDES),
-    resource_name=st.text(min_size=1, max_size=30, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_")),
-    file_path=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="/_.")),
+    resource_name=st.text(
+        min_size=1,
+        max_size=30,
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_"),
+    ),
+    file_path=st.text(
+        min_size=1,
+        max_size=50,
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="/_."),
+    ),
     line_number=st.integers(min_value=1, max_value=10000),
     description=st.text(min_size=1, max_size=200),
     mitigation=st.text(min_size=1, max_size=200),
@@ -351,7 +382,7 @@ _finding_strategy = st.builds(
 
 @settings(max_examples=100)
 @given(findings=st.lists(_finding_strategy, min_size=0, max_size=10))
-def test_property_12_json_reporter_valid_sarif(findings: List[Finding]):
+def test_property_12_json_reporter_valid_sarif(findings: list[Finding]):
     """
     **Property 12: JSONReporter produces structurally valid SARIF for any ScanResult**
 
@@ -389,9 +420,10 @@ def test_property_12_json_reporter_valid_sarif(findings: List[Finding]):
 # Validates: Requirements 7.4
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(findings=st.lists(_finding_strategy, min_size=0, max_size=10))
-def test_property_13_json_reporter_round_trip(findings: List[Finding]):
+def test_property_13_json_reporter_round_trip(findings: list[Finding]):
     """
     **Property 13: JSONReporter round-trip preserves findings**
 
@@ -446,9 +478,9 @@ def test_property_14_json_reporter_severity_mapping(severity: str):
     data = json.loads(output)
     sarif_level = data["runs"][0]["results"][0]["level"]
     expected_level = _SARIF_LEVEL_MAP[severity]
-    assert sarif_level == expected_level, (
-        f"Expected SARIF level {expected_level!r} for severity {severity!r}, got {sarif_level!r}"
-    )
+    assert (
+        sarif_level == expected_level
+    ), f"Expected SARIF level {expected_level!r} for severity {severity!r}, got {sarif_level!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +492,7 @@ from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult
 
 
 def _make_delta_finding(**kwargs) -> DeltaFinding:
-    defaults: Dict[str, Any] = dict(
+    defaults: dict[str, Any] = dict(
         rule_id="TMAC-AWS-S3-001",
         rule_name="S3 Public ACL",
         severity="Critical",
@@ -482,7 +514,7 @@ def _make_delta_finding(**kwargs) -> DeltaFinding:
 
 
 def _make_delta_scan_result(
-    findings: List[DeltaFinding] = None,
+    findings: list[DeltaFinding] = None,
     findings_introduced: int = None,
     findings_resolved: int = 0,
     resources_created: int = 0,
@@ -586,10 +618,27 @@ _delta_finding_strategy = st.builds(
     _make_delta_finding,
     rule_id=st.from_regex(r"TMAC-AWS-[A-Z0-9]+-\d{3}", fullmatch=True),
     severity=st.sampled_from(["Critical", "High", "Medium", "Low", "Info"]),
-    stride=st.sampled_from(["Spoofing", "Tampering", "Repudiation", "Information Disclosure", "Denial of Service", "Elevation of Privilege"]),
-    resource_name=st.text(min_size=1, max_size=30, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_")),
+    stride=st.sampled_from(
+        [
+            "Spoofing",
+            "Tampering",
+            "Repudiation",
+            "Information Disclosure",
+            "Denial of Service",
+            "Elevation of Privilege",
+        ]
+    ),
+    resource_name=st.text(
+        min_size=1,
+        max_size=30,
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_"),
+    ),
     change_action=_change_action_strategy,
-    changed_attribute=st.text(min_size=1, max_size=30, alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_")),
+    changed_attribute=st.text(
+        min_size=1,
+        max_size=30,
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_"),
+    ),
     value_before=st.one_of(st.none(), st.text(min_size=0, max_size=50)),
     value_after=st.one_of(st.none(), st.text(min_size=0, max_size=50)),
 )
@@ -604,7 +653,7 @@ _delta_finding_strategy = st.builds(
     resources_deleted=st.integers(min_value=0, max_value=10),
 )
 def test_property_15_html_reporter_delta_no_template_errors(
-    findings: List[DeltaFinding],
+    findings: list[DeltaFinding],
     findings_resolved: int,
     resources_created: int,
     resources_updated: int,
@@ -647,11 +696,14 @@ def test_property_15_html_reporter_delta_no_template_errors(
 # Validates: Requirements 5.3, 5.4
 # ---------------------------------------------------------------------------
 
+
 class TestMarkdownReporterDelta:
     def test_executive_summary_line_with_correct_values(self):
         """Markdown contains an executive summary line with findings_introduced and findings_resolved. (Req 5.4)"""
         reporter = MarkdownReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
+        finding = _make_delta_finding(
+            change_action=ChangeAction.update, value_before="private", value_after="public-read"
+        )
         result = _make_delta_scan_result(findings=[finding], findings_resolved=2)
         output = reporter.generate(result)
         assert "This plan introduces 1 new threats and resolves 2" in output
@@ -688,7 +740,9 @@ class TestMarkdownReporterDelta:
     def test_delta_finding_create_shows_new(self):
         """Table row shows NEW for change_action=create."""
         reporter = MarkdownReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.create, value_before=None, value_after="public-read")
+        finding = _make_delta_finding(
+            change_action=ChangeAction.create, value_before=None, value_after="public-read"
+        )
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
         assert "NEW" in output
@@ -696,7 +750,9 @@ class TestMarkdownReporterDelta:
     def test_delta_finding_update_shows_modified(self):
         """Table row shows MODIFIED for change_action=update."""
         reporter = MarkdownReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
+        finding = _make_delta_finding(
+            change_action=ChangeAction.update, value_before="private", value_after="public-read"
+        )
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
         assert "MODIFIED" in output
@@ -704,7 +760,9 @@ class TestMarkdownReporterDelta:
     def test_delta_finding_delete_shows_removed(self):
         """Table row shows REMOVED for change_action=delete."""
         reporter = MarkdownReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.delete, value_before="public-read", value_after=None)
+        finding = _make_delta_finding(
+            change_action=ChangeAction.delete, value_before="public-read", value_after=None
+        )
         result = _make_delta_scan_result(findings=[finding])
         output = reporter.generate(result)
         assert "REMOVED" in output
@@ -731,13 +789,14 @@ class TestMarkdownReporterDelta:
 # Validates: Requirements 5.3, 5.4
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(
     findings=st.lists(_delta_finding_strategy, min_size=1, max_size=5),
     findings_resolved=st.integers(min_value=0, max_value=10),
 )
 def test_property_16_markdown_reporter_delta_table_and_summary(
-    findings: List[DeltaFinding],
+    findings: list[DeltaFinding],
     findings_resolved: int,
 ) -> None:
     """
@@ -756,7 +815,10 @@ def test_property_16_markdown_reporter_delta_table_and_summary(
     output = reporter.generate(result)
 
     # Executive summary line must be present with correct values
-    assert f"This plan introduces {result.findings_introduced} new threats and resolves {findings_resolved}" in output
+    assert (
+        f"This plan introduces {result.findings_introduced} new threats and resolves {findings_resolved}"
+        in output
+    )
 
     # Table columns must be present
     assert "Action" in output
@@ -777,7 +839,9 @@ class TestJSONReporterDelta:
     def test_delta_scan_result_contains_properties_change_action(self):
         """JSON SARIF generated from a DeltaScanResult contains properties.changeAction in each result. (Req 5.5)"""
         reporter = JSONReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.update, value_before="private", value_after="public-read")
+        finding = _make_delta_finding(
+            change_action=ChangeAction.update, value_before="private", value_after="public-read"
+        )
         result = _make_delta_scan_result(findings=[finding])
         data = json.loads(reporter.generate(result))
         sarif_result = data["runs"][0]["results"][0]
@@ -787,7 +851,9 @@ class TestJSONReporterDelta:
     def test_delta_finding_create_value_before_is_null(self):
         """properties.valueBefore is null for a DeltaFinding with change_action=create. (Req 5.5)"""
         reporter = JSONReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.create, value_before=None, value_after="public-read")
+        finding = _make_delta_finding(
+            change_action=ChangeAction.create, value_before=None, value_after="public-read"
+        )
         result = _make_delta_scan_result(findings=[finding])
         data = json.loads(reporter.generate(result))
         props = data["runs"][0]["results"][0]["properties"]
@@ -797,7 +863,9 @@ class TestJSONReporterDelta:
     def test_delta_finding_delete_value_after_is_null(self):
         """properties.valueAfter is null for a DeltaFinding with change_action=delete. (Req 5.5)"""
         reporter = JSONReporter()
-        finding = _make_delta_finding(change_action=ChangeAction.delete, value_before="public-read", value_after=None)
+        finding = _make_delta_finding(
+            change_action=ChangeAction.delete, value_before="public-read", value_after=None
+        )
         result = _make_delta_scan_result(findings=[finding])
         data = json.loads(reporter.generate(result))
         props = data["runs"][0]["results"][0]["properties"]
@@ -840,7 +908,7 @@ class TestJSONReporterDelta:
     findings=st.lists(_delta_finding_strategy, min_size=1, max_size=5),
 )
 def test_property_17_json_reporter_sarif_delta_properties(
-    findings: List[DeltaFinding],
+    findings: list[DeltaFinding],
 ) -> None:
     """
     **Property 17: JSONReporter includes delta fields in SARIF properties**
@@ -880,7 +948,7 @@ def test_property_17_json_reporter_sarif_delta_properties(
     findings_resolved=st.integers(min_value=0, max_value=10),
 )
 def test_property_14_report_consistency_invariant(
-    findings: List[DeltaFinding],
+    findings: list[DeltaFinding],
     findings_resolved: int,
 ) -> None:
     """
@@ -893,7 +961,6 @@ def test_property_14_report_consistency_invariant(
 
     **Validates: Requirements 5.7**
     """
-    import re
     result = _make_delta_scan_result(findings=findings, findings_resolved=findings_resolved)
     n = result.findings_introduced
 
@@ -914,6 +981,7 @@ def test_property_14_report_consistency_invariant(
 # ---------------------------------------------------------------------------
 # HTML report must escape attacker-controllable values (XSS)
 # ---------------------------------------------------------------------------
+
 
 class TestHTMLReporterEscaping:
     PAYLOAD = '<script>alert("xss")</script>'
@@ -937,7 +1005,7 @@ class TestHTMLReporterEscaping:
         finding = _make_finding(references=[ref])
         html = HTMLReporter().generate(_make_scan_result(findings=[finding]))
         assert 'href="#"' in html
-        assert "href=\"javascript" not in html.lower()
+        assert 'href="javascript' not in html.lower()
 
     def test_https_reference_links_are_kept(self):
         url = "https://docs.aws.amazon.com/AmazonS3/latest/userguide/acls.html"
@@ -951,17 +1019,20 @@ class TestHTMLReporterEscaping:
 # Shared helpers: get_reporter / ScanStatistics.from_findings
 # ---------------------------------------------------------------------------
 
-from tmac.reporters import get_reporter  # noqa: E402
-from tmac.reporters.json_report import JSONReporter  # noqa: E402
+from tmac.reporters import get_reporter
 
 
-@pytest.mark.parametrize("fmt, cls", [("html", HTMLReporter), ("md", MarkdownReporter), ("json", JSONReporter)])
+@pytest.mark.parametrize(
+    "fmt, cls", [("html", HTMLReporter), ("md", MarkdownReporter), ("json", JSONReporter)]
+)
 def test_get_reporter_returns_matching_reporter(fmt, cls):
     assert isinstance(get_reporter(fmt), cls)
 
 
 def test_scan_statistics_from_findings_counts_by_severity():
-    findings = [_make_finding(severity=s) for s in ["Critical", "High", "High", "Medium", "Low", "Info"]]
+    findings = [
+        _make_finding(severity=s) for s in ["Critical", "High", "High", "Medium", "Low", "Info"]
+    ]
     stats = ScanStatistics.from_findings(findings, total_resources=4)
     assert (stats.total_resources, stats.total_findings) == (4, 6)
     assert (stats.critical, stats.high, stats.medium, stats.low, stats.info) == (1, 2, 1, 1, 1)

@@ -6,13 +6,13 @@ Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8,
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
+from tmac.delta.models import ChangeAction, DeltaFinding, PlannedChange
 from tmac.delta.scanner import DeltaScanError, DeltaScanner
 from tmac.engine.evaluator import Evaluator
 from tmac.models.resource import ResourceModel
@@ -25,12 +25,13 @@ PLANS = Path("tests/fixtures/plans")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_rule(
     rule_id: str = "TMAC-AWS-S3-001",
     resource_type: str = "aws_s3_bucket",
     attribute: str = "acl",
     condition: str = "in",
-    values: Optional[List[Any]] = None,
+    values: list[Any] | None = None,
     severity: str = "Critical",
 ) -> ThreatRule:
     return ThreatRule(
@@ -77,6 +78,7 @@ def scanner() -> DeltaScanner:
 # ---------------------------------------------------------------------------
 # 3.5 — Core classification tests
 # ---------------------------------------------------------------------------
+
 
 def test_create_produces_delta_finding(scanner: DeltaScanner):
     """PlannedChange create with insecure attribute produces DeltaFinding with change_action=create."""
@@ -134,9 +136,14 @@ def test_resource_counts_correct(scanner: DeltaScanner):
 
 def test_findings_introduced_equals_len_findings(scanner: DeltaScanner):
     """findings_introduced == len(result.findings) invariant holds."""
-    for fixture in ["create_with_threat.json", "update_secure_to_insecure.json",
-                    "update_insecure_to_secure.json", "delete_with_threat.json",
-                    "clean_plan.json", "mixed_plan.json"]:
+    for fixture in [
+        "create_with_threat.json",
+        "update_secure_to_insecure.json",
+        "update_insecure_to_secure.json",
+        "delete_with_threat.json",
+        "clean_plan.json",
+        "mixed_plan.json",
+    ]:
         result = scanner.run(str(PLANS / fixture))
         assert result.findings_introduced == len(result.findings), (
             f"Invariant violated for {fixture}: "
@@ -188,8 +195,10 @@ def test_delta_finding_fields_populated(scanner: DeltaScanner):
 def test_replace_action_counted_as_updated(scanner: DeltaScanner, tmp_path: Path):
     """PlannedChange with replace action is counted in resources_updated."""
     data = _minimal_plan(
-        "aws_s3_bucket.data", ["delete", "create"],
-        before={"acl": "private"}, after={"acl": "public-read"},
+        "aws_s3_bucket.data",
+        ["delete", "create"],
+        before={"acl": "private"},
+        after={"acl": "public-read"},
     )
     path = _write_plan(tmp_path, data)
     result = scanner.run(path)
@@ -200,6 +209,7 @@ def test_replace_action_counted_as_updated(scanner: DeltaScanner, tmp_path: Path
 # ---------------------------------------------------------------------------
 # _build_resource_model tests
 # ---------------------------------------------------------------------------
+
 
 def test_build_resource_model_use_after():
     """_build_resource_model with use_after=True uses 'after' attributes."""
@@ -237,6 +247,7 @@ def test_build_resource_model_use_before():
 # ---------------------------------------------------------------------------
 # _evaluate_change unit tests
 # ---------------------------------------------------------------------------
+
 
 def test_evaluate_change_create_introduces_finding():
     """_evaluate_change for create action returns introduced findings."""
@@ -383,6 +394,7 @@ def test_property_7_delta_finding_semantics_update(acl_after: str):
 # Feature: tmac-v1-1-tfplan-delta, Property 8
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(n_rules=st.integers(min_value=1, max_value=5))
 def test_property_8_exact_findings_for_update(n_rules: int):
@@ -417,6 +429,7 @@ def test_property_8_exact_findings_for_update(n_rules: int):
 # Property 9: DeltaScanner correctly records resolved threats
 # Feature: tmac-v1-1-tfplan-delta, Property 9
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(
@@ -468,43 +481,48 @@ def test_property_9_resolved_threats(action: ChangeAction, n_rules: int):
 # Feature: tmac-v1-1-tfplan-delta, Property 10
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     n_create=st.integers(min_value=0, max_value=3),
     n_update=st.integers(min_value=0, max_value=3),
     n_delete=st.integers(min_value=0, max_value=3),
 )
-def test_property_10_count_invariants(
-    tmp_path: Path, n_create: int, n_update: int, n_delete: int
-):
+def test_property_10_count_invariants(tmp_path: Path, n_create: int, n_update: int, n_delete: int):
     """Property 10: resource count fields match actual PlannedChange counts."""
     # Feature: tmac-v1-1-tfplan-delta, Property 10: DeltaScanResult count invariants
     resource_changes = []
     for i in range(n_create):
-        resource_changes.append({
-            "address": f"aws_s3_bucket.create_{i}",
-            "type": "aws_s3_bucket",
-            "name": f"create_{i}",
-            "change": {"actions": ["create"], "before": None, "after": {"acl": "private"}},
-        })
+        resource_changes.append(
+            {
+                "address": f"aws_s3_bucket.create_{i}",
+                "type": "aws_s3_bucket",
+                "name": f"create_{i}",
+                "change": {"actions": ["create"], "before": None, "after": {"acl": "private"}},
+            }
+        )
     for i in range(n_update):
-        resource_changes.append({
-            "address": f"aws_s3_bucket.update_{i}",
-            "type": "aws_s3_bucket",
-            "name": f"update_{i}",
-            "change": {
-                "actions": ["update"],
-                "before": {"acl": "private"},
-                "after": {"acl": "private"},
-            },
-        })
+        resource_changes.append(
+            {
+                "address": f"aws_s3_bucket.update_{i}",
+                "type": "aws_s3_bucket",
+                "name": f"update_{i}",
+                "change": {
+                    "actions": ["update"],
+                    "before": {"acl": "private"},
+                    "after": {"acl": "private"},
+                },
+            }
+        )
     for i in range(n_delete):
-        resource_changes.append({
-            "address": f"aws_s3_bucket.delete_{i}",
-            "type": "aws_s3_bucket",
-            "name": f"delete_{i}",
-            "change": {"actions": ["delete"], "before": {"acl": "private"}, "after": None},
-        })
+        resource_changes.append(
+            {
+                "address": f"aws_s3_bucket.delete_{i}",
+                "type": "aws_s3_bucket",
+                "name": f"delete_{i}",
+                "change": {"actions": ["delete"], "before": {"acl": "private"}, "after": None},
+            }
+        )
 
     data = {"format_version": "1.2", "resource_changes": resource_changes}
     path = _write_plan(tmp_path, data)
@@ -521,6 +539,7 @@ def test_property_10_count_invariants(
 # Property 12: Equivalence between DeltaScanner and Scanner evaluation
 # Feature: tmac-v1-1-tfplan-delta, Property 12
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(acl=st.sampled_from(["private", "public-read", "public-read-write"]))
@@ -555,6 +574,7 @@ def test_property_12_evaluation_equivalence(acl: str):
 # Property 13: tmac:ignore suppresses resources from delta analysis
 # Feature: tmac-v1-1-tfplan-delta, Property 13
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(acl=_acl_strategy)

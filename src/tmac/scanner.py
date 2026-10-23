@@ -2,7 +2,7 @@ import fnmatch
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from tmac.config import ConfigError, load_config
 from tmac.engine.matcher import Matcher
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 class ScanError(Exception):
     """Raised when the scan pipeline cannot proceed."""
-    pass
 
 
 class Scanner:
@@ -28,7 +27,7 @@ class Scanner:
     BaseParser subclass, not a new scanner.
     """
 
-    def __init__(self, parser: Optional[BaseParser] = None) -> None:
+    def __init__(self, parser: BaseParser | None = None) -> None:
         self.parser = parser or TerraformParser()
         if not self.parser.file_patterns:
             raise ValueError(f"{type(self.parser).__name__} declares no file_patterns")
@@ -36,12 +35,12 @@ class Scanner:
     def run_scan(
         self,
         directory: str,
-        rules_dir: Optional[str] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        rules_dir: str | None = None,
+        exclude_patterns: list[str] | None = None,
         min_severity: str = "all",
         verbose: bool = False,
-        include_paths: Optional[List[str]] = None,
-        config: Optional[Dict[str, Any]] = None,
+        include_paths: list[str] | None = None,
+        config: dict[str, Any] | None = None,
     ) -> ScanResult:
         """Run the scan. ``config`` is an already-loaded .tmac.yaml; when None, the
         default ./.tmac.yaml is loaded."""
@@ -73,13 +72,15 @@ class Scanner:
         files = self._discover_files(scan_path, all_excludes, include_set)
         logger.debug(
             "Discovered %d files (%s) in %s",
-            len(files), ", ".join(self.parser.file_patterns), directory,
+            len(files),
+            ", ".join(self.parser.file_patterns),
+            directory,
         )
 
         # Parse resources (tmac:ignore suppressions travel on each ResourceModel).
         # Unparseable files are recorded, not silently treated as empty.
         all_resources = []
-        issues: List[ScanIssue] = []
+        issues: list[ScanIssue] = []
         for file in files:
             try:
                 all_resources.extend(self.parser.parse_strict(str(file)))
@@ -113,8 +114,8 @@ class Scanner:
         )
 
     def _discover_files(
-        self, scan_path: Path, excludes: List[str], include_set: Optional[Set[str]] = None
-    ) -> List[Path]:
+        self, scan_path: Path, excludes: list[str], include_set: set[str] | None = None
+    ) -> list[Path]:
         """Files matching the parser's patterns, minus excludes, deduplicated and sorted.
 
         When ``include_set`` is given, only those (resolved, absolute) paths are kept.
@@ -130,7 +131,7 @@ class Scanner:
         return sorted(f for f in found if self.parser.can_parse(str(f)))
 
 
-def _is_excluded(file_path: Path, patterns: List[str]) -> bool:
+def _is_excluded(file_path: Path, patterns: list[str]) -> bool:
     """Return True if any exclude pattern matches any part of the file path."""
     path_str = str(file_path)
     for pattern in patterns:

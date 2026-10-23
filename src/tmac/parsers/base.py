@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, List, Tuple
+from typing import ClassVar
+
 from ..models.resource import ResourceModel
 
 
@@ -20,14 +21,14 @@ class BaseParser(ABC):
         Scanner can report the file instead of treating it as having no resources.
     """
 
-    file_patterns: ClassVar[Tuple[str, ...]] = ()
+    file_patterns: ClassVar[tuple[str, ...]] = ()
 
     def can_parse(self, file_path: str) -> bool:
         """Return False to skip a file that matched ``file_patterns`` but is not this format."""
         return True
 
     @abstractmethod
-    def parse(self, file_path: str) -> List[ResourceModel]:
+    def parse(self, file_path: str) -> list[ResourceModel]:
         """
         Parse an IaC file and return a list of ResourceModels.
 
@@ -37,9 +38,8 @@ class BaseParser(ABC):
         Returns:
             List of normalized ResourceModels extracted from the file
         """
-        pass
 
-    def parse_strict(self, file_path: str) -> List[ResourceModel]:
+    def parse_strict(self, file_path: str) -> list[ResourceModel]:
         """Like parse(), but raises ParseError when the file cannot be parsed.
 
         The default cannot tell a failure from an empty file; parsers should override it.

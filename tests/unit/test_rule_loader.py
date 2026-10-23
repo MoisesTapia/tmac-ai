@@ -2,22 +2,23 @@
 Unit tests for RuleLoader — schema validation and structured logging.
 Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 9.1
 """
+
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
-from unittest.mock import patch
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
-from hypothesis import given, settings, strategies as st
-
-from tmac.engine.rule_loader import RuleLoader, REQUIRED_FILE_FIELDS, REQUIRED_RULE_FIELDS
 from tmac.engine.matcher import Matcher
-from tmac.models.rule import ThreatRule, CheckCondition
+from tmac.engine.rule_loader import RuleLoader
 from tmac.models.resource import ResourceModel
-
+from tmac.models.rule import CheckCondition, ThreatRule
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_valid_rule_data(**overrides):
     base = {
@@ -50,6 +51,7 @@ def _write_yaml(tmp_path: Path, filename: str, data: dict) -> Path:
 # 3.1 — Validation of required fields
 # ---------------------------------------------------------------------------
 
+
 def test_file_missing_version_emits_warning_and_is_skipped(tmp_path, caplog):
     """Req 6.1, 6.2: a file without 'version' emits a warning and is skipped."""
     data = {"rules": [_make_valid_rule_data()]}  # no 'version'
@@ -58,6 +60,7 @@ def test_file_missing_version_emits_warning_and_is_skipped(tmp_path, caplog):
     loader = RuleLoader()
     rules_dict: dict = {}
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.engine.rule_loader"):
         loader._load_file(yaml_file, rules_dict)
 
@@ -75,6 +78,7 @@ def test_rule_missing_id_emits_warning_and_is_skipped(tmp_path, caplog):
     loader = RuleLoader()
     rules_dict: dict = {}
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.engine.rule_loader"):
         loader._load_file(yaml_file, rules_dict)
 
@@ -119,6 +123,7 @@ def test_no_print_calls_in_rule_loader(tmp_path, capsys):
 # ---------------------------------------------------------------------------
 # 3.2 — Propagation of tags to the Finding
 # ---------------------------------------------------------------------------
+
 
 def test_tags_propagated_from_rule_to_finding():
     """Req 9.1: rule tags are propagated to the Finding produced by the Matcher."""
@@ -181,10 +186,15 @@ def test_empty_tags_propagated_to_finding():
 # Validates: Requirements 6.5
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100, deadline=None)
 @given(
     st.lists(
-        st.text(alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), min_codepoint=65), min_size=3, max_size=10),
+        st.text(
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), min_codepoint=65),
+            min_size=3,
+            max_size=10,
+        ),
         min_size=1,
         max_size=5,
         unique=True,
@@ -197,13 +207,14 @@ def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
     Loading the same YAML files in any order produces the same set of ThreatRule.
     """
     import tempfile
-    import os
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
         for suffix in rule_id_suffixes:
             rule_id = f"TMAC-TEST-{suffix}"
-            data = _make_valid_file_data(rules=[_make_valid_rule_data(id=rule_id, name=f"Rule {suffix}")])
+            data = _make_valid_file_data(
+                rules=[_make_valid_rule_data(id=rule_id, name=f"Rule {suffix}")]
+            )
             p = tmp_path / f"rules_{suffix}.yaml"
             p.write_text(yaml.dump(data), encoding="utf-8")
 
@@ -223,10 +234,15 @@ def test_property_11_rule_loader_idempotent_order(rule_id_suffixes):
 # Validates: Requirements 9.1
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(
     st.lists(
-        st.text(alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd", "Pd"), min_codepoint=45), min_size=1, max_size=20),
+        st.text(
+            alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd", "Pd"), min_codepoint=45),
+            min_size=1,
+            max_size=20,
+        ),
         min_size=0,
         max_size=10,
     )
@@ -267,21 +283,27 @@ def test_property_17_finding_tags_propagated_from_rule(tags):
 # Rule value validation (severity / stride / condition / regex)
 # ---------------------------------------------------------------------------
 
+
 class TestRuleValidation:
     def test_values_are_normalized_case_insensitively(self):
-        rule = ThreatRule(**_make_valid_rule_data(
-            severity="critical",
-            stride="information disclosure",
-            check={"attribute": "acl", "condition": "EQUALS", "values": ["public-read"]},
-        ))
+        rule = ThreatRule(
+            **_make_valid_rule_data(
+                severity="critical",
+                stride="information disclosure",
+                check={"attribute": "acl", "condition": "EQUALS", "values": ["public-read"]},
+            )
+        )
         assert rule.severity == "Critical"
         assert rule.stride == "Information Disclosure"
         assert rule.check.condition == "equals"
 
-    @pytest.mark.parametrize("field, value", [
-        ("severity", "Critcal"),
-        ("stride", "Infomation Disclosure"),
-    ])
+    @pytest.mark.parametrize(
+        "field, value",
+        [
+            ("severity", "Critcal"),
+            ("stride", "Infomation Disclosure"),
+        ],
+    )
     def test_typo_in_severity_or_stride_is_rejected(self, field, value):
         with pytest.raises(ValueError, match=f"invalid {field}"):
             ThreatRule(**_make_valid_rule_data(**{field: value}))
@@ -304,16 +326,21 @@ class TestRuleValidation:
     def test_invalid_nested_and_check_is_rejected(self):
         with pytest.raises(ValueError, match="invalid condition"):
             CheckCondition(
-                attribute="acl", condition="equals", values=["x"],
+                attribute="acl",
+                condition="equals",
+                values=["x"],
                 and_check={"attribute": "b", "condition": "nope", "values": ["y"]},
             )
 
     def test_invalid_rule_is_skipped_without_dropping_the_rest_of_the_file(self, tmp_path, caplog):
         import logging
-        data = _make_valid_file_data(rules=[
-            _make_valid_rule_data(id="TMAC-TEST-BAD", severity="Critcal"),
-            _make_valid_rule_data(id="TMAC-TEST-GOOD"),
-        ])
+
+        data = _make_valid_file_data(
+            rules=[
+                _make_valid_rule_data(id="TMAC-TEST-BAD", severity="Critcal"),
+                _make_valid_rule_data(id="TMAC-TEST-GOOD"),
+            ]
+        )
         _write_yaml(tmp_path, "custom.yaml", data)
         with caplog.at_level(logging.WARNING):
             rules = RuleLoader().load_rules(str(tmp_path))
@@ -324,6 +351,7 @@ class TestRuleValidation:
 
     def test_all_built_in_rules_are_valid(self, caplog):
         import logging
+
         with caplog.at_level(logging.WARNING):
             rules = RuleLoader().load_rules()
         assert len(rules) == 520  # threats.yaml + threats_extended.yaml

@@ -7,7 +7,6 @@ appears in 2+ resources; the rest is left as shared infrastructure.
 """
 
 from collections import defaultdict
-from typing import Dict, List
 
 from tmac.graph.builder import ResourceGraph
 
@@ -19,7 +18,7 @@ def _leading_token(name: str) -> str:
     return name.split("_", 1)[0]
 
 
-def group_by_name(graph: ResourceGraph, min_size: int = 2) -> Dict[str, List[str]]:
+def group_by_name(graph: ResourceGraph, min_size: int = 2) -> dict[str, list[str]]:
     """Group node ids by name token.
 
     Args:
@@ -30,12 +29,12 @@ def group_by_name(graph: ResourceGraph, min_size: int = 2) -> Dict[str, List[str
         Map ``group_label -> [node_id, ...]``. Resources whose token does not
         form a group are placed under ``SHARED_GROUP``.
     """
-    token_to_nodes: Dict[str, List[str]] = defaultdict(list)
+    token_to_nodes: dict[str, list[str]] = defaultdict(list)
     for node in graph.nodes:
         token_to_nodes[_leading_token(node.name)].append(node.id)
 
-    groups: Dict[str, List[str]] = {}
-    shared: List[str] = []
+    groups: dict[str, list[str]] = {}
+    shared: list[str] = []
     for token, node_ids in token_to_nodes.items():
         if len(node_ids) >= min_size:
             groups[token] = sorted(node_ids)

@@ -11,8 +11,6 @@ Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.6, 2.7, 2.8, 2.9,
 
 from __future__ import annotations
 
-from typing import List
-
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -20,7 +18,6 @@ from tests.property.strategies import (
     comment_context_strategy,
     delta_finding_strategy,
     finding_list_strategy,
-    finding_strategy,
 )
 from tmac.ci.comment import MARKER, CommentContext, CommentFormatter
 from tmac.cli import SEVERITY_LEVELS
@@ -34,7 +31,7 @@ from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistic
 _SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"]
 
 
-def _make_scan_result(findings: List[Finding]) -> ScanResult:
+def _make_scan_result(findings: list[Finding]) -> ScanResult:
     return ScanResult(
         metadata=ScanMetadata(scanned_directory="test"),
         statistics=ScanStatistics(total_findings=len(findings)),
@@ -42,7 +39,7 @@ def _make_scan_result(findings: List[Finding]) -> ScanResult:
     )
 
 
-def _make_delta_scan_result(findings: List[DeltaFinding]) -> DeltaScanResult:
+def _make_delta_scan_result(findings: list[DeltaFinding]) -> DeltaScanResult:
     return DeltaScanResult(
         metadata=ScanMetadata(scanned_directory="test"),
         statistics=ScanStatistics(total_findings=len(findings)),
@@ -74,6 +71,7 @@ def _default_ctx(
 # Property 6: Executive summary reports both counts
 # ===========================================================================
 
+
 @settings(max_examples=100)
 @given(
     findings=finding_list_strategy(),
@@ -93,6 +91,7 @@ def test_executive_summary_reports_both_counts(findings, ctx):
 # ===========================================================================
 # Property 7: Severity breakdown complete and accurate
 # ===========================================================================
+
 
 @settings(max_examples=100)
 @given(
@@ -114,14 +113,15 @@ def test_severity_breakdown_complete_and_accurate(findings, ctx):
     breakdown = formatter._severity_breakdown(findings)
     for sev in _SEVERITY_ORDER:
         expected_count = sum(1 for f in findings if f.severity.lower() == sev)
-        assert breakdown[sev] == expected_count, (
-            f"Breakdown mismatch for {sev}: expected {expected_count}, got {breakdown[sev]}"
-        )
+        assert (
+            breakdown[sev] == expected_count
+        ), f"Breakdown mismatch for {sev}: expected {expected_count}, got {breakdown[sev]}"
 
 
 # ===========================================================================
 # Property 8: Every finding row carries all required fields
 # ===========================================================================
+
 
 @settings(max_examples=100)
 @given(
@@ -160,6 +160,7 @@ def test_every_finding_row_carries_all_required_fields(findings, ctx):
 # Property 9: Findings ordering is deterministic
 # ===========================================================================
 
+
 @settings(max_examples=100)
 @given(
     findings=finding_list_strategy(),
@@ -193,18 +194,19 @@ def test_findings_ordering_is_deterministic(findings, ctx):
         addr_b = f"{b.resource_type}.{b.resource_name}"
 
         if sev_a != sev_b:
-            assert sev_a >= sev_b, (
-                f"Ordering violation: {a.severity} (idx {i}) before {b.severity} (idx {i+1})"
-            )
+            assert (
+                sev_a >= sev_b
+            ), f"Ordering violation: {a.severity} (idx {i}) before {b.severity} (idx {i+1})"
         else:
-            assert addr_a <= addr_b, (
-                f"Tie-break violation: {addr_a!r} (idx {i}) after {addr_b!r} (idx {i+1})"
-            )
+            assert (
+                addr_a <= addr_b
+            ), f"Tie-break violation: {addr_a!r} (idx {i}) after {addr_b!r} (idx {i+1})"
 
 
 # ===========================================================================
 # Property 10: Status_Badge well-defined and correct
 # ===========================================================================
+
 
 @settings(max_examples=100)
 @given(
@@ -227,24 +229,20 @@ def test_status_badge_well_defined_and_correct(findings, ctx):
         assert badge == "APPROVED", f"Expected APPROVED for empty findings, got {badge!r}"
     else:
         any_blocked = any(
-            SEVERITY_LEVELS.get(f.severity.lower(), -1) >= threshold
-            for f in findings
+            SEVERITY_LEVELS.get(f.severity.lower(), -1) >= threshold for f in findings
         )
         if any_blocked:
             # At least one finding >= threshold → BLOCKED (R2.8)
-            assert badge == "BLOCKED", (
-                f"Expected BLOCKED (threshold={ctx.fail_on}), got {badge!r}"
-            )
+            assert badge == "BLOCKED", f"Expected BLOCKED (threshold={ctx.fail_on}), got {badge!r}"
         else:
             # Findings present but none meet threshold → WARNING (R2.9)
-            assert badge == "WARNING", (
-                f"Expected WARNING (threshold={ctx.fail_on}), got {badge!r}"
-            )
+            assert badge == "WARNING", f"Expected WARNING (threshold={ctx.fail_on}), got {badge!r}"
 
 
 # ===========================================================================
 # Property 11: Change labels match delta semantics
 # ===========================================================================
+
 
 @settings(max_examples=100)
 @given(
@@ -269,6 +267,7 @@ def test_change_labels_match_delta_semantics(finding, ctx):
 # Property 12: Artifact reference always present
 # ===========================================================================
 
+
 @settings(max_examples=100)
 @given(
     findings=finding_list_strategy(),
@@ -281,14 +280,15 @@ def test_artifact_reference_always_present(findings, ctx):
     formatter = CommentFormatter()
     rendered = formatter.format(result, ctx)
 
-    assert ctx.artifact_ref in rendered, (
-        f"Artifact ref {ctx.artifact_ref!r} not found in rendered comment"
-    )
+    assert (
+        ctx.artifact_ref in rendered
+    ), f"Artifact ref {ctx.artifact_ref!r} not found in rendered comment"
 
 
 # ===========================================================================
 # Property 13: Truncation respects ordering, budget, and omitted count
 # ===========================================================================
+
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 @given(
@@ -303,35 +303,34 @@ def test_truncation_respects_ordering_budget_and_omitted_count(findings, ctx):
     rendered = formatter.format(result, ctx)
 
     # 1. Rendered comment must not exceed max_length
-    assert len(rendered) <= ctx.max_length, (
-        f"Rendered comment length {len(rendered)} exceeds max_length {ctx.max_length}"
-    )
+    assert (
+        len(rendered) <= ctx.max_length
+    ), f"Rendered comment length {len(rendered)} exceeds max_length {ctx.max_length}"
 
     # 2. Retained rows are a prefix of the established ordering
     ordered_all = formatter._ordered_rows(findings)
     kept, omitted = formatter._truncate(ordered_all, ctx)
 
-    assert len(kept) + omitted == len(findings), (
-        f"kept ({len(kept)}) + omitted ({omitted}) != total ({len(findings)})"
-    )
+    assert len(kept) + omitted == len(
+        findings
+    ), f"kept ({len(kept)}) + omitted ({omitted}) != total ({len(findings)})"
 
     # The kept rows must be the *first* N rows of the full ordering
     for i, f in enumerate(kept):
-        assert f is ordered_all[i], (
-            f"Kept row at index {i} is not the same object as the ordered row"
-        )
+        assert (
+            f is ordered_all[i]
+        ), f"Kept row at index {i} is not the same object as the ordered row"
 
     # 3. If any rows omitted, truncation notice must state the exact count
     if omitted > 0:
-        assert str(omitted) in rendered, (
-            f"Omitted count {omitted} not found in rendered comment"
-        )
+        assert str(omitted) in rendered, f"Omitted count {omitted} not found in rendered comment"
         assert "omitted" in rendered.lower(), "Truncation notice not found in rendered comment"
 
 
 # ===========================================================================
 # Property 14: Every rendered comment carries the idempotency marker
 # ===========================================================================
+
 
 @settings(max_examples=100)
 @given(
@@ -345,7 +344,7 @@ def test_every_comment_carries_the_idempotency_marker(findings, ctx):
     formatter = CommentFormatter()
     rendered = formatter.format(result, ctx)
 
-    assert MARKER in rendered, f"MARKER not found in rendered comment"
+    assert MARKER in rendered, "MARKER not found in rendered comment"
     # MARKER must be at the very beginning of the rendered body
     assert rendered.startswith(MARKER), (
         f"MARKER must appear at the start of the comment, but rendered body starts with: "
@@ -359,7 +358,6 @@ def test_every_comment_carries_the_idempotency_marker(findings, ctx):
 
 # Feature: tmac-v1-6-pr-agent, Property 15: Find-or-update publishing is idempotent
 
-import json as _json
 
 from tests.property.strategies import (
     FakeHttpTransport,
@@ -403,29 +401,27 @@ def test_find_or_update_publishing_is_idempotent_github(comments, ctx):
     if not marked_comments:
         # No existing marked comment → exactly one POST (create) (R3.2)
         write_methods = [c[0] for c in transport.written_calls]
-        assert write_methods.count("POST") == 1, (
-            f"Expected 1 POST (create) but got: {write_methods}"
-        )
-        assert "PATCH" not in write_methods, (
-            "Should not PATCH when no existing marked comment"
-        )
+        assert (
+            write_methods.count("POST") == 1
+        ), f"Expected 1 POST (create) but got: {write_methods}"
+        assert "PATCH" not in write_methods, "Should not PATCH when no existing marked comment"
     else:
         # Existing marked comments → exactly one PATCH (update), zero POSTs (R3.3, R3.4)
         write_methods = [c[0] for c in transport.written_calls]
-        assert "POST" not in write_methods, (
-            "Should not POST (create) when marked comment already exists"
-        )
-        assert write_methods.count("PATCH") == 1, (
-            f"Expected 1 PATCH (update) but got: {write_methods}"
-        )
+        assert (
+            "POST" not in write_methods
+        ), "Should not POST (create) when marked comment already exists"
+        assert (
+            write_methods.count("PATCH") == 1
+        ), f"Expected 1 PATCH (update) but got: {write_methods}"
 
         # The PATCH must target the most-recently-created marked comment
         most_recent_marked = marked_comments[-1]  # last in ascending order = most recent
         patch_call = next(c for c in transport.written_calls if c[0] == "PATCH")
         patch_url = patch_call[1]
-        assert str(most_recent_marked["id"]) in patch_url, (
-            f"PATCH targeted wrong comment: expected id {most_recent_marked['id']} in URL {patch_url!r}"
-        )
+        assert (
+            str(most_recent_marked["id"]) in patch_url
+        ), f"PATCH targeted wrong comment: expected id {most_recent_marked['id']} in URL {patch_url!r}"
 
 
 @settings(max_examples=100)
@@ -458,29 +454,25 @@ def test_find_or_update_publishing_is_idempotent_gitlab(comments, ctx):
     if not marked_comments:
         # No existing marked comment → exactly one POST (create) (R3.2)
         write_methods = [c[0] for c in transport.written_calls]
-        assert write_methods.count("POST") == 1, (
-            f"Expected 1 POST (create) but got: {write_methods}"
-        )
-        assert "PUT" not in write_methods, (
-            "Should not PUT when no existing marked comment"
-        )
+        assert (
+            write_methods.count("POST") == 1
+        ), f"Expected 1 POST (create) but got: {write_methods}"
+        assert "PUT" not in write_methods, "Should not PUT when no existing marked comment"
     else:
         # Existing marked comments → exactly one PUT (update), zero POSTs (R3.3, R3.4)
         write_methods = [c[0] for c in transport.written_calls]
-        assert "POST" not in write_methods, (
-            "Should not POST (create) when marked comment already exists"
-        )
-        assert write_methods.count("PUT") == 1, (
-            f"Expected 1 PUT (update) but got: {write_methods}"
-        )
+        assert (
+            "POST" not in write_methods
+        ), "Should not POST (create) when marked comment already exists"
+        assert write_methods.count("PUT") == 1, f"Expected 1 PUT (update) but got: {write_methods}"
 
         # The PUT must target the most-recently-created marked comment
         most_recent_marked = marked_comments[-1]  # last in ascending order = most recent
         put_call = next(c for c in transport.written_calls if c[0] == "PUT")
         put_url = put_call[1]
-        assert str(most_recent_marked["id"]) in put_url, (
-            f"PUT targeted wrong comment: expected id {most_recent_marked['id']} in URL {put_url!r}"
-        )
+        assert (
+            str(most_recent_marked["id"]) in put_url
+        ), f"PUT targeted wrong comment: expected id {most_recent_marked['id']} in URL {put_url!r}"
 
 
 @settings(max_examples=100)
@@ -524,9 +516,9 @@ def test_find_or_update_leaves_other_comments_unchanged(comments, ctx):
                 # The other comments' ids should NOT be the target of PATCH
                 # (they may appear as part of the listing URL but not write URL)
                 # Write URLs end with /comments/{id}
-                assert not url.endswith(f"/comments/{other_id}"), (
-                    f"PATCH incorrectly targeted non-most-recent comment id {other_id} at {url!r}"
-                )
+                assert not url.endswith(
+                    f"/comments/{other_id}"
+                ), f"PATCH incorrectly targeted non-most-recent comment id {other_id} at {url!r}"
 
 
 # ===========================================================================
@@ -550,7 +542,9 @@ _ref_string = st.text(
     alphabet=st.characters(blacklist_characters=["\n", "\x00", "\r"]),
     min_size=1,
     max_size=40,
-).filter(lambda s: s.strip())  # non-whitespace-only to avoid git confusion
+).filter(
+    lambda s: s.strip()
+)  # non-whitespace-only to avoid git confusion
 
 
 def _init_tmp_git_repo(repo_path: Path) -> str:
@@ -558,19 +552,24 @@ def _init_tmp_git_repo(repo_path: Path) -> str:
     subprocess.run(["git", "init", str(repo_path)], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo_path), "config", "user.email", "test@test.com"],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
         ["git", "-C", str(repo_path), "config", "user.name", "Test"],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
         ["git", "-C", str(repo_path), "commit", "--allow-empty", "-m", "init"],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     result = subprocess.run(
         ["git", "-C", str(repo_path), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     return result.stdout.strip()
 
@@ -588,11 +587,14 @@ def test_property_5a_missing_base_ref_exits_3(tmp_path, head_ref):
         cli,
         [
             "ci",
-            "--dir", str(tmp_path),
-            "--head-ref", head_ref,
+            "--dir",
+            str(tmp_path),
+            "--head-ref",
+            head_ref,
             "--delta-only",
             "--no-comment",
-            "--output", str(tmp_path / "report.md"),
+            "--output",
+            str(tmp_path / "report.md"),
         ],
     )
     assert result.exit_code == 3, (
@@ -601,11 +603,13 @@ def test_property_5a_missing_base_ref_exits_3(tmp_path, head_ref):
     )
     # Error output must name the missing ref
     error_output = (result.output or "") + (
-        result.exception.__str__() if result.exception and not isinstance(result.exception, SystemExit) else ""
+        result.exception.__str__()
+        if result.exception and not isinstance(result.exception, SystemExit)
+        else ""
     )
-    assert "base" in error_output.lower(), (
-        f"Error output should name 'base_ref', got: {error_output!r}"
-    )
+    assert (
+        "base" in error_output.lower()
+    ), f"Error output should name 'base_ref', got: {error_output!r}"
 
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
@@ -621,11 +625,14 @@ def test_property_5b_missing_head_ref_exits_3(tmp_path, base_ref):
         cli,
         [
             "ci",
-            "--dir", str(tmp_path),
-            "--base-ref", base_ref,
+            "--dir",
+            str(tmp_path),
+            "--base-ref",
+            base_ref,
             "--delta-only",
             "--no-comment",
-            "--output", str(tmp_path / "report.md"),
+            "--output",
+            str(tmp_path / "report.md"),
         ],
     )
     assert result.exit_code == 3, (
@@ -634,11 +641,13 @@ def test_property_5b_missing_head_ref_exits_3(tmp_path, base_ref):
     )
     # Error output must name the missing ref
     error_output = (result.output or "") + (
-        result.exception.__str__() if result.exception and not isinstance(result.exception, SystemExit) else ""
+        result.exception.__str__()
+        if result.exception and not isinstance(result.exception, SystemExit)
+        else ""
     )
-    assert "head" in error_output.lower(), (
-        f"Error output should name 'head_ref', got: {error_output!r}"
-    )
+    assert (
+        "head" in error_output.lower()
+    ), f"Error output should name 'head_ref', got: {error_output!r}"
 
 
 # Strategy for generating unresolvable ref strings: avoid strings that look like
@@ -660,7 +669,10 @@ _unresolvable_ref = st.text(
 )
 
 
-@settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow])
+@settings(
+    max_examples=100,
+    suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+)
 @given(
     bad_base=_unresolvable_ref,
     bad_head=_unresolvable_ref,
@@ -683,12 +695,16 @@ def test_property_5c_unresolvable_refs_exit_3(tmp_path, bad_base, bad_head):
         cli,
         [
             "ci",
-            "--dir", str(tmp_path),
-            "--base-ref", bad_base,
-            "--head-ref", bad_head,
+            "--dir",
+            str(tmp_path),
+            "--base-ref",
+            bad_base,
+            "--head-ref",
+            bad_head,
             "--delta-only",
             "--no-comment",
-            "--output", str(tmp_path / "report.md"),
+            "--output",
+            str(tmp_path / "report.md"),
         ],
     )
 
@@ -713,9 +729,7 @@ def test_property_5c_unresolvable_refs_exit_3(tmp_path, bad_base, bad_head):
         or bad_base in error_output
         or bad_head in error_output
         or "ref" in error_output.lower()
-    ), (
-        f"Error output should identify offending ref, got: {error_output!r}"
-    )
+    ), f"Error output should identify offending ref, got: {error_output!r}"
 
 
 # ===========================================================================
@@ -734,9 +748,7 @@ import subprocess as _subprocess
 _P19_VALID_FAIL_ON: frozenset = frozenset({"critical", "high", "medium", "low"})
 _P19_VALID_REPORT_FORMAT: frozenset = frozenset({"markdown", "md", "html", "json"})
 
-_ENTRYPOINT_PATH = str(
-    Path(__file__).parent.parent.parent / "ci" / "github" / "entrypoint.sh"
-)
+_ENTRYPOINT_PATH = str(Path(__file__).parent.parent.parent / "ci" / "github" / "entrypoint.sh")
 
 # Strategy: printable ASCII strings (1–20 chars) whose lowercase form is NOT in the valid set.
 # We restrict to printable ASCII (0x20–0x7e) to avoid shell/subprocess env-var encoding
@@ -757,7 +769,7 @@ _invalid_report_format_st = st.text(
 ).filter(lambda s: s.lower() not in _P19_VALID_REPORT_FORMAT)
 
 
-def _run_entrypoint(env_overrides: dict) -> "_subprocess.CompletedProcess[str]":
+def _run_entrypoint(env_overrides: dict) -> _subprocess.CompletedProcess[str]:
     """Run entrypoint.sh via bash with the given env overrides.
 
     We inject a minimal set of env vars so that the script fails on the
@@ -804,16 +816,15 @@ def test_invalid_fail_on_exits_3(invalid_fail_on):
     # stderr must contain "Error:" and mention the input name and the offending value
     stderr = proc.stderr
     assert "Error:" in stderr, (
-        f"Expected 'Error:' in stderr for invalid fail-on {invalid_fail_on!r}, "
-        f"got: {stderr!r}"
+        f"Expected 'Error:' in stderr for invalid fail-on {invalid_fail_on!r}, " f"got: {stderr!r}"
     )
     assert "fail-on" in stderr, (
         f"Expected input name 'fail-on' in stderr for value {invalid_fail_on!r}, "
         f"got: {stderr!r}"
     )
-    assert invalid_fail_on in stderr, (
-        f"Expected offending value {invalid_fail_on!r} in stderr, got: {stderr!r}"
-    )
+    assert (
+        invalid_fail_on in stderr
+    ), f"Expected offending value {invalid_fail_on!r} in stderr, got: {stderr!r}"
 
 
 @settings(max_examples=100)
@@ -839,9 +850,9 @@ def test_invalid_report_format_exits_3(invalid_report_format):
         f"Expected input name 'report-format' in stderr for value {invalid_report_format!r}, "
         f"got: {stderr!r}"
     )
-    assert invalid_report_format in stderr, (
-        f"Expected offending value {invalid_report_format!r} in stderr, got: {stderr!r}"
-    )
+    assert (
+        invalid_report_format in stderr
+    ), f"Expected offending value {invalid_report_format!r} in stderr, got: {stderr!r}"
 
 
 # ===========================================================================
@@ -851,9 +862,7 @@ def test_invalid_report_format_exits_3(invalid_report_format):
 # Feature: tmac-v1-6-pr-agent, Property 18: Exit code is propagated unchanged by the wrappers
 # Validates: Requirements 5.11, 5.12, 6.6, 6.8
 
-import os
 import stat
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -861,7 +870,6 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from tmac.ci.publisher import (
-    CIContext,
     NoPullRequestContext,
     PublishError,
     PublishPermissionError,
@@ -877,6 +885,7 @@ _EXIT_CODE_STRATEGY = st.sampled_from([0, 1, 2])
 # the findings-based exit code).
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(expected_exit=_EXIT_CODE_STRATEGY)
 def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
@@ -890,7 +899,6 @@ def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
     #   1 → at least one Critical finding
     #   2 → at least one High finding (no Critical)
     from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
-    from tmac.models.rule import CheckCondition, ThreatRule
 
     if expected_exit == 0:
         findings = []
@@ -945,9 +953,7 @@ def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
 
     runner = CIRunner()
 
-    with (
-        patch("tmac.ci.runner.CIRunner.run") as mock_run,
-    ):
+    with (patch("tmac.ci.runner.CIRunner.run") as mock_run,):
         # Configure mock to return the expected exit code directly — we simulate
         # that the underlying scan produced findings corresponding to expected_exit
         mock_run.return_value = expected_exit
@@ -963,9 +969,7 @@ def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
             ctx=ci_ctx,
         )
 
-    assert result == expected_exit, (
-        f"Expected exit code {expected_exit}, got {result}"
-    )
+    assert result == expected_exit, f"Expected exit code {expected_exit}, got {result}"
 
 
 @settings(max_examples=100)
@@ -1017,17 +1021,17 @@ def test_property_18b_cirunner_publish_error_does_not_change_exit_code(expected_
 
     # 1. Compute the findings-based exit code
     computed_code = runner._compute_exit_code(findings, "high")
-    assert computed_code == expected_exit, (
-        f"_compute_exit_code returned {computed_code}, expected {expected_exit}"
-    )
+    assert (
+        computed_code == expected_exit
+    ), f"_compute_exit_code returned {computed_code}, expected {expected_exit}"
 
     # 2. Simulate what happens after a PublishError: verify the runner logic
     # would still return computed_code (not change it to 3).
     # We test this by checking that PublishError is caught and re-mapped by runner.run()
     # by patching the internal publisher call to raise PublishError and checking
     # the return value matches the findings-based code.
-    from unittest.mock import MagicMock, patch
     import tempfile
+    from unittest.mock import MagicMock, patch
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a minimal .tf file so Scanner can run
@@ -1056,6 +1060,7 @@ def test_property_18b_cirunner_publish_error_does_not_change_exit_code(expected_
             mock_scanner_cls.return_value = mock_scanner
 
             from tmac.models.finding import ScanMetadata, ScanResult, ScanStatistics
+
             mock_scanner.run_scan.return_value = ScanResult(
                 metadata=ScanMetadata(scanned_directory=tmpdir),
                 statistics=ScanStatistics(total_findings=len(findings)),
@@ -1075,9 +1080,9 @@ def test_property_18b_cirunner_publish_error_does_not_change_exit_code(expected_
             )
 
         # The exit code must equal the findings-based code, not 3
-        assert actual_exit == expected_exit, (
-            f"After PublishError, expected findings-based exit {expected_exit}, got {actual_exit}"
-        )
+        assert (
+            actual_exit == expected_exit
+        ), f"After PublishError, expected findings-based exit {expected_exit}, got {actual_exit}"
         # Confirm publish was actually attempted (and raised)
         mock_publisher.publish.assert_called_once()
 
@@ -1104,9 +1109,7 @@ _VALID_REPORT_FORMAT = st.sampled_from(["Markdown", "md", "html", "json"])
     fail_on=_VALID_FAIL_ON,
     report_format=_VALID_REPORT_FORMAT,
 )
-def test_property_18c_entrypoint_propagates_exit_code_unchanged(
-    exit_code, fail_on, report_format
-):
+def test_property_18c_entrypoint_propagates_exit_code_unchanged(exit_code, fail_on, report_format):
     # Feature: tmac-v1-6-pr-agent, Property 18: Exit code is propagated unchanged by the wrappers
     # Validates: Requirements 5.11, 5.12
     # Design: create a fake `tmac` binary in a temp dir that exits with `exit_code`,
@@ -1155,6 +1158,7 @@ def test_property_18c_entrypoint_propagates_exit_code_unchanged(
 # Property 18d: CIRunner with PublishPermissionError also preserves exit code
 # (R3.7, R6.6 — permission failure is just a warning, not a code change)
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(expected_exit=_EXIT_CODE_STRATEGY)
@@ -1210,9 +1214,7 @@ def test_property_18d_publish_permission_error_does_not_change_exit_code(expecte
         )
 
         mock_publisher = MagicMock()
-        mock_publisher.publish.side_effect = PublishPermissionError(
-            "Simulated permission error"
-        )
+        mock_publisher.publish.side_effect = PublishPermissionError("Simulated permission error")
 
         runner = CIRunner()
 
@@ -1252,6 +1254,7 @@ def test_property_18d_publish_permission_error_does_not_change_exit_code(expecte
 # Property 18e: NoPullRequestContext also preserves exit code
 # (R3.8 — no PR context skips publish, uses findings-based exit)
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(expected_exit=_EXIT_CODE_STRATEGY)
@@ -1308,9 +1311,7 @@ def test_property_18e_no_pr_context_does_not_change_exit_code(expected_exit):
         )
 
         mock_publisher = MagicMock()
-        mock_publisher.publish.side_effect = NoPullRequestContext(
-            "No PR context"
-        )
+        mock_publisher.publish.side_effect = NoPullRequestContext("No PR context")
 
         runner = CIRunner()
 

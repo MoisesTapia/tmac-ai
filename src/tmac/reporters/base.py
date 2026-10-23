@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+
 from tmac.models.finding import ScanResult
+
 
 class BaseReporter(ABC):
     """Abstract base class for reporters."""
-    
+
     @abstractmethod
     def generate(self, result: ScanResult, diagram: str | None = None) -> str:
         """

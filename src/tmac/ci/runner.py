@@ -14,12 +14,11 @@ import logging
 import os
 import re
 import sys
-from typing import List, Optional
 
 # CIContext is defined (and already imported by publisher + tests) in publisher.py.
 # Re-export it here so the design's "place CIContext in runner.py" is honoured while
 # maintaining backward compatibility for existing imports.
-from tmac.ci.publisher import CIContext  # noqa: F401  (re-export)
+from tmac.ci.publisher import CIContext
 
 logger = logging.getLogger(__name__)
 
@@ -28,22 +27,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # GitHub Actions standard env vars
-_GH_REPO = "GITHUB_REPOSITORY"          # "owner/repo"
-_GH_EVENT_NAME = "GITHUB_EVENT_NAME"    # "pull_request", "push", ...
-_GH_HEAD_REF = "GITHUB_HEAD_REF"        # branch name of the PR head
-_GH_BASE_REF = "GITHUB_BASE_REF"        # branch name of the PR base
-_GH_REF = "GITHUB_REF"                  # full ref: "refs/pull/{n}/merge" or "refs/heads/..."
-_GH_API_URL = "GITHUB_API_URL"          # "https://api.github.com"
-_GH_SERVER_URL = "GITHUB_SERVER_URL"    # "https://github.com"
-_GH_EVENT_PATH = "GITHUB_EVENT_PATH"    # path to the event payload JSON file
+_GH_REPO = "GITHUB_REPOSITORY"  # "owner/repo"
+_GH_EVENT_NAME = "GITHUB_EVENT_NAME"  # "pull_request", "push", ...
+_GH_HEAD_REF = "GITHUB_HEAD_REF"  # branch name of the PR head
+_GH_BASE_REF = "GITHUB_BASE_REF"  # branch name of the PR base
+_GH_REF = "GITHUB_REF"  # full ref: "refs/pull/{n}/merge" or "refs/heads/..."
+_GH_API_URL = "GITHUB_API_URL"  # "https://api.github.com"
+_GH_SERVER_URL = "GITHUB_SERVER_URL"  # "https://github.com"
+_GH_EVENT_PATH = "GITHUB_EVENT_PATH"  # path to the event payload JSON file
 
 # GitLab CI standard env vars
-_GL_PROJECT_PATH = "CI_PROJECT_PATH"                        # "namespace/project"
-_GL_MR_IID = "CI_MERGE_REQUEST_IID"                        # MR internal ID
+_GL_PROJECT_PATH = "CI_PROJECT_PATH"  # "namespace/project"
+_GL_MR_IID = "CI_MERGE_REQUEST_IID"  # MR internal ID
 _GL_MR_SOURCE_BRANCH = "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
 _GL_MR_TARGET_BRANCH = "CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-_GL_SERVER_URL = "CI_SERVER_URL"                            # "https://gitlab.com"
-_GL_API_V4_URL = "CI_API_V4_URL"                           # "https://gitlab.com/api/v4"
+_GL_SERVER_URL = "CI_SERVER_URL"  # "https://gitlab.com"
+_GL_API_V4_URL = "CI_API_V4_URL"  # "https://gitlab.com/api/v4"
 
 # Regex to extract PR number from "refs/pull/{number}/merge"
 _GH_PR_REF_RE = re.compile(r"^refs/pull/(\d+)/merge$")
@@ -53,14 +52,15 @@ _GH_PR_REF_RE = re.compile(r"^refs/pull/(\d+)/merge$")
 # Public helper: ci_context_from_env
 # ---------------------------------------------------------------------------
 
+
 def ci_context_from_env(
     *,
-    platform: Optional[str] = None,
-    repo: Optional[str] = None,
-    pr_number: Optional[str] = None,
-    base_ref: Optional[str] = None,
-    head_ref: Optional[str] = None,
-    api_base: Optional[str] = None,
+    platform: str | None = None,
+    repo: str | None = None,
+    pr_number: str | None = None,
+    base_ref: str | None = None,
+    head_ref: str | None = None,
+    api_base: str | None = None,
     artifact_path: str = "tmac-report.md",
 ) -> CIContext:
     """Build a `CIContext` from explicit arguments, falling back to CI env vars.
@@ -131,7 +131,8 @@ def ci_context_from_env(
 # Internal: platform detection
 # ---------------------------------------------------------------------------
 
-def _detect_platform() -> Optional[str]:
+
+def _detect_platform() -> str | None:
     """Detect the running CI platform from env vars.
 
     Returns ``"github"``, ``"gitlab"``, or ``None`` when not in a known CI env.
@@ -147,14 +148,15 @@ def _detect_platform() -> Optional[str]:
 # Internal: GitHub context builder
 # ---------------------------------------------------------------------------
 
+
 def _build_github_context(
     *,
     platform: str,
-    repo: Optional[str],
-    pr_number: Optional[str],
-    base_ref: Optional[str],
-    head_ref: Optional[str],
-    api_base: Optional[str],
+    repo: str | None,
+    pr_number: str | None,
+    base_ref: str | None,
+    head_ref: str | None,
+    api_base: str | None,
     artifact_path: str,
 ) -> CIContext:
     """Populate a CIContext for GitHub Actions from env vars."""
@@ -179,7 +181,7 @@ def _build_github_context(
     )
 
 
-def _extract_github_pr_number() -> Optional[str]:
+def _extract_github_pr_number() -> str | None:
     """Extract the PR number from GitHub env vars.
 
     Tries three sources in order:
@@ -199,10 +201,7 @@ def _extract_github_pr_number() -> Optional[str]:
         try:
             with open(event_path, "r", encoding="utf-8") as fh:
                 event = json.load(fh)
-            pr_number = (
-                event.get("pull_request", {}).get("number")
-                or event.get("number")
-            )
+            pr_number = event.get("pull_request", {}).get("number") or event.get("number")
             if pr_number is not None:
                 return str(pr_number)
         except (OSError, json.JSONDecodeError, KeyError) as exc:
@@ -224,14 +223,15 @@ def _extract_github_pr_number() -> Optional[str]:
 # Internal: GitLab context builder
 # ---------------------------------------------------------------------------
 
+
 def _build_gitlab_context(
     *,
     platform: str,
-    repo: Optional[str],
-    pr_number: Optional[str],
-    base_ref: Optional[str],
-    head_ref: Optional[str],
-    api_base: Optional[str],
+    repo: str | None,
+    pr_number: str | None,
+    base_ref: str | None,
+    head_ref: str | None,
+    api_base: str | None,
     artifact_path: str,
 ) -> CIContext:
     """Populate a CIContext for GitLab CI from env vars."""
@@ -245,9 +245,7 @@ def _build_gitlab_context(
     resolved_head_ref = head_ref or os.environ.get(_GL_MR_SOURCE_BRANCH) or None
 
     if resolved_pr_number is None:
-        logger.debug(
-            "GitLab: CI_MERGE_REQUEST_IID not set; pr_number=None (no MR context, R6.9)."
-        )
+        logger.debug("GitLab: CI_MERGE_REQUEST_IID not set; pr_number=None (no MR context, R6.9).")
 
     return CIContext(
         platform=platform,
@@ -263,6 +261,7 @@ def _build_gitlab_context(
 # ---------------------------------------------------------------------------
 # CIRunner — main orchestration class (task 8.2)
 # ---------------------------------------------------------------------------
+
 
 class CIRunner:
     """Orchestrates the full CI analysis pipeline.
@@ -288,7 +287,11 @@ class CIRunner:
     # circular import cli → runner → cli)
     # -----------------------------------------------------------------
     _SEVERITY_LEVELS = {
-        "critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0,
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1,
+        "info": 0,
     }
 
     def _compute_exit_code(self, findings: list, threshold: str) -> int:
@@ -319,13 +322,13 @@ class CIRunner:
         self,
         *,
         directory: str,
-        plan_file: Optional[str],
+        plan_file: str | None,
         fail_on: str,
         report_fmt: str,
-        output: Optional[str],
+        output: str | None,
         delta_only: bool,
         comment: bool,
-        exclude: List[str],
+        exclude: list[str],
         ctx: CIContext,
         lenient: bool = False,
     ) -> int:
@@ -360,17 +363,12 @@ class CIRunner:
         from tmac.ci.comment import CommentContext, CommentFormatter
         from tmac.ci.git_diff import GitRefError, changed_tf_files
         from tmac.ci.publisher import (
-            GitHubCommentPublisher,
-            GitLabCommentPublisher,
             NoPullRequestContext,
             PublishError,
             PublishPermissionError,
         )
         from tmac.delta.models import DeltaScanResult
         from tmac.delta.scanner import DeltaScanError, DeltaScanner
-        from tmac.reporters.html import HTMLReporter
-        from tmac.reporters.json_report import JSONReporter
-        from tmac.reporters.markdown import MarkdownReporter
         from tmac.scanner import ScanError, Scanner
 
         token = _secrets.read_token()
@@ -379,7 +377,7 @@ class CIRunner:
         # Step 1: Determine scan mode and produce result
         # ------------------------------------------------------------------
         result = None
-        include_paths: Optional[List[str]] = None
+        include_paths: list[str] | None = None
 
         if plan_file:
             # Plan-file mode → DeltaScanner (R1.5)
@@ -425,6 +423,7 @@ class CIRunner:
 
                 # Resolve to absolute paths for include_paths filtering
                 import os as _os
+
                 include_paths = [
                     str(_os.path.join(_os.path.abspath(directory), p)) for p in changed
                 ]
@@ -578,11 +577,12 @@ class CIRunner:
 
             def request(self, method, url, headers, body):
                 import urllib.request as _req
+
                 from tmac.ci.publisher import HttpResponse
 
                 req = _req.Request(url, data=body, headers=headers or {}, method=method)
                 try:
-                    with _req.urlopen(req) as resp:  # noqa: S310
+                    with _req.urlopen(req) as resp:
                         return HttpResponse(
                             status=resp.status,
                             body=resp.read().decode("utf-8", errors="replace"),

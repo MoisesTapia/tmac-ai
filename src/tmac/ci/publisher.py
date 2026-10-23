@@ -14,13 +14,8 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
-from urllib.parse import urljoin
 
 from tmac.ci.comment import MARKER
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -28,18 +23,20 @@ logger = logging.getLogger(__name__)
 # CIContext — shared across publisher and runner (task 8 imports from here)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CIContext:
     """CI environment description shared by runner and publisher.
 
     pr_number is None when there is no open PR/MR context (R3.8, R5.9, R6.9).
     """
-    platform: str            # "github" | "gitlab"
-    repo: str                # "owner/repo" for GitHub; project id/path for GitLab
-    pr_number: Optional[str] # PR/MR number; None ⇒ no PR context (R3.8)
-    base_ref: Optional[str]
-    head_ref: Optional[str]
-    api_base: str            # platform API root URL
+
+    platform: str  # "github" | "gitlab"
+    repo: str  # "owner/repo" for GitHub; project id/path for GitLab
+    pr_number: str | None  # PR/MR number; None ⇒ no PR context (R3.8)
+    base_ref: str | None
+    head_ref: str | None
+    api_base: str  # platform API root URL
     artifact_path: str
 
 
@@ -47,9 +44,11 @@ class CIContext:
 # HTTP transport protocol and response
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class HttpResponse:
     """Minimal HTTP response wrapper."""
+
     status: int
     body: str
 
@@ -66,7 +65,7 @@ class HttpTransport:
         method: str,
         url: str,
         headers: dict,
-        body: Optional[bytes],
+        body: bytes | None,
     ) -> HttpResponse:
         """Perform an HTTP request and return the response.
 
@@ -85,6 +84,7 @@ class HttpTransport:
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class PublishError(Exception):
     """Raised when comment publishing fails for any reason."""
@@ -108,6 +108,7 @@ class NoPullRequestContext(PublishError):
 # Abstract base
 # ---------------------------------------------------------------------------
 
+
 class CommentPublisher(ABC):
     """Provider-agnostic comment publisher base.
 
@@ -123,7 +124,7 @@ class CommentPublisher(ABC):
     def __init__(self, transport: HttpTransport, token: str) -> None:
         self._transport = transport
         # Store token privately; never expose it in repr or logs
-        self.__token = token  # noqa: SIM117
+        self.__token = token
 
     # Expose token only to sub-classes for header construction
     @property
@@ -135,7 +136,7 @@ class CommentPublisher(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def find_existing(self, ctx: CIContext) -> Optional[str]:
+    def find_existing(self, ctx: CIContext) -> str | None:
         """Return the comment id of the most-recently-created comment whose body
         contains MARKER, else None.  Must NOT log the token (R3.5).
 
@@ -212,6 +213,7 @@ class CommentPublisher(ABC):
 # GitHub implementation
 # ---------------------------------------------------------------------------
 
+
 class GitHubCommentPublisher(CommentPublisher):
     """Publish PR comments via the GitHub Issues Comments API.
 
@@ -253,7 +255,7 @@ class GitHubCommentPublisher(CommentPublisher):
         resp = self._transport.request("GET", url, self._auth_headers(), None)
         return resp.status == 403
 
-    def find_existing(self, ctx: CIContext) -> Optional[str]:
+    def find_existing(self, ctx: CIContext) -> str | None:
         """Return the id of the most-recently-created TMAC marker comment, else None.
 
         Lists all comments (with pagination) and returns the last one containing MARKER.
@@ -269,12 +271,10 @@ class GitHubCommentPublisher(CommentPublisher):
             resp = self._transport.request("GET", url, self._auth_headers(), None)
             if resp.status == 403:
                 raise PublishPermissionError(
-                    f"GitHub GET comments returned 403 — insufficient token scope."
+                    "GitHub GET comments returned 403 — insufficient token scope."
                 )
             if resp.status not in (200, 201):
-                raise PublishError(
-                    f"GitHub GET comments returned HTTP {resp.status}."
-                )
+                raise PublishError(f"GitHub GET comments returned HTTP {resp.status}.")
             comments = json.loads(resp.body) if resp.body else []
             for comment in comments:
                 if MARKER in comment.get("body", ""):
@@ -338,6 +338,7 @@ class GitHubCommentPublisher(CommentPublisher):
 # GitLab implementation
 # ---------------------------------------------------------------------------
 
+
 class GitLabCommentPublisher(CommentPublisher):
     """Publish MR notes via the GitLab Merge Request Notes API.
 
@@ -387,7 +388,7 @@ class GitLabCommentPublisher(CommentPublisher):
         resp = self._transport.request("GET", url, self._auth_headers(), None)
         return resp.status == 403
 
-    def find_existing(self, ctx: CIContext) -> Optional[str]:
+    def find_existing(self, ctx: CIContext) -> str | None:
         """Return the id of the most-recently-created TMAC marker note, else None.
 
         Lists notes and returns the last one containing MARKER (ascending order).
@@ -405,9 +406,7 @@ class GitLabCommentPublisher(CommentPublisher):
                     "GitLab GET notes returned 403 — insufficient token scope."
                 )
             if resp.status not in (200, 201):
-                raise PublishError(
-                    f"GitLab GET notes returned HTTP {resp.status}."
-                )
+                raise PublishError(f"GitLab GET notes returned HTTP {resp.status}.")
             notes = json.loads(resp.body) if resp.body else []
             for note in notes:
                 if MARKER in note.get("body", ""):
@@ -456,8 +455,6 @@ class GitLabCommentPublisher(CommentPublisher):
         payload = json.dumps({"body": body}).encode("utf-8")
         resp = self._transport.request("PUT", url, self._auth_headers(), payload)
         if resp.status == 403:
-            raise PublishPermissionError(
-                "GitLab PUT note returned 403 — insufficient token scope."
-            )
+            raise PublishPermissionError("GitLab PUT note returned 403 — insufficient token scope.")
         if resp.status not in (200, 201):
             raise PublishError(f"GitLab PUT note returned HTTP {resp.status}.")

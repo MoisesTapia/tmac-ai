@@ -3,21 +3,22 @@ Unit tests for TMAC data models: Finding, ScanResult, ResourceModel.
 
 Validates: Requirements 9.1, 9.2, 9.3, 20.2, 20.3
 """
-from typing import Any, Dict
 
-import pytest
-from hypothesis import given, settings, strategies as st
+from typing import Any
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
 from tmac.models.resource import ResourceModel
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_finding(**kwargs) -> Finding:
-    defaults: Dict[str, Any] = dict(
+    defaults: dict[str, Any] = dict(
         rule_id="TMAC-AWS-S3-001",
         rule_name="S3 Public ACL",
         severity="Critical",
@@ -35,7 +36,7 @@ def _make_finding(**kwargs) -> Finding:
 
 
 def _make_scan_result(**kwargs) -> ScanResult:
-    defaults: Dict[str, Any] = dict(
+    defaults: dict[str, Any] = dict(
         metadata=ScanMetadata(scanned_directory="/tmp/test"),
         statistics=ScanStatistics(total_resources=1, total_findings=1, critical=1),
         findings=[_make_finding()],
@@ -45,7 +46,7 @@ def _make_scan_result(**kwargs) -> ScanResult:
 
 
 def _make_resource(**kwargs) -> ResourceModel:
-    defaults: Dict[str, Any] = dict(
+    defaults: dict[str, Any] = dict(
         resource_type="aws_s3_bucket",
         name="test_bucket",
         attributes={"acl": "public-read"},
@@ -59,6 +60,7 @@ def _make_resource(**kwargs) -> ResourceModel:
 # ---------------------------------------------------------------------------
 # Finding tests — Requirement 9.1
 # ---------------------------------------------------------------------------
+
 
 class TestFinding:
     def test_tags_defaults_to_empty_list(self):
@@ -87,6 +89,7 @@ class TestFinding:
 # ---------------------------------------------------------------------------
 # ScanResult tests — Requirements 9.2, 9.3
 # ---------------------------------------------------------------------------
+
 
 class TestScanResult:
     def test_files_scanned_defaults_to_zero(self):
@@ -119,6 +122,7 @@ class TestScanResult:
 # ---------------------------------------------------------------------------
 # ResourceModel.to_dict() round-trip — Requirements 20.2, 20.3
 # ---------------------------------------------------------------------------
+
 
 class TestResourceModelToDict:
     def test_to_dict_returns_dict(self):
@@ -182,7 +186,11 @@ _source_file_st = st.text(
     max_size=100,
 )
 _attributes_st = st.dictionaries(
-    keys=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",), whitelist_characters="_")),
+    keys=st.text(
+        min_size=1,
+        max_size=20,
+        alphabet=st.characters(whitelist_categories=("Ll",), whitelist_characters="_"),
+    ),
     values=st.one_of(
         st.text(max_size=50),
         st.integers(),
@@ -204,7 +212,7 @@ _attributes_st = st.dictionaries(
 def test_property_19_resource_model_round_trip(
     resource_type: str,
     name: str,
-    attributes: Dict[str, Any],
+    attributes: dict[str, Any],
     source_file: str,
     line_number: int,
 ):

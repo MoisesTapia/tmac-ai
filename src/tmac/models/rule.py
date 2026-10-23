@@ -1,5 +1,6 @@
 import re
-from typing import Any, Dict, List, Literal, Optional, get_args
+from typing import Any, Literal, Optional, get_args
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 Severity = Literal["Critical", "High", "Medium", "Low", "Info"]
@@ -30,7 +31,7 @@ def _canonical(value: Any, allowed: Any, field: str) -> Any:
     """Map a case-insensitive input onto its canonical Literal spelling."""
     if not isinstance(value, str):
         return value
-    lookup: Dict[str, str] = {opt.lower(): opt for opt in get_args(allowed)}
+    lookup: dict[str, str] = {opt.lower(): opt for opt in get_args(allowed)}
     canonical = lookup.get(value.strip().lower())
     if canonical is None:
         raise ValueError(f"invalid {field} {value!r}; allowed: {', '.join(get_args(allowed))}")
@@ -40,7 +41,7 @@ def _canonical(value: Any, allowed: Any, field: str) -> Any:
 class CheckCondition(BaseModel):
     attribute: str
     condition: ConditionOp
-    values: List[Any] = Field(default_factory=list)
+    values: list[Any] = Field(default_factory=list)
     and_check: Optional["CheckCondition"] = None
 
     @field_validator("condition", mode="before")
@@ -71,8 +72,8 @@ class ThreatRule(BaseModel):
     stride: Stride
     description: str
     mitigation: str
-    references: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
+    references: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("severity", mode="before")
     @classmethod

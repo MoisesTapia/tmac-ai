@@ -2,28 +2,36 @@
 Unit tests for Evaluator and Matcher.
 Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 13.1, 13.2, 13.3, 13.4, 13.5
 """
+
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tmac.engine.evaluator import Evaluator
 from tmac.engine.matcher import Matcher
-from tmac.models.rule import CheckCondition, ThreatRule
 from tmac.models.resource import ResourceModel
-
+from tmac.models.rule import CheckCondition, ThreatRule
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_rule(rule_id="TMAC-TEST-001", resource_type="aws_security_group",
-               attribute="ingress.from_port", condition="equals", values=None,
-               and_check=None):
+
+def _make_rule(
+    rule_id="TMAC-TEST-001",
+    resource_type="aws_security_group",
+    attribute="ingress.from_port",
+    condition="equals",
+    values=None,
+    and_check=None,
+):
     return ThreatRule(
         id=rule_id,
         name=f"Rule {rule_id}",
         resource_type=resource_type,
-        check=CheckCondition(attribute=attribute, condition=condition,
-                             values=values or [], and_check=and_check),
+        check=CheckCondition(
+            attribute=attribute, condition=condition, values=values or [], and_check=and_check
+        ),
         severity="High",
         stride="Denial of Service",
         description="desc",
@@ -48,41 +56,45 @@ evaluator = Evaluator()
 # 4.1 — Parametrized tests per operator (Req 5.4, 13.1)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("condition,values,actual,expected", [
-    # equals
-    ("equals",       ["public-read"],  "public-read",  True),
-    ("equals",       ["public-read"],  "private",      False),
-    # not_equals
-    ("not_equals",   ["private"],      "public-read",  True),
-    ("not_equals",   ["public-read"],  "public-read",  False),
-    # in
-    ("in",           ["a", "b", "c"], "b",             True),
-    ("in",           ["a", "b", "c"], "d",             False),
-    # not_in
-    ("not_in",       ["a", "b"],      "c",             True),
-    ("not_in",       ["a", "b"],      "a",             False),
-    # contains (string)
-    ("contains",     ["0.0.0.0"],     "0.0.0.0/0",    True),
-    ("contains",     ["10.0.0.0"],    "0.0.0.0/0",    False),
-    # contains (list)
-    ("contains",     ["admin"],       ["admin", "user"], True),
-    ("contains",     ["root"],        ["admin", "user"], False),
-    # not_contains (string)
-    ("not_contains", ["10.0.0.0"],    "0.0.0.0/0",    True),
-    ("not_contains", ["0.0.0.0"],     "0.0.0.0/0",    False),
-    # not_contains (list)
-    ("not_contains", ["root"],        ["admin", "user"], True),
-    ("not_contains", ["admin"],       ["admin", "user"], False),
-    # regex
-    ("regex",        ["^0\\.0\\.0\\.0"], "0.0.0.0/0", True),
-    ("regex",        ["^10\\."],      "0.0.0.0/0",    False),
-    # exists
-    ("exists",       [],              "something",    True),
-    ("exists",       [],              None,           False),
-    # not_exists
-    ("not_exists",   [],              None,           True),
-    ("not_exists",   [],              "something",    False),
-])
+
+@pytest.mark.parametrize(
+    "condition,values,actual,expected",
+    [
+        # equals
+        ("equals", ["public-read"], "public-read", True),
+        ("equals", ["public-read"], "private", False),
+        # not_equals
+        ("not_equals", ["private"], "public-read", True),
+        ("not_equals", ["public-read"], "public-read", False),
+        # in
+        ("in", ["a", "b", "c"], "b", True),
+        ("in", ["a", "b", "c"], "d", False),
+        # not_in
+        ("not_in", ["a", "b"], "c", True),
+        ("not_in", ["a", "b"], "a", False),
+        # contains (string)
+        ("contains", ["0.0.0.0"], "0.0.0.0/0", True),
+        ("contains", ["10.0.0.0"], "0.0.0.0/0", False),
+        # contains (list)
+        ("contains", ["admin"], ["admin", "user"], True),
+        ("contains", ["root"], ["admin", "user"], False),
+        # not_contains (string)
+        ("not_contains", ["10.0.0.0"], "0.0.0.0/0", True),
+        ("not_contains", ["0.0.0.0"], "0.0.0.0/0", False),
+        # not_contains (list)
+        ("not_contains", ["root"], ["admin", "user"], True),
+        ("not_contains", ["admin"], ["admin", "user"], False),
+        # regex
+        ("regex", ["^0\\.0\\.0\\.0"], "0.0.0.0/0", True),
+        ("regex", ["^10\\."], "0.0.0.0/0", False),
+        # exists
+        ("exists", [], "something", True),
+        ("exists", [], None, False),
+        # not_exists
+        ("not_exists", [], None, True),
+        ("not_exists", [], "something", False),
+    ],
+)
 def test_all_operators(condition, values, actual, expected):
     """Req 5.4, 13.1: Evaluator is correct for all operators."""
     cond = CheckCondition(attribute="x", condition=condition, values=values)
@@ -97,6 +109,7 @@ def test_all_operators(condition, values, actual, expected):
 # ---------------------------------------------------------------------------
 # 4.1 — Composite and_check (Req 13.2)
 # ---------------------------------------------------------------------------
+
 
 def test_and_check_both_true():
     """Req 13.2: composite and_check evaluates correctly when both conditions are True."""
@@ -126,13 +139,14 @@ def test_and_check_second_false():
 # 4.1 — SG with multiple ingress blocks (Req 5.1, 5.2, 13.3)
 # ---------------------------------------------------------------------------
 
+
 def test_multi_ingress_detects_when_any_block_matches():
     """Req 5.1, 5.2, 13.3: SG with multiple ingress blocks detects a rule when any block satisfies it."""
     # Only the second ingress block has port 22 open to 0.0.0.0/0
     attrs = {
         "ingress": [
             {"from_port": 443, "to_port": 443, "cidr_blocks": ["10.0.0.0/8"]},
-            {"from_port": 22,  "to_port": 22,  "cidr_blocks": ["0.0.0.0/0"]},
+            {"from_port": 22, "to_port": 22, "cidr_blocks": ["0.0.0.0/0"]},
         ]
     }
     cond = CheckCondition(attribute="ingress.from_port", condition="equals", values=[22])
@@ -144,7 +158,7 @@ def test_multi_ingress_no_match_when_none_satisfy():
     attrs = {
         "ingress": [
             {"from_port": 443, "to_port": 443, "cidr_blocks": ["10.0.0.0/8"]},
-            {"from_port": 80,  "to_port": 80,  "cidr_blocks": ["10.0.0.0/8"]},
+            {"from_port": 80, "to_port": 80, "cidr_blocks": ["10.0.0.0/8"]},
         ]
     }
     cond = CheckCondition(attribute="ingress.from_port", condition="equals", values=[22])
@@ -155,7 +169,7 @@ def test_multi_ingress_first_block_matches():
     """Req 5.1: detects when the first block (not just last) matches."""
     attrs = {
         "ingress": [
-            {"from_port": 22,  "to_port": 22,  "cidr_blocks": ["0.0.0.0/0"]},
+            {"from_port": 22, "to_port": 22, "cidr_blocks": ["0.0.0.0/0"]},
             {"from_port": 443, "to_port": 443, "cidr_blocks": ["10.0.0.0/8"]},
         ]
     }
@@ -167,12 +181,15 @@ def test_multi_ingress_first_block_matches():
 # 4.2 — Matcher: global tmac:ignore (Req 13.4)
 # ---------------------------------------------------------------------------
 
+
 def test_matcher_global_ignore_suppresses_all_findings():
     """Req 13.4: Matcher skips resources with a global # tmac:ignore."""
-    rule = _make_rule(attribute="acl", condition="equals", values=["public-read"],
-                      resource_type="aws_s3_bucket")
-    resource = _make_resource(resource_type="aws_s3_bucket", name="my_bucket",
-                               attributes={"acl": "public-read"})
+    rule = _make_rule(
+        attribute="acl", condition="equals", values=["public-read"], resource_type="aws_s3_bucket"
+    )
+    resource = _make_resource(
+        resource_type="aws_s3_bucket", name="my_bucket", attributes={"acl": "public-read"}
+    )
     ignore_map = {"my_bucket": ["*"]}
 
     matcher = Matcher()
@@ -182,12 +199,15 @@ def test_matcher_global_ignore_suppresses_all_findings():
 
 def test_matcher_global_ignore_does_not_affect_other_resources():
     """Global ignore on one resource does not suppress findings on another."""
-    rule = _make_rule(attribute="acl", condition="equals", values=["public-read"],
-                      resource_type="aws_s3_bucket")
-    r1 = _make_resource(resource_type="aws_s3_bucket", name="ignored_bucket",
-                         attributes={"acl": "public-read"})
-    r2 = _make_resource(resource_type="aws_s3_bucket", name="other_bucket",
-                         attributes={"acl": "public-read"})
+    rule = _make_rule(
+        attribute="acl", condition="equals", values=["public-read"], resource_type="aws_s3_bucket"
+    )
+    r1 = _make_resource(
+        resource_type="aws_s3_bucket", name="ignored_bucket", attributes={"acl": "public-read"}
+    )
+    r2 = _make_resource(
+        resource_type="aws_s3_bucket", name="other_bucket", attributes={"acl": "public-read"}
+    )
     ignore_map = {"ignored_bucket": ["*"]}
 
     matcher = Matcher()
@@ -200,15 +220,25 @@ def test_matcher_global_ignore_does_not_affect_other_resources():
 # 4.2 — Matcher: tmac:ignore[RULE-ID] (Req 13.5)
 # ---------------------------------------------------------------------------
 
+
 def test_matcher_rule_ignore_suppresses_only_specified_rule():
     """Req 13.5: Matcher skips only the specified rule with # tmac:ignore[RULE-ID]."""
-    rule1 = _make_rule(rule_id="TMAC-AWS-S3-001", attribute="acl",
-                        condition="equals", values=["public-read"],
-                        resource_type="aws_s3_bucket")
-    rule2 = _make_rule(rule_id="TMAC-AWS-S3-002", attribute="encryption",
-                        condition="not_exists", resource_type="aws_s3_bucket")
-    resource = _make_resource(resource_type="aws_s3_bucket", name="my_bucket",
-                               attributes={"acl": "public-read"})
+    rule1 = _make_rule(
+        rule_id="TMAC-AWS-S3-001",
+        attribute="acl",
+        condition="equals",
+        values=["public-read"],
+        resource_type="aws_s3_bucket",
+    )
+    rule2 = _make_rule(
+        rule_id="TMAC-AWS-S3-002",
+        attribute="encryption",
+        condition="not_exists",
+        resource_type="aws_s3_bucket",
+    )
+    resource = _make_resource(
+        resource_type="aws_s3_bucket", name="my_bucket", attributes={"acl": "public-read"}
+    )
     # Only ignore rule1; rule2 should still fire (encryption not_exists → True)
     ignore_map = {"my_bucket": ["TMAC-AWS-S3-001"]}
 
@@ -221,10 +251,12 @@ def test_matcher_rule_ignore_suppresses_only_specified_rule():
 
 def test_matcher_no_ignore_map_produces_findings():
     """Without ignore_map, all matching rules produce findings."""
-    rule = _make_rule(attribute="acl", condition="equals", values=["public-read"],
-                      resource_type="aws_s3_bucket")
-    resource = _make_resource(resource_type="aws_s3_bucket", name="my_bucket",
-                               attributes={"acl": "public-read"})
+    rule = _make_rule(
+        attribute="acl", condition="equals", values=["public-read"], resource_type="aws_s3_bucket"
+    )
+    resource = _make_resource(
+        resource_type="aws_s3_bucket", name="my_bucket", attributes={"acl": "public-read"}
+    )
 
     matcher = Matcher()
     findings = matcher.match([resource], [rule])
@@ -235,6 +267,7 @@ def test_matcher_no_ignore_map_produces_findings():
 # Property 9: Evaluator detects a condition in any element of a list of blocks
 # Validates: Requirements 5.1, 5.2, 5.5
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(
@@ -269,6 +302,7 @@ def test_property_9_evaluator_list_any_match(ports):
 # Property 10: Evaluator is correct for all operators
 # Validates: Requirements 5.4
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100)
 @given(

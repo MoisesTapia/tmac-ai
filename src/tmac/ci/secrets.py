@@ -8,7 +8,6 @@ Requirements: R3.6, R4.1, R4.2, R4.3, R4.5
 """
 
 import os
-from typing import Optional
 
 # The fixed redaction placeholder. It contains no alphanumeric characters from
 # any typical token, satisfying R4.1 (placeholder contains none of the original
@@ -19,7 +18,7 @@ _REDACTED_PLACEHOLDER = "***REDACTED***"
 _TOKEN_ENV_VARS = ["GITHUB_TOKEN", "CI_JOB_TOKEN", "TMAC_TOKEN"]
 
 
-def read_token() -> Optional[str]:
+def read_token() -> str | None:
     """Read the CI token from environment variables in priority order.
 
     Checks the following environment variables in order:

@@ -28,6 +28,7 @@ from tmac.ci.publisher import (
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
 
+
 def _github_ctx(pr_number: str = "42") -> CIContext:
     return CIContext(
         platform="github",
@@ -64,6 +65,7 @@ def _comment_without_marker() -> dict:
 # Task 7.4 — auth header, 403, and fork-token pre-check
 # ===========================================================================
 
+
 class TestAuthHeader:
     """Assert every request carries the auth header (R3.5)."""
 
@@ -77,16 +79,14 @@ class TestAuthHeader:
 
         # Every call must include the Authorization header
         for method, url, headers, body in transport.calls:
-            assert "Authorization" in headers, (
-                f"Authorization header missing on {method} {url}"
-            )
-            assert "my-secret-token" in headers["Authorization"], (
-                f"Token not present in Authorization header for {method} {url}"
-            )
+            assert "Authorization" in headers, f"Authorization header missing on {method} {url}"
+            assert (
+                "my-secret-token" in headers["Authorization"]
+            ), f"Token not present in Authorization header for {method} {url}"
             # Token must not be logged — we verify it's only in the header
-            assert "my-secret-token" not in url, (
-                f"Token found in URL (should only be in headers): {url}"
-            )
+            assert (
+                "my-secret-token" not in url
+            ), f"Token found in URL (should only be in headers): {url}"
 
     def test_gitlab_get_carries_private_token(self):
         transport = FakeHttpTransport()
@@ -97,12 +97,10 @@ class TestAuthHeader:
         publisher.publish(_gitlab_ctx(), f"body {MARKER}")
 
         for method, url, headers, body in transport.calls:
-            assert "PRIVATE-TOKEN" in headers, (
-                f"PRIVATE-TOKEN header missing on {method} {url}"
-            )
-            assert "glpat-secret" in headers["PRIVATE-TOKEN"], (
-                f"Token not present in PRIVATE-TOKEN header for {method} {url}"
-            )
+            assert "PRIVATE-TOKEN" in headers, f"PRIVATE-TOKEN header missing on {method} {url}"
+            assert (
+                "glpat-secret" in headers["PRIVATE-TOKEN"]
+            ), f"Token not present in PRIVATE-TOKEN header for {method} {url}"
 
     def test_gitlab_job_token_uses_job_token_header(self):
         transport = FakeHttpTransport()
@@ -113,13 +111,11 @@ class TestAuthHeader:
         publisher.publish(_gitlab_ctx(), f"body {MARKER}")
 
         for method, url, headers, body in transport.calls:
-            assert "JOB-TOKEN" in headers, (
-                f"JOB-TOKEN header missing on {method} {url}"
-            )
+            assert "JOB-TOKEN" in headers, f"JOB-TOKEN header missing on {method} {url}"
             # Should NOT use PRIVATE-TOKEN when use_job_token=True
-            assert "PRIVATE-TOKEN" not in headers, (
-                f"PRIVATE-TOKEN should not be sent when use_job_token=True"
-            )
+            assert (
+                "PRIVATE-TOKEN" not in headers
+            ), "PRIVATE-TOKEN should not be sent when use_job_token=True"
 
 
 class TestPermissionError:
@@ -142,8 +138,8 @@ class TestPermissionError:
         Existing comments must remain unchanged (no writes before the failure).
         """
         transport = FakeHttpTransport()
-        transport.set_list_response([])      # no existing marker comments
-        transport.set_write_response(403)    # write returns 403
+        transport.set_list_response([])  # no existing marker comments
+        transport.set_write_response(403)  # write returns 403
 
         publisher = GitHubCommentPublisher(transport, "bad-token")
         ctx = _github_ctx()
@@ -153,9 +149,7 @@ class TestPermissionError:
             publisher.publish(ctx, f"new body {MARKER}")
 
         # No successful writes occurred
-        successful_writes = [
-            c for c in transport.written_calls if c[0] in ("POST", "PATCH", "PUT")
-        ]
+        successful_writes = [c for c in transport.written_calls if c[0] in ("POST", "PATCH", "PUT")]
         # The only write attempt should be the failed POST
         assert len(successful_writes) == 1
         assert successful_writes[0][0] == "POST"
@@ -179,9 +173,9 @@ class TestPermissionError:
             publisher.publish(ctx, f"new body {MARKER}")
 
         # The original comment body is unchanged (we tracked it before publish)
-        assert existing["body"] == original_body, (
-            "Existing comment body was mutated despite publish failure"
-        )
+        assert (
+            existing["body"] == original_body
+        ), "Existing comment body was mutated despite publish failure"
 
     def test_gitlab_403_on_get_raises_permission_error(self):
         transport = FakeHttpTransport()
@@ -212,7 +206,7 @@ class TestForkTokenPreCheck:
         """When GET returns 403 (read-only token), create() raises PublishPermissionError
         WITHOUT making a POST write attempt."""
         transport = FakeHttpTransport()
-        transport.set_get_403(True)   # simulate read-only / fork token
+        transport.set_get_403(True)  # simulate read-only / fork token
 
         publisher = GitHubCommentPublisher(transport, "fork-token")
         ctx = _github_ctx()
@@ -221,9 +215,9 @@ class TestForkTokenPreCheck:
             publisher.create(ctx, f"body {MARKER}")
 
         # No write calls should have been made
-        assert len(transport.written_calls) == 0, (
-            f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
-        )
+        assert (
+            len(transport.written_calls) == 0
+        ), f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
 
     def test_github_fork_token_raises_before_update(self):
         """When GET returns 403 (read-only token), update() raises PublishPermissionError
@@ -237,9 +231,9 @@ class TestForkTokenPreCheck:
         with pytest.raises(PublishPermissionError):
             publisher.update(ctx, "1", f"body {MARKER}")
 
-        assert len(transport.written_calls) == 0, (
-            f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
-        )
+        assert (
+            len(transport.written_calls) == 0
+        ), f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
 
     def test_gitlab_fork_token_raises_before_create(self):
         """When GET returns 403 (read-only token), GitLab create() raises PublishPermissionError
@@ -253,9 +247,9 @@ class TestForkTokenPreCheck:
         with pytest.raises(PublishPermissionError):
             publisher.create(ctx, f"body {MARKER}")
 
-        assert len(transport.written_calls) == 0, (
-            f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
-        )
+        assert (
+            len(transport.written_calls) == 0
+        ), f"Expected 0 write calls but got: {[c[0] for c in transport.written_calls]}"
 
     def test_gitlab_fork_token_raises_before_update(self):
         transport = FakeHttpTransport()
@@ -276,7 +270,7 @@ class TestForkTokenPreCheck:
         ctx = CIContext(
             platform="github",
             repo="owner/repo",
-            pr_number=None,   # <-- no PR
+            pr_number=None,  # <-- no PR
             base_ref="main",
             head_ref="feature",
             api_base="https://api.github.com",
@@ -287,14 +281,13 @@ class TestForkTokenPreCheck:
             publisher.publish(ctx, f"body {MARKER}")
 
         # No HTTP requests should have been made
-        assert len(transport.calls) == 0, (
-            "No HTTP calls should be made when there is no PR context"
-        )
+        assert len(transport.calls) == 0, "No HTTP calls should be made when there is no PR context"
 
 
 # ===========================================================================
 # Task 7.5 — GitHub vs GitLab equivalence (integration tests)
 # ===========================================================================
+
 
 class TestGitHubGitLabEquivalence:
     """Assert both publishers produce equivalent find-or-update behavior
@@ -331,10 +324,12 @@ class TestGitHubGitLabEquivalence:
 
         # GitLab uses /projects/ path
         gl_post_url = gl_transport.written_calls[0][1]
-        assert "/projects/" in gl_post_url, f"GitLab POST URL should contain /projects/: {gl_post_url}"
-        assert "/merge_requests/" in gl_post_url, (
-            f"GitLab POST URL should contain /merge_requests/: {gl_post_url}"
-        )
+        assert (
+            "/projects/" in gl_post_url
+        ), f"GitLab POST URL should contain /projects/: {gl_post_url}"
+        assert (
+            "/merge_requests/" in gl_post_url
+        ), f"GitLab POST URL should contain /merge_requests/: {gl_post_url}"
 
     def test_both_update_when_existing_comment_present(self):
         """When an existing marked comment exists, both platforms update it."""
@@ -397,16 +392,12 @@ class TestGitHubGitLabEquivalence:
         # GitHub PATCH must target id=20 (most recent)
         gh_patch_url = gh_transport.written_calls[0][1]
         assert "20" in gh_patch_url, f"GitHub PATCH should target id=20, got URL: {gh_patch_url}"
-        assert "10" not in gh_patch_url.split("/")[-1], (
-            f"GitHub PATCH should NOT target id=10"
-        )
+        assert "10" not in gh_patch_url.split("/")[-1], "GitHub PATCH should NOT target id=10"
 
         # GitLab PUT must target id=40 (most recent)
         gl_put_url = gl_transport.written_calls[0][1]
         assert "40" in gl_put_url, f"GitLab PUT should target id=40, got URL: {gl_put_url}"
-        assert "30" not in gl_put_url.split("/")[-1], (
-            f"GitLab PUT should NOT target id=30"
-        )
+        assert "30" not in gl_put_url.split("/")[-1], "GitLab PUT should NOT target id=30"
 
     def test_both_produce_json_body_with_comment_text(self):
         """Both publishers send the comment body as JSON."""
@@ -427,17 +418,13 @@ class TestGitHubGitLabEquivalence:
         gh_write_body = gh_transport.written_calls[0][3]
         assert gh_write_body is not None
         gh_payload = json.loads(gh_write_body.decode("utf-8"))
-        assert gh_payload.get("body") == body, (
-            f"GitHub JSON body mismatch: {gh_payload}"
-        )
+        assert gh_payload.get("body") == body, f"GitHub JSON body mismatch: {gh_payload}"
 
         # Check GitLab write
         gl_write_body = gl_transport.written_calls[0][3]
         assert gl_write_body is not None
         gl_payload = json.loads(gl_write_body.decode("utf-8"))
-        assert gl_payload.get("body") == body, (
-            f"GitLab JSON body mismatch: {gl_payload}"
-        )
+        assert gl_payload.get("body") == body, f"GitLab JSON body mismatch: {gl_payload}"
 
     def test_both_include_marker_in_written_body(self):
         """Both publishers write a body that contains MARKER (idempotency anchor)."""
@@ -456,6 +443,6 @@ class TestGitHubGitLabEquivalence:
             write_body = transport.written_calls[0][3]
             assert write_body is not None
             payload = json.loads(write_body.decode("utf-8"))
-            assert MARKER in payload.get("body", ""), (
-                f"{publisher_cls.__name__} did not include MARKER in written body"
-            )
+            assert MARKER in payload.get(
+                "body", ""
+            ), f"{publisher_cls.__name__} did not include MARKER in written body"

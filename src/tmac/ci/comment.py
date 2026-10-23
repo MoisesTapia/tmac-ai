@@ -11,10 +11,9 @@ Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Tuple
 
 from tmac.cli import SEVERITY_LEVELS
-from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult
+from tmac.delta.models import ChangeAction, DeltaFinding
 from tmac.models.finding import Finding, ScanResult
 
 # ---------------------------------------------------------------------------
@@ -29,18 +28,18 @@ MARKER = "<!-- tmac:pr-comment:v1 -->"
 
 _SEVERITY_EMOJI = {
     "critical": "🔴",
-    "high":     "🟠",
-    "medium":   "🟡",
-    "low":      "🟢",
-    "info":     "🔵",
+    "high": "🟠",
+    "medium": "🟡",
+    "low": "🟢",
+    "info": "🔵",
 }
 
 _SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"]
 
 _STATUS_EMOJI = {
     "APPROVED": "✅",
-    "WARNING":  "⚠️",
-    "BLOCKED":  "🚫",
+    "WARNING": "⚠️",
+    "BLOCKED": "🚫",
 }
 
 
@@ -48,19 +47,22 @@ _STATUS_EMOJI = {
 # Public data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class CommentContext:
     """Inputs the formatter needs that are not on the scan result."""
-    fail_on: str         # Fail_On_Threshold (e.g. "high")
-    artifact_ref: str    # URL / path of the full Report_Artifact (R2.12)
-    max_length: int      # Platform maximum comment length (R2.13)
-    introduced: int      # Newly introduced threat count (R2.1)
-    resolved: int        # Resolved threat count (R2.1)
+
+    fail_on: str  # Fail_On_Threshold (e.g. "high")
+    artifact_ref: str  # URL / path of the full Report_Artifact (R2.12)
+    max_length: int  # Platform maximum comment length (R2.13)
+    introduced: int  # Newly introduced threat count (R2.1)
+    resolved: int  # Resolved threat count (R2.1)
 
 
 # ---------------------------------------------------------------------------
 # Formatter
 # ---------------------------------------------------------------------------
+
 
 class CommentFormatter:
     """Renders a deterministic Markdown PR/MR comment from a scan result."""
@@ -74,7 +76,7 @@ class CommentFormatter:
 
         Deterministic: identical (result, ctx) input → identical string.
         """
-        findings: List[Finding] = list(result.findings)
+        findings: list[Finding] = list(result.findings)
 
         badge = self._status_badge(findings, ctx.fail_on)
         badge_emoji = _STATUS_EMOJI[badge]
@@ -82,7 +84,7 @@ class CommentFormatter:
         ordered = self._ordered_rows(findings)
         ordered, omitted = self._truncate(ordered, ctx)
 
-        lines: List[str] = [MARKER, ""]
+        lines: list[str] = [MARKER, ""]
         lines.append("## 🛡️ TMAC Threat Model Analysis")
         lines.append("")
         lines.append(f"**Status:** {badge_emoji} {badge}")
@@ -124,9 +126,7 @@ class CommentFormatter:
                 resource = f"`{finding.resource_type}.{finding.resource_name}`"
                 rule = f"`{finding.rule_id}`"
                 action = self._action_label(finding)
-                lines.append(
-                    f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |"
-                )
+                lines.append(f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |")
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")
@@ -137,7 +137,7 @@ class CommentFormatter:
     # Internal helpers (unit-tested directly)
     # ------------------------------------------------------------------
 
-    def _status_badge(self, findings: List[Finding], fail_on: str) -> str:
+    def _status_badge(self, findings: list[Finding], fail_on: str) -> str:
         """Return one of BLOCKED, WARNING, APPROVED.
 
         - empty findings → APPROVED  (R2.7)
@@ -154,7 +154,7 @@ class CommentFormatter:
 
         return "WARNING"
 
-    def _severity_breakdown(self, findings: List[Finding]) -> dict:
+    def _severity_breakdown(self, findings: list[Finding]) -> dict:
         """Return all five severity levels, zero-filled. (R2.2)"""
         breakdown: dict = {sev: 0 for sev in _SEVERITY_ORDER}
         for f in findings:
@@ -163,9 +163,10 @@ class CommentFormatter:
                 breakdown[key] += 1
         return breakdown
 
-    def _ordered_rows(self, findings: List[Finding]) -> List[Finding]:
+    def _ordered_rows(self, findings: list[Finding]) -> list[Finding]:
         """Sort by severity desc, then resource address asc. (R2.4, R7.3)"""
-        def sort_key(f: Finding) -> Tuple[int, str]:
+
+        def sort_key(f: Finding) -> tuple[int, str]:
             sev_val = SEVERITY_LEVELS.get(f.severity.lower(), -1)
             address = f"{f.resource_type}.{f.resource_name}"
             return (-sev_val, address)
@@ -190,9 +191,9 @@ class CommentFormatter:
 
     def _truncate(
         self,
-        rows: List[Finding],
+        rows: list[Finding],
         ctx: CommentContext,
-    ) -> Tuple[List[Finding], int]:
+    ) -> tuple[list[Finding], int]:
         """Drop rows from the END of ordered list until rendered body fits max_length. (R2.13, R7.4)
 
         Returns (kept_rows, omitted_count).  The caller prepends the truncation
@@ -222,7 +223,7 @@ class CommentFormatter:
 
     def _render_body(
         self,
-        rows: List[Finding],
+        rows: list[Finding],
         ctx: CommentContext,
         omitted: int,
     ) -> str:
@@ -234,7 +235,7 @@ class CommentFormatter:
         badge_emoji = _STATUS_EMOJI[badge]
         breakdown = self._severity_breakdown(rows)
 
-        lines: List[str] = [MARKER, ""]
+        lines: list[str] = [MARKER, ""]
         lines.append("## 🛡️ TMAC Threat Model Analysis")
         lines.append("")
         lines.append(f"**Status:** {badge_emoji} {badge}")
@@ -273,9 +274,7 @@ class CommentFormatter:
                 resource = f"`{finding.resource_type}.{finding.resource_name}`"
                 rule = f"`{finding.rule_id}`"
                 action = self._action_label(finding)
-                lines.append(
-                    f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |"
-                )
+                lines.append(f"| {sev_emoji} {finding.severity} | {resource} | {rule} | {action} |")
 
         lines.append("")
         lines.append(f"📎 Full report: {ctx.artifact_ref}")

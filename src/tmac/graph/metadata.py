@@ -13,10 +13,9 @@ attributes relevant to security per resource type and detecting absences.
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -26,9 +25,14 @@ from tmac.models.resource import ResourceModel
 logger = logging.getLogger(__name__)
 
 # Defaults used if the external YAML is unavailable or invalid.
-_DEFAULT_SECURITY_ATTRS: Dict[str, List[str]] = {
+_DEFAULT_SECURITY_ATTRS: dict[str, list[str]] = {
     "aws_s3_bucket": ["acl", "versioning", "server_side_encryption_configuration"],
-    "aws_db_instance": ["storage_encrypted", "publicly_accessible", "kms_key_id", "iam_database_authentication_enabled"],
+    "aws_db_instance": [
+        "storage_encrypted",
+        "publicly_accessible",
+        "kms_key_id",
+        "iam_database_authentication_enabled",
+    ],
     "aws_instance": ["associate_public_ip_address", "metadata_options", "ebs_optimized"],
     "aws_security_group": ["ingress", "egress"],
     "aws_vpc": ["cidr_block", "enable_dns_support"],
@@ -39,7 +43,7 @@ _DEFAULT_SECURITY_ATTRS: Dict[str, List[str]] = {
     "aws_sns_topic": ["kms_master_key_id"],
 }
 
-_DEFAULT_SATELLITES: Dict[str, str] = {
+_DEFAULT_SATELLITES: dict[str, str] = {
     "aws_flow_log": "VPC Flow Logs",
     "aws_s3_bucket_server_side_encryption_configuration": "S3 Encryption",
     "aws_s3_bucket_logging": "S3 Access Logging",
@@ -52,7 +56,7 @@ _DEFAULT_SATELLITES: Dict[str, str] = {
 _SECURITY_ATTRS_YAML = Path(__file__).parent.parent / "rules" / "aws" / "security_attrs.yaml"
 
 
-def _load_security_config() -> tuple[Dict[str, List[str]], Dict[str, str]]:
+def _load_security_config() -> tuple[dict[str, list[str]], dict[str, str]]:
     """Load security_attrs and satellites from the external YAML, with fallback."""
     try:
         with open(_SECURITY_ATTRS_YAML, "r", encoding="utf-8") as f:
@@ -91,11 +95,11 @@ class ResourceMetadata:
     name: str
     source_file: str
     line_number: int
-    config: Dict[str, Any] = field(default_factory=dict)
-    connections: Dict[str, Any] = field(default_factory=dict)
-    blocks: Dict[str, Any] = field(default_factory=dict)
-    security_attrs: Dict[str, Any] = field(default_factory=dict)
-    enrichments: List[str] = field(default_factory=list)
+    config: dict[str, Any] = field(default_factory=dict)
+    connections: dict[str, Any] = field(default_factory=dict)
+    blocks: dict[str, Any] = field(default_factory=dict)
+    security_attrs: dict[str, Any] = field(default_factory=dict)
+    enrichments: list[str] = field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -105,9 +109,9 @@ class ResourceMetadata:
 class MetadataExtractor:
     """Extracts ResourceMetadata from a list of ResourceModel."""
 
-    def extract(self, resources: List[ResourceModel]) -> List[ResourceMetadata]:
+    def extract(self, resources: list[ResourceModel]) -> list[ResourceMetadata]:
         # Maps satellite resources to the target resources they enrich.
-        enrichment_map: Dict[str, List[str]] = {}
+        enrichment_map: dict[str, list[str]] = {}
         for res in resources:
             label = SATELLITE_RESOURCES.get(res.resource_type)
             if not label:
@@ -115,11 +119,11 @@ class MetadataExtractor:
             for target_id in self._referenced_ids(res.attributes):
                 enrichment_map.setdefault(target_id, []).append(label)
 
-        metadata: List[ResourceMetadata] = []
+        metadata: list[ResourceMetadata] = []
         for res in resources:
-            config: Dict[str, Any] = {}
-            connections: Dict[str, Any] = {}
-            blocks: Dict[str, Any] = {}
+            config: dict[str, Any] = {}
+            connections: dict[str, Any] = {}
+            blocks: dict[str, Any] = {}
 
             for attr, value in res.attributes.items():
                 if attr == "__is_block__":
@@ -132,9 +136,7 @@ class MetadataExtractor:
                     config[attr] = value
 
             sec_keys = SECURITY_ATTRS.get(res.resource_type, [])
-            security_attrs = {
-                k: res.attributes.get(k, "<not defined>") for k in sec_keys
-            }
+            security_attrs = {k: res.attributes.get(k, "<not defined>") for k in sec_keys}
 
             metadata.append(
                 ResourceMetadata(
@@ -159,12 +161,12 @@ class MetadataExtractor:
             return any(isinstance(v, dict) for v in value)
         return False
 
-    def _referenced_ids(self, attributes: Dict[str, Any]) -> List[str]:
-        ids: List[str] = []
+    def _referenced_ids(self, attributes: dict[str, Any]) -> list[str]:
+        ids: list[str] = []
         self._collect(attributes, ids)
         return ids
 
-    def _collect(self, value: Any, acc: List[str]) -> None:
+    def _collect(self, value: Any, acc: list[str]) -> None:
         if isinstance(value, str):
             for m in _REFERENCE_RE.finditer(value):
                 if m.group(1) not in _NON_RESOURCE_PREFIXES:
@@ -187,15 +189,14 @@ def _fmt_value(value: Any) -> str:
     return text if len(text) <= 120 else text[:117] + "..."
 
 
-def render_metadata_markdown(metadata: List[ResourceMetadata]) -> str:
+def render_metadata_markdown(metadata: list[ResourceMetadata]) -> str:
     """Render the metadata as a readable Markdown document."""
-    lines: List[str] = [
+    lines: list[str] = [
         "# TMAC — Resource Configuration Metadata",
         "",
         f"Total resources analyzed: **{len(metadata)}**",
         "",
-        "This document details the configuration of each resource to support "
-        "threat modeling.",
+        "This document details the configuration of each resource to support " "threat modeling.",
         "",
     ]
 
@@ -244,7 +245,7 @@ def render_metadata_markdown(metadata: List[ResourceMetadata]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_metadata_json(metadata: List[ResourceMetadata]) -> str:
+def render_metadata_json(metadata: list[ResourceMetadata]) -> str:
     """Render the metadata as JSON (consumable by agents/threat modelers)."""
     payload = {
         "tool": "TMAC",
@@ -269,7 +270,7 @@ def render_metadata_json(metadata: List[ResourceMetadata]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
-def render_metadata(metadata: List[ResourceMetadata], fmt: str = "md") -> str:
+def render_metadata(metadata: list[ResourceMetadata], fmt: str = "md") -> str:
     fmt = fmt.lower()
     if fmt in ("md", "markdown"):
         return render_metadata_markdown(metadata)

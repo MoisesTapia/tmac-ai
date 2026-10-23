@@ -72,8 +72,12 @@ def changed_tf_files(
     # --- Step 2: compute the diff ---
     result = subprocess.run(
         [
-            "git", "-C", repo_path,
-            "diff", "--name-status", "--diff-filter=AMR",
+            "git",
+            "-C",
+            repo_path,
+            "diff",
+            "--name-status",
+            "--diff-filter=AMR",
             f"{base_ref}...{head_ref}",
         ],
         capture_output=True,
@@ -113,6 +117,7 @@ def changed_tf_files(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _validate_ref(ref_label: str, ref_value: str, repo_path: str) -> None:
     """Run ``git rev-parse --verify`` for *ref_value*; raise GitRefError if it fails."""

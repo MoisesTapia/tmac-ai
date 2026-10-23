@@ -5,14 +5,15 @@ Covers exit codes, report formats, flags, and Property 11 (exit code mapping).
 
 **Validates: Requirements 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.1, 5.3, 5.5**
 """
+
 import json
 import re
 import tempfile
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tmac.cli import cli
 
@@ -37,6 +38,7 @@ def _invoke_plan(plan_file: str, extra_args: list = None, output: str = None) ->
 # 13.1 Exit code tests
 # Requirements: 4.4, 4.5, 4.6, 4.7
 # ---------------------------------------------------------------------------
+
 
 class TestExitCodes:
     def test_exit_code_0_clean_plan(self, tmp_path):
@@ -88,9 +90,10 @@ class TestExitCodes:
             output=str(tmp_path / "report.html"),
         )
         # Exit 2 requires High findings but no Critical ones
-        assert result.exit_code in (0, 2), (
-            f"Expected 0 or 2 for High-only plan, got {result.exit_code}. Output: {result.output}"
-        )
+        assert result.exit_code in (
+            0,
+            2,
+        ), f"Expected 0 or 2 for High-only plan, got {result.exit_code}. Output: {result.output}"
 
     def test_exit_code_3_invalid_file(self, tmp_path):
         """tmac plan with a non-existent file → exit code 3."""
@@ -118,6 +121,7 @@ class TestExitCodes:
 # Requirements: 4.2, 4.3, 5.1, 5.3, 5.5
 # ---------------------------------------------------------------------------
 
+
 class TestReportFormats:
     def test_markdown_report_generated(self, tmp_path):
         """tmac plan --report md generates a file with delta table and executive summary."""
@@ -132,13 +136,13 @@ class TestReportFormats:
         assert out_file.exists(), f"Report not created. Output: {result.output}"
         content = out_file.read_text(encoding="utf-8")
         # Executive summary line
-        assert "introduces" in content.lower() or "resolves" in content.lower(), (
-            f"Executive summary missing from Markdown report. Content:\n{content[:500]}"
-        )
+        assert (
+            "introduces" in content.lower() or "resolves" in content.lower()
+        ), f"Executive summary missing from Markdown report. Content:\n{content[:500]}"
         # Delta table columns
-        assert "Action" in content or "Resource" in content, (
-            f"Delta table missing from Markdown report. Content:\n{content[:500]}"
-        )
+        assert (
+            "Action" in content or "Resource" in content
+        ), f"Delta table missing from Markdown report. Content:\n{content[:500]}"
 
     def test_html_report_generated(self, tmp_path):
         """tmac plan --report html generates a file with delta-summary section."""
@@ -152,9 +156,9 @@ class TestReportFormats:
         )
         assert out_file.exists(), f"Report not created. Output: {result.output}"
         content = out_file.read_text(encoding="utf-8")
-        assert "delta-summary" in content, (
-            f"'delta-summary' section missing from HTML report. Content:\n{content[:500]}"
-        )
+        assert (
+            "delta-summary" in content
+        ), f"'delta-summary' section missing from HTML report. Content:\n{content[:500]}"
 
     def test_json_report_sarif_fields(self, tmp_path):
         """tmac plan --report json generates SARIF with properties.changeAction."""
@@ -172,12 +176,12 @@ class TestReportFormats:
         results = data["runs"][0]["results"]
         assert len(results) > 0, "No SARIF results found"
         for sarif_result in results:
-            assert "properties" in sarif_result, (
-                f"'properties' missing from SARIF result: {sarif_result}"
-            )
-            assert "changeAction" in sarif_result["properties"], (
-                f"'changeAction' missing from SARIF properties: {sarif_result['properties']}"
-            )
+            assert (
+                "properties" in sarif_result
+            ), f"'properties' missing from SARIF result: {sarif_result}"
+            assert (
+                "changeAction" in sarif_result["properties"]
+            ), f"'changeAction' missing from SARIF properties: {sarif_result['properties']}"
 
     def test_quiet_flag_suppresses_stdout(self, tmp_path):
         """tmac plan --quiet produces empty stdout while still generating the report."""
@@ -189,9 +193,9 @@ class TestReportFormats:
             ["plan", "--plan-file", plan_file, "--quiet", "--output", str(out_file)],
             catch_exceptions=False,
         )
-        assert result.output.strip() == "", (
-            f"Expected empty stdout with --quiet, got: {result.output!r}"
-        )
+        assert (
+            result.output.strip() == ""
+        ), f"Expected empty stdout with --quiet, got: {result.output!r}"
         assert out_file.exists(), "Report file should still be generated with --quiet"
 
 
@@ -199,6 +203,7 @@ class TestReportFormats:
 # 13.3 Additional flag tests
 # Requirements: 4.2, 4.8
 # ---------------------------------------------------------------------------
+
 
 class TestAdditionalFlags:
     def test_verbose_flag_emits_debug_messages(self, tmp_path):
@@ -224,18 +229,18 @@ class TestAdditionalFlags:
             ["plan", "--plan-file", plan_file, "--no-color", "--output", str(out_file)],
             catch_exceptions=False,
         )
-        assert not ANSI_PATTERN.search(result.output), (
-            f"ANSI sequences found in output with --no-color: {result.output!r}"
-        )
+        assert not ANSI_PATTERN.search(
+            result.output
+        ), f"ANSI sequences found in output with --no-color: {result.output!r}"
 
     def test_plan_help_shows_plan_file_flag(self):
         """tmac plan --help output contains --plan-file."""
         runner = CliRunner()
         result = runner.invoke(cli, ["plan", "--help"], catch_exceptions=False)
         assert result.exit_code == 0
-        assert "--plan-file" in result.output, (
-            f"--plan-file not found in help output: {result.output}"
-        )
+        assert (
+            "--plan-file" in result.output
+        ), f"--plan-file not found in help output: {result.output}"
 
     def test_scan_command_unaffected(self, tmp_path):
         """tmac scan still works correctly after adding v1.1.0 modules (no regression)."""
@@ -251,14 +256,14 @@ class TestAdditionalFlags:
             ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")],
             catch_exceptions=False,
         )
-        assert result.exit_code == 0, (
-            f"tmac scan regression: expected exit 0, got {result.exit_code}. Output: {result.output}"
-        )
+        assert (
+            result.exit_code == 0
+        ), f"tmac scan regression: expected exit 0, got {result.exit_code}. Output: {result.output}"
         # Verify --plan-file is NOT in scan help
         help_result = runner.invoke(cli, ["scan", "--help"], catch_exceptions=False)
-        assert "--plan-file" not in help_result.output, (
-            "tmac scan --help should not contain --plan-file"
-        )
+        assert (
+            "--plan-file" not in help_result.output
+        ), "tmac scan --help should not contain --plan-file"
 
     def test_scan_command_unaffected_by_v110_modules(self, tmp_path):
         """
@@ -417,6 +422,7 @@ class TestAdditionalFlags:
 
         # Re-run via Scanner directly to inspect findings without CLI output parsing
         from tmac.scanner import Scanner
+
         scan_result = Scanner().run_scan(directory="tests/fixtures")
         actual_pairs = {(f.rule_id, f.resource_name) for f in scan_result.findings}
         actual_total = len(scan_result.findings)
@@ -435,9 +441,9 @@ class TestAdditionalFlags:
 
         # Verify --plan-file is NOT exposed in tmac scan --help
         help_result = runner.invoke(cli, ["scan", "--help"], catch_exceptions=False)
-        assert "--plan-file" not in help_result.output, (
-            "tmac scan --help must not contain --plan-file (v1.1.0 regression)"
-        )
+        assert (
+            "--plan-file" not in help_result.output
+        ), "tmac scan --help must not contain --plan-file (v1.1.0 regression)"
 
 
 # ---------------------------------------------------------------------------
@@ -447,6 +453,7 @@ class TestAdditionalFlags:
 # ---------------------------------------------------------------------------
 
 SEVERITY_LEVELS = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+
 
 # Minimal tfplan.json template for property tests
 def _make_plan(acl: str) -> dict:
@@ -489,8 +496,7 @@ def test_property_11_exit_code_0_clean_plan(threshold):
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["plan", "--plan-file", plan_file, "--fail-on", threshold,
-             "--output", str(out_file)],
+            ["plan", "--plan-file", plan_file, "--fail-on", threshold, "--output", str(out_file)],
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
@@ -518,8 +524,15 @@ def test_property_11_exit_code_critical_finding(threshold):
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["plan", "--plan-file", str(plan_file), "--fail-on", threshold,
-             "--output", str(out_file)],
+            [
+                "plan",
+                "--plan-file",
+                str(plan_file),
+                "--fail-on",
+                threshold,
+                "--output",
+                str(out_file),
+            ],
             catch_exceptions=False,
         )
         threshold_val = SEVERITY_LEVELS[threshold]
@@ -542,9 +555,14 @@ def test_property_11_exit_code_3_nonexistent_file():
     with tempfile.TemporaryDirectory() as tmp_dir:
         result = runner.invoke(
             cli,
-            ["plan", "--plan-file", "/absolutely/nonexistent/plan.json",
-             "--output", str(Path(tmp_dir) / "report.html")],
+            [
+                "plan",
+                "--plan-file",
+                "/absolutely/nonexistent/plan.json",
+                "--output",
+                str(Path(tmp_dir) / "report.html"),
+            ],
         )
-        assert result.exit_code == 3, (
-            f"Expected exit 3 for nonexistent file, got {result.exit_code}. Output: {result.output}"
-        )
+        assert (
+            result.exit_code == 3
+        ), f"Expected exit 3 for nonexistent file, got {result.exit_code}. Output: {result.output}"

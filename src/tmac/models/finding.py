@@ -1,8 +1,11 @@
-from typing import List, Literal, Sequence
-from pydantic import BaseModel, Field
+from collections.abc import Sequence
 from datetime import datetime, timezone
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from tmac import __version__
+
 
 class Finding(BaseModel):
     rule_id: str
@@ -16,8 +19,9 @@ class Finding(BaseModel):
     matched_attribute: str
     description: str
     mitigation: str
-    references: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
+    references: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
 
 class ScanMetadata(BaseModel):
     tool_name: str = "TMAC"
@@ -27,6 +31,7 @@ class ScanMetadata(BaseModel):
     )
     scanned_directory: str
     execution_time_seconds: float = 0.0
+
 
 class ScanStatistics(BaseModel):
     total_resources: int = 0
@@ -46,19 +51,22 @@ class ScanStatistics(BaseModel):
                 counts[sev] += 1
         return cls(total_resources=total_resources, total_findings=len(findings), **counts)
 
+
 class ScanIssue(BaseModel):
     """Something that made the scan incomplete: an unparseable IaC file or an invalid rule."""
+
     kind: Literal["parse", "rules"]
     file_path: str
     message: str
 
+
 class ScanResult(BaseModel):
     metadata: ScanMetadata
     statistics: ScanStatistics
-    findings: List[Finding]
+    findings: list[Finding]
     files_scanned: int = 0
     rules_loaded: int = 0
     # Number of IaC files that could not be parsed (== parse issues below).
     files_failed: int = 0
     # Non-empty means the results may be missing findings (the scan is not trustworthy).
-    issues: List[ScanIssue] = Field(default_factory=list)
+    issues: list[ScanIssue] = Field(default_factory=list)

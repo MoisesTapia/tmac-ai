@@ -1,9 +1,11 @@
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 from urllib.parse import urlparse
-from tmac.reporters.base import BaseReporter
-from tmac.models.finding import ScanResult
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from tmac.delta.models import DeltaScanResult
+from tmac.models.finding import ScanResult
+from tmac.reporters.base import BaseReporter
 
 SAFE_URL_SCHEMES = {"http", "https"}
 
