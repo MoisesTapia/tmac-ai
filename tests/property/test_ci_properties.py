@@ -31,6 +31,29 @@ from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistic
 _SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"]
 
 
+def _bash_executable() -> str:
+    """A POSIX bash for running ci/github/entrypoint.sh.
+
+    On Windows a bare "bash" resolves to System32\\bash.exe (WSL), which fails when no
+    distro is installed (e.g. GitHub's Windows runners); use the Git Bash shipped with git.
+    """
+    import shutil
+    import sys
+    from pathlib import Path
+
+    import pytest
+
+    if sys.platform != "win32":
+        return "bash"
+    git = shutil.which("git")
+    if git:
+        for parent in Path(git).resolve().parents:
+            candidate = parent / "bin" / "bash.exe"
+            if candidate.exists():
+                return str(candidate)
+    pytest.skip("Git Bash not found; entrypoint.sh tests need a POSIX bash")
+
+
 def _make_scan_result(findings: list[Finding]) -> ScanResult:
     return ScanResult(
         metadata=ScanMetadata(scanned_directory="test"),
@@ -797,7 +820,7 @@ def _run_entrypoint(env_overrides: dict) -> _subprocess.CompletedProcess[str]:
     base_env.update(env_overrides)
 
     return _subprocess.run(
-        ["bash", _ENTRYPOINT_PATH],
+        [_bash_executable(), _ENTRYPOINT_PATH],
         env=base_env,
         capture_output=True,
         text=True,
@@ -1157,7 +1180,7 @@ def test_property_18c_entrypoint_propagates_exit_code_unchanged(exit_code, fail_
         env.pop("GITHUB_WORKSPACE", None)
 
         proc = subprocess.run(
-            ["bash", str(_ENTRYPOINT_SH)],
+            [_bash_executable(), str(_ENTRYPOINT_SH)],
             env=env,
             capture_output=True,
             timeout=15,

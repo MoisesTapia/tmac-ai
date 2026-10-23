@@ -27,7 +27,8 @@ jobs:
   test:
     name: Tests (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # The suite takes ~15-19 min on hosted runners (Hypothesis-heavy); keep headroom.
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
