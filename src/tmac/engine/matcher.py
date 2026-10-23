@@ -1,11 +1,16 @@
 from typing import Dict, List, Optional
-from tmac.models.resource import ResourceModel
+from tmac.models.resource import IgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
 from tmac.models.finding import Finding
 from tmac.engine.evaluator import Evaluator
 
-# IgnoreMap: resource_name → ["*"] (global) or ["RULE-ID-1", ...] (per-rule)
-IgnoreMap = Dict[str, List[str]]
+
+def group_rules_by_type(rules: List[ThreatRule]) -> Dict[str, List[ThreatRule]]:
+    """Index rules by resource_type so each resource only sees applicable rules."""
+    rules_by_type: Dict[str, List[ThreatRule]] = {}
+    for rule in rules:
+        rules_by_type.setdefault(rule.resource_type, []).append(rule)
+    return rules_by_type
 
 
 class Matcher:
@@ -22,13 +27,7 @@ class Matcher:
     ) -> List[Finding]:
         findings: List[Finding] = []
         ignore_map = ignore_map or {}
-
-        # Group rules by resource type for optimization
-        rules_by_type: dict[str, List[ThreatRule]] = {}
-        for rule in rules:
-            if rule.resource_type not in rules_by_type:
-                rules_by_type[rule.resource_type] = []
-            rules_by_type[rule.resource_type].append(rule)
+        rules_by_type = group_rules_by_type(rules)
 
         for resource in resources:
             # Suppressions bound to the resource itself, plus any caller-supplied

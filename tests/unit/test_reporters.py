@@ -945,3 +945,23 @@ class TestHTMLReporterEscaping:
         html = HTMLReporter().generate(_make_scan_result(findings=[finding]))
         assert f'href="{url}"' in html
         assert 'rel="noopener noreferrer"' in html
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers: get_reporter / ScanStatistics.from_findings
+# ---------------------------------------------------------------------------
+
+from tmac.reporters import get_reporter  # noqa: E402
+from tmac.reporters.json_report import JSONReporter  # noqa: E402
+
+
+@pytest.mark.parametrize("fmt, cls", [("html", HTMLReporter), ("md", MarkdownReporter), ("json", JSONReporter)])
+def test_get_reporter_returns_matching_reporter(fmt, cls):
+    assert isinstance(get_reporter(fmt), cls)
+
+
+def test_scan_statistics_from_findings_counts_by_severity():
+    findings = [_make_finding(severity=s) for s in ["Critical", "High", "High", "Medium", "Low", "Info"]]
+    stats = ScanStatistics.from_findings(findings, total_resources=4)
+    assert (stats.total_resources, stats.total_findings) == (4, 6)
+    assert (stats.critical, stats.high, stats.medium, stats.low, stats.info) == (1, 2, 1, 1, 1)
