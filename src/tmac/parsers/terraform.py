@@ -23,9 +23,15 @@ def merge_ignores(existing: list[str], new: list[str]) -> list[str]:
 
 
 class TerraformParser(BaseParser):
-    """Parser for Terraform HCL format (.tf files)."""
+    """Parser for Terraform / OpenTofu HCL (.tf and .tofu files)."""
 
-    file_patterns = ("*.tf",)
+    file_patterns = ("*.tf", "*.tofu")
+
+    def can_parse(self, file_path: str) -> bool:
+        # OpenTofu loads x.tofu instead of x.tf when both exist; mirror that so the
+        # overridden .tf file is not reported.
+        path = Path(file_path)
+        return not (path.suffix == ".tf" and path.with_suffix(".tofu").exists())
 
     def parse(self, file_path: str) -> list[ResourceModel]:
         """Lenient parse: logs a warning and returns [] if the file cannot be parsed."""
@@ -74,13 +80,16 @@ class TerraformParser(BaseParser):
             return {}
 
     def collect_resource_ignores(self, directory: str) -> ResourceIgnoreMap:
-        """Merge tmac:ignore suppressions from every .tf file under ``directory``.
+        """Merge tmac:ignore suppressions from every .tf/.tofu file under ``directory``.
 
         Used by ``tmac plan --source-dir``: plan JSON carries no comments, so
         suppressions are matched to planned changes by (resource_type, resource_name).
         """
         merged: ResourceIgnoreMap = {}
-        for tf_file in sorted(Path(directory).rglob("*.tf")):
+        sources = sorted(f for p in self.file_patterns for f in Path(directory).rglob(p))
+        for tf_file in sources:
+            if not self.can_parse(str(tf_file)):
+                continue
             for key, rule_ids in self.get_resource_ignores(str(tf_file)).items():
                 merged[key] = merge_ignores(merged.get(key, []), rule_ids)
         return merged

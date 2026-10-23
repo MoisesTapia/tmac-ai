@@ -1,0 +1,12 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Key:
+    Type: AWS::KMS::Key
+    Properties:
+      Enabled: false
+      KeyPolicy:
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: "*"}
+            Action: "kms:*"
+            Resource: "*"

@@ -1,0 +1,23 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.3",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.data",
+      "type": "aws_s3_bucket",
+      "name": "data",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "before": null,
+        "after": {
+          "acl": "public-read",
+          "bucket": "my-data-bucket",
+          "tags": {}
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import fnmatch
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,17 @@ from tmac.parsers.base import BaseParser, ParseError
 from tmac.parsers.terraform import TerraformParser
 
 logger = logging.getLogger(__name__)
+
+# Never descended into: VCS metadata, downloaded dependencies/modules and tool caches.
+# (.terraform holds third-party module copies; scanning them reports findings the
+# project doesn't own.)
+DEFAULT_EXCLUDED_DIRS = frozenset(
+    {
+        ".git", ".hg", ".svn", ".terraform", ".terragrunt-cache", "node_modules",
+        ".venv", "venv", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache",
+        ".ruff_cache", ".aws-sam",
+    }
+)  # fmt: skip
 
 
 class ScanError(Exception):
@@ -106,14 +118,21 @@ class Scanner:
         )
 
     def _discover_files(self, scan_path: Path, excludes: list[str]) -> list[Path]:
-        """Files matching the parser's patterns, minus excludes, deduplicated and sorted."""
-        found = {
-            f
-            for pattern in self.parser.file_patterns
-            for f in scan_path.rglob(pattern)
-            if f.is_file() and not _is_excluded(f, excludes)
-        }
-        return sorted(f for f in found if self.parser.can_parse(str(f)))
+        """Files matching the parser's patterns, minus excludes, sorted.
+
+        Directories in DEFAULT_EXCLUDED_DIRS are pruned while walking, so vendored
+        trees (node_modules, .terraform, virtualenvs) are never read.
+        """
+        found: list[Path] = []
+        for root, dirs, files in os.walk(scan_path):
+            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
+            for name in files:
+                if not any(fnmatch.fnmatch(name, p) for p in self.parser.file_patterns):
+                    continue
+                path = Path(root) / name
+                if not _is_excluded(path, excludes) and self.parser.can_parse(str(path)):
+                    found.append(path)
+        return sorted(found)
 
 
 def _is_excluded(file_path: Path, patterns: list[str]) -> bool:

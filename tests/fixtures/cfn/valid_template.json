@@ -1,0 +1,23 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Template con varios recursos (equivalente a valid_multi_resource.yaml)",
+  "Resources": {
+    "Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "PublicRead",
+        "Tags": [{"Key": "env", "Value": "prod"}]
+      }
+    },
+    "Queue": {"Type": "AWS::SQS::Queue"},
+    "Sg": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "web",
+        "SecurityGroupIngress": [
+          {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "CidrIp": "10.0.0.0/8"}
+        ]
+      }
+    }
+  }
+}
