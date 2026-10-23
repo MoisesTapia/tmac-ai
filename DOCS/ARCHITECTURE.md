@@ -4,17 +4,26 @@
 
 ```
 src/tmac/
-├── cli.py          # CLI interface (Click) — scan, plan, and diagram subcommands
-├── scanner.py      # Scan pipeline orchestrator (tmac scan)
+├── cli.py          # CLI interface (Click) — scan, cfn, plan, ci, and diagram subcommands
+├── scanner.py      # Format-agnostic scan pipeline: Scanner(parser=...) + discover_files()
 ├── config.py       # Loading and validation of .tmac.yaml
 ├── models/         # Pydantic models (Finding, ScanResult, ResourceModel)
-├── parsers/        # TerraformParser (.tf) and TfplanParser (tfplan.json)
+├── parsers/        # TerraformParser (.tf/.tofu), CloudFormationParser, TfplanParser
 ├── delta/          # DeltaScanner, DeltaFinding, DeltaScanResult, PlannedChange
 ├── engine/         # RuleLoader, Matcher, Evaluator
 ├── graph/          # GraphBuilder, filters, grouping, metadata, and diagram renderers
 ├── reporters/      # HTMLReporter, MarkdownReporter, JSONReporter (SARIF)
+├── rules/          # aws/threats*.yaml (Terraform) and cfn/threats.yaml (CloudFormation)
 └── templates/      # Jinja2 templates for HTML and Markdown (scan + delta)
 ```
+
+### Adding an IaC format
+
+`Scanner` does not know about formats: it walks the directory and delegates to a `BaseParser`
+subclass, which declares `file_patterns`, can reject files with `can_parse()`, and implements
+`parse_strict()` (raising `ParseError`, so the scan is reported as incomplete instead of silently
+treating the file as empty). Inline suppressions travel on `ResourceModel.ignored_rules`. A new
+format is a parser plus a rules file; the rule engine and reporters are reused unchanged.
 
 ## Full-state analysis vs. risk delta
 

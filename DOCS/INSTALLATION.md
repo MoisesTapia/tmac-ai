@@ -7,12 +7,15 @@
 
 ---
 
-## Option 1 — PyPI (recommended)
+## Option 1 — From the repository (recommended)
 
 ```bash
-pip install tmac
+pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"   # pin a tag or commit SHA instead of main
 tmac --version
 ```
+
+> **Note:** the PyPI package named `tmac` is an **unrelated project** — do not
+> `pip install tmac`. Install TMAC from this repository (pin a tag or commit SHA in CI).
 
 ## Option 2 — Poetry (development)
 
@@ -31,28 +34,27 @@ cd tmac-ai
 
 python -m venv venv
 source venv/bin/activate        # Windows: .\venv\Scripts\Activate.ps1
-pip install -e .
+pip install --require-hashes -r requirements.txt   # exact, hash-verified dependencies
+pip install --no-deps -e .
 tmac --version
 ```
 
 ## Option 4 — Docker
 
+Build the image from the repository Dockerfile (dependencies are installed from the
+hash-locked `requirements.txt`):
+
 ```bash
+docker build -t tmac .
+
 # Scan a locally mounted directory
 docker run --rm \
   -v $(pwd)/infra:/scan:ro \
   -v $(pwd)/output:/out \
-  tmac-security/tmac:latest scan --dir /scan --output /out/report.html
+  tmac scan --dir /scan --output /out/report.html
 
 # Show help
-docker run --rm tmac-security/tmac:latest --help
-```
-
-To build the image locally from the repository Dockerfile:
-
-```bash
-docker build -t tmac .
-docker run --rm -v $(pwd)/infra:/scan tmac scan --dir /scan
+docker run --rm tmac --help
 ```
 
 ## Option 5 — pre-commit hook
@@ -96,5 +98,5 @@ choco install graphviz
 
 ```bash
 tmac --version   # should print: TMAC, version 1.6.0
-tmac --help      # lists subcommands: scan, plan, ci, diagram
+tmac --help      # lists subcommands: scan, cfn, plan, ci, diagram
 ```
