@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore
 
 from tmac.graph.builder import _NON_RESOURCE_PREFIXES, _REFERENCE_RE
 from tmac.models.resource import ResourceModel
@@ -64,7 +64,8 @@ def _load_security_config() -> tuple[dict[str, list[str]], dict[str, str]]:
         sec = data.get("security_attrs") or {}
         sat = data.get("satellites") or {}
         if not isinstance(sec, dict) or not isinstance(sat, dict):
-            raise ValueError("invalid format in security_attrs.yaml")
+            # ValueError on purpose: caught below to fall back to the defaults.
+            raise ValueError("invalid format in security_attrs.yaml")  # noqa: TRY004
         return sec, sat
     except (OSError, ValueError, yaml.YAMLError) as exc:
         logger.warning("Could not load %s (%s); using defaults.", _SECURITY_ATTRS_YAML, exc)
@@ -196,7 +197,7 @@ def render_metadata_markdown(metadata: list[ResourceMetadata]) -> str:
         "",
         f"Total resources analyzed: **{len(metadata)}**",
         "",
-        "This document details the configuration of each resource to support " "threat modeling.",
+        "This document details the configuration of each resource to support threat modeling.",
         "",
     ]
 

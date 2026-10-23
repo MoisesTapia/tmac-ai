@@ -123,6 +123,7 @@ def _validate_ref(ref_label: str, ref_value: str, repo_path: str) -> None:
     """Run ``git rev-parse --verify`` for *ref_value*; raise GitRefError if it fails."""
     proc = subprocess.run(
         ["git", "-C", repo_path, "rev-parse", "--verify", ref_value],
+        check=False,  # the return code is inspected below
         capture_output=True,
         text=True,
     )

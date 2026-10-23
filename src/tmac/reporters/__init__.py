@@ -1,7 +1,6 @@
 """Reporters module for TMAC."""
 
 from collections.abc import Callable
-from typing import Dict
 
 from tmac.reporters.base import BaseReporter
 from tmac.reporters.html import HTMLReporter

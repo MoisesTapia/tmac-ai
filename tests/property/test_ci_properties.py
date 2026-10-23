@@ -520,6 +520,10 @@ def test_find_or_update_leaves_other_comments_unchanged(comments, ctx):
                     f"/comments/{other_id}"
                 ), f"PATCH incorrectly targeted non-most-recent comment id {other_id} at {url!r}"
 
+        assert any(
+            url.endswith(f"/comments/{most_recent_id}") for url in patched_urls
+        ), f"The most recent marked comment ({most_recent_id}) was not updated: {patched_urls!r}"
+
 
 # ===========================================================================
 # Property 5: Unresolved or missing refs are rejected with exit 3 (CLI level)
@@ -898,7 +902,7 @@ def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
     #   0 → no findings (or only info)
     #   1 → at least one Critical finding
     #   2 → at least one High finding (no Critical)
-    from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
+    from tmac.models.finding import Finding
 
     if expected_exit == 0:
         findings = []
@@ -935,41 +939,53 @@ def test_property_18a_publish_error_does_not_change_exit_code(expected_exit):
             )
         ]
 
-    mock_scan_result = ScanResult(
-        metadata=ScanMetadata(scanned_directory="test"),
-        statistics=ScanStatistics(total_findings=len(findings)),
-        findings=findings,
-    )
+    import tempfile
+    from unittest.mock import MagicMock, patch
 
-    ci_ctx = CIContext(
-        platform="github",
-        repo="owner/repo",
-        pr_number="42",
-        base_ref="main",
-        head_ref="feature-branch",
-        api_base="https://api.github.com",
-        artifact_path="tmac-report.md",
-    )
+    from tmac.ci.publisher import PublishPermissionError
+    from tmac.models.finding import ScanMetadata, ScanResult, ScanStatistics
 
-    runner = CIRunner()
-
-    with (patch("tmac.ci.runner.CIRunner.run") as mock_run,):
-        # Configure mock to return the expected exit code directly — we simulate
-        # that the underlying scan produced findings corresponding to expected_exit
-        mock_run.return_value = expected_exit
-        result = runner.run(
-            directory="/tmp",
-            plan_file=None,
-            fail_on="high",
-            report_fmt="md",
-            output=None,
-            delta_only=False,
-            comment=True,
-            exclude=[],
-            ctx=ci_ctx,
+    # Run the real CIRunner (only the scan and the publisher are faked) and make the
+    # publish fail with a permission error (HTTP 403), the other error branch next to
+    # the generic PublishError covered by Property 18b.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        report = str(Path(tmpdir) / "tmac-report.md")
+        ci_ctx = CIContext(
+            platform="github",
+            repo="owner/repo",
+            pr_number="42",
+            base_ref="main",
+            head_ref="feature-branch",
+            api_base="https://api.github.com",
+            artifact_path=report,
         )
+        mock_publisher = MagicMock()
+        mock_publisher.publish.side_effect = PublishPermissionError("Simulated 403")
+
+        with (
+            patch("tmac.ci.runner.CIRunner._build_publisher", return_value=mock_publisher),
+            patch("tmac.ci.secrets.read_token", return_value="fake-token"),
+            patch("tmac.scanner.Scanner") as mock_scanner_cls,
+        ):
+            mock_scanner_cls.return_value.run_scan.return_value = ScanResult(
+                metadata=ScanMetadata(scanned_directory=tmpdir),
+                statistics=ScanStatistics(total_findings=len(findings)),
+                findings=findings,
+            )
+            result = CIRunner().run(
+                directory=tmpdir,
+                plan_file=None,
+                fail_on="high",
+                report_fmt="md",
+                output=report,
+                delta_only=False,
+                comment=True,
+                exclude=[],
+                ctx=ci_ctx,
+            )
 
     assert result == expected_exit, f"Expected exit code {expected_exit}, got {result}"
+    mock_publisher.publish.assert_called_once()
 
 
 @settings(max_examples=100)

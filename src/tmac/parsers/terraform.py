@@ -69,7 +69,7 @@ class TerraformParser(BaseParser):
                 content = f.read()
             _, ignores = self._prescan_resources(content)
             return ignores
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Failed to read ignore map from %s: %s", file_path, e)
             return {}
 
@@ -92,7 +92,7 @@ class TerraformParser(BaseParser):
                 content = f.read()
             _, ignore_map = self._prescan(content)
             return ignore_map
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Failed to read ignore map from %s: %s", file_path, e)
             return {}
 

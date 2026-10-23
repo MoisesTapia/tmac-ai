@@ -10,9 +10,8 @@ import html
 import re
 import shutil
 import subprocess
-from typing import Optional
 
-from tmac.graph.builder import ResourceGraph
+from tmac.graph.builder import GraphNode, ResourceGraph
 
 
 def _sanitize_id(node_id: str) -> str:
@@ -28,7 +27,7 @@ def _short_label(node_id: str) -> str:
     return node_id
 
 
-Groups = Optional[dict[str, list[str]]]
+Groups = dict[str, list[str]] | None
 
 
 class MermaidRenderer:
@@ -82,7 +81,7 @@ class DotRenderer:
             '    edge [fontname="Helvetica", fontsize=10, color="#5f6368"];',
         ]
 
-        def node_stmt(node) -> str:
+        def node_stmt(node: GraphNode) -> str:
             return f'{_sanitize_id(node.id)} [label="{node.resource_type}\\n{node.name}"];'
 
         if groups:
@@ -175,7 +174,7 @@ class DrawioRenderer:
         )
 
 
-_RENDERERS = {
+_RENDERERS: dict[str, type[MermaidRenderer | DotRenderer | DrawioRenderer]] = {
     "mermaid": MermaidRenderer,
     "dot": DotRenderer,
     "drawio": DrawioRenderer,

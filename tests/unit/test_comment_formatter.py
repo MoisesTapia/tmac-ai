@@ -28,13 +28,13 @@ def _make_scan_result(findings) -> ScanResult:
 
 
 def _default_ctx(**kwargs) -> CommentContext:
-    defaults = dict(
-        fail_on="high",
-        artifact_ref="https://example.com/report",
-        max_length=65536,
-        introduced=0,
-        resolved=0,
-    )
+    defaults = {
+        "fail_on": "high",
+        "artifact_ref": "https://example.com/report",
+        "max_length": 65536,
+        "introduced": 0,
+        "resolved": 0,
+    }
     defaults.update(kwargs)
     return CommentContext(**defaults)
 
@@ -47,19 +47,19 @@ def _make_finding(
     resource_name: str = "example",
     change_action: ChangeAction | None = None,
 ) -> Finding:
-    base = dict(
-        rule_id=rule_id,
-        rule_name="Test Rule",
-        severity=severity,
-        stride="Tampering",
-        resource_type=resource_type,
-        resource_name=resource_name,
-        file_path=f"{resource_type}.{resource_name}",
-        line_number=1,
-        matched_attribute="acl",
-        description="A test finding.",
-        mitigation="Fix it.",
-    )
+    base = {
+        "rule_id": rule_id,
+        "rule_name": "Test Rule",
+        "severity": severity,
+        "stride": "Tampering",
+        "resource_type": resource_type,
+        "resource_name": resource_name,
+        "file_path": f"{resource_type}.{resource_name}",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "A test finding.",
+        "mitigation": "Fix it.",
+    }
     if change_action is not None:
         return DeltaFinding(
             **base,

@@ -39,7 +39,7 @@ def read_token() -> str | None:
     return None
 
 
-def redact(text: str, *secrets: str) -> str:
+def redact(text: str, *secrets: str | None) -> str:
     """Replace every occurrence of each secret in text with the redaction placeholder.
 
     The placeholder is the fixed string "***REDACTED***", which contains none of

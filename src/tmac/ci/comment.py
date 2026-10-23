@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tmac.cli import SEVERITY_LEVELS
 from tmac.delta.models import ChangeAction, DeltaFinding
+from tmac.engine.severity import SEVERITY_LEVELS
 from tmac.models.finding import Finding, ScanResult
 
 # ---------------------------------------------------------------------------
@@ -154,9 +154,9 @@ class CommentFormatter:
 
         return "WARNING"
 
-    def _severity_breakdown(self, findings: list[Finding]) -> dict:
+    def _severity_breakdown(self, findings: list[Finding]) -> dict[str, int]:
         """Return all five severity levels, zero-filled. (R2.2)"""
-        breakdown: dict = {sev: 0 for sev in _SEVERITY_ORDER}
+        breakdown: dict[str, int] = {sev: 0 for sev in _SEVERITY_ORDER}
         for f in findings:
             key = f.severity.lower()
             if key in breakdown:

@@ -363,11 +363,8 @@ def test_property_5_invalid_json_no_exception(
     p = tmp_path / "bad.json"
     try:
         p.write_text(bad_content, encoding="utf-8", errors="replace")
-    except Exception:
+    except (OSError, UnicodeError):
         return  # skip if we can't even write the file
-    try:
-        result = parser.parse_plan(str(p))
-        # If it parses as valid JSON but lacks resource_changes, result is []
-        assert isinstance(result, list)
-    except Exception as exc:
-        pytest.fail(f"parse_plan raised an unexpected exception: {exc}")
+    result = parser.parse_plan(str(p))
+    # If it parses as valid JSON but lacks resource_changes, result is []
+    assert isinstance(result, list)

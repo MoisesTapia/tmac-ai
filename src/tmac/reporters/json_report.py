@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from tmac.delta.models import DeltaFinding
 from tmac.models.finding import ScanResult
@@ -18,7 +19,7 @@ class JSONReporter(BaseReporter):
 
     def generate(self, result: ScanResult, diagram: str | None = None) -> str:
         # Build unique rules from findings
-        seen_rule_ids: set = set()
+        seen_rule_ids: set[str] = set()
         rules = []
         for finding in result.findings:
             if finding.rule_id not in seen_rule_ids:
@@ -36,7 +37,7 @@ class JSONReporter(BaseReporter):
         results = []
         for finding in result.findings:
             level = SARIF_SEVERITY_MAP.get(finding.severity.lower(), "warning")
-            result_entry: dict = {
+            result_entry: dict[str, Any] = {
                 "ruleId": finding.rule_id,
                 "level": level,
                 "message": {"text": finding.description},

@@ -51,7 +51,7 @@ class DiagramService:
         graph = GraphBuilder().build(all_resources)
         logger.debug("Built graph: %d nodes, %d edges", len(graph.nodes), len(graph.edges))
 
-        types_to_hide: set = set(exclude_types or [])
+        types_to_hide: set[str] = set(exclude_types or [])
         if simplify:
             types_to_hide |= DEFAULT_NOISE_TYPES
         if types_to_hide:

@@ -18,41 +18,41 @@ from tmac.models.resource import ResourceModel
 
 
 def _make_finding(**kwargs) -> Finding:
-    defaults: dict[str, Any] = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="test_bucket",
-        file_path="test.tf",
-        line_number=5,
-        matched_attribute="acl",
-        description="Bucket is public",
-        mitigation="Set acl to private",
-    )
+    defaults: dict[str, Any] = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "test_bucket",
+        "file_path": "test.tf",
+        "line_number": 5,
+        "matched_attribute": "acl",
+        "description": "Bucket is public",
+        "mitigation": "Set acl to private",
+    }
     defaults.update(kwargs)
     return Finding(**defaults)
 
 
 def _make_scan_result(**kwargs) -> ScanResult:
-    defaults: dict[str, Any] = dict(
-        metadata=ScanMetadata(scanned_directory="/tmp/test"),
-        statistics=ScanStatistics(total_resources=1, total_findings=1, critical=1),
-        findings=[_make_finding()],
-    )
+    defaults: dict[str, Any] = {
+        "metadata": ScanMetadata(scanned_directory="/tmp/test"),
+        "statistics": ScanStatistics(total_resources=1, total_findings=1, critical=1),
+        "findings": [_make_finding()],
+    }
     defaults.update(kwargs)
     return ScanResult(**defaults)
 
 
 def _make_resource(**kwargs) -> ResourceModel:
-    defaults: dict[str, Any] = dict(
-        resource_type="aws_s3_bucket",
-        name="test_bucket",
-        attributes={"acl": "public-read"},
-        source_file="test.tf",
-        line_number=5,
-    )
+    defaults: dict[str, Any] = {
+        "resource_type": "aws_s3_bucket",
+        "name": "test_bucket",
+        "attributes": {"acl": "public-read"},
+        "source_file": "test.tf",
+        "line_number": 5,
+    }
     defaults.update(kwargs)
     return ResourceModel(**defaults)
 

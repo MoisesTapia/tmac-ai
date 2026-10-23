@@ -18,7 +18,10 @@ import sys
 # CIContext is defined (and already imported by publisher + tests) in publisher.py.
 # Re-export it here so the design's "place CIContext in runner.py" is honoured while
 # maintaining backward compatibility for existing imports.
-from tmac.ci.publisher import CIContext
+from tmac.ci.publisher import CIContext, CommentPublisher
+from tmac.engine.severity import SEVERITY_LEVELS
+from tmac.models.finding import Finding, ScanResult
+from tmac.reporters.base import BaseReporter
 
 logger = logging.getLogger(__name__)
 
@@ -283,18 +286,12 @@ class CIRunner:
     """
 
     # -----------------------------------------------------------------
-    # Exit-code logic (replicated from cli._exit_with_code to avoid the
-    # circular import cli → runner → cli)
+    # Exit-code logic (same rules as cli._exit_with_code; severity levels come
+    # from tmac.engine.severity, which does not import the CLI)
     # -----------------------------------------------------------------
-    _SEVERITY_LEVELS = {
-        "critical": 4,
-        "high": 3,
-        "medium": 2,
-        "low": 1,
-        "info": 0,
-    }
+    _SEVERITY_LEVELS = SEVERITY_LEVELS
 
-    def _compute_exit_code(self, findings: list, threshold: str) -> int:
+    def _compute_exit_code(self, findings: list[Finding], threshold: str) -> int:
         """Return the findings-based exit code (does NOT call sys.exit)."""
         threshold_val = self._SEVERITY_LEVELS.get(
             threshold.lower(), self._SEVERITY_LEVELS["critical"]
@@ -376,7 +373,7 @@ class CIRunner:
         # ------------------------------------------------------------------
         # Step 1: Determine scan mode and produce result
         # ------------------------------------------------------------------
-        result = None
+        result: ScanResult
         include_paths: list[str] | None = None
 
         if plan_file:
@@ -548,7 +545,7 @@ class CIRunner:
     # -----------------------------------------------------------------
 
     @staticmethod
-    def _build_reporter(fmt: str):
+    def _build_reporter(fmt: str) -> BaseReporter:
         """Return the reporter matching the requested format."""
         from tmac.reporters.html import HTMLReporter
         from tmac.reporters.json_report import JSONReporter
@@ -562,7 +559,7 @@ class CIRunner:
         return MarkdownReporter()
 
     @staticmethod
-    def _build_publisher(ctx: CIContext, token: str):
+    def _build_publisher(ctx: CIContext, token: str) -> CommentPublisher | None:
         """Instantiate the appropriate publisher for the platform.
 
         Returns None when the platform is not recognized.
@@ -570,26 +567,25 @@ class CIRunner:
         from tmac.ci.publisher import (
             GitHubCommentPublisher,
             GitLabCommentPublisher,
+            HttpResponse,
+            HttpTransport,
         )
 
-        class _StdlibHttpTransport:
+        class _StdlibHttpTransport(HttpTransport):
             """Minimal stdlib urllib-based HttpTransport."""
 
-            def request(self, method, url, headers, body):
+            def request(
+                self, method: str, url: str, headers: dict[str, str], body: bytes | None
+            ) -> HttpResponse:
                 import urllib.request as _req
 
-                from tmac.ci.publisher import HttpResponse
-
                 req = _req.Request(url, data=body, headers=headers or {}, method=method)
-                try:
-                    with _req.urlopen(req) as resp:
-                        return HttpResponse(
-                            status=resp.status,
-                            body=resp.read().decode("utf-8", errors="replace"),
-                        )
-                except Exception as exc:
-                    # Re-raise so publisher error handling can map HTTP codes
-                    raise exc
+                # Errors propagate so the publisher can map HTTP codes.
+                with _req.urlopen(req) as resp:
+                    return HttpResponse(
+                        status=resp.status,
+                        body=resp.read().decode("utf-8", errors="replace"),
+                    )
 
         transport = _StdlibHttpTransport()
 

@@ -13,7 +13,6 @@ Validates: Requirements 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.10, 1.11, 1.12,
 import json
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -276,15 +275,11 @@ def test_parser_handles_invalid_json(tmp_path, bad_content):
     p = tmp_path / "bad.json"
     try:
         p.write_text(bad_content, encoding="utf-8", errors="replace")
-    except Exception:
+    except (OSError, UnicodeError):
         return
 
-    parser = TfplanParser()
-    try:
-        result = parser.parse_plan(str(p))
-        assert isinstance(result, list)
-    except Exception as exc:
-        pytest.fail(f"parse_plan raised an unexpected exception: {exc}")
+    result = TfplanParser().parse_plan(str(p))
+    assert isinstance(result, list)
 
 
 # ===========================================================================
@@ -720,10 +715,7 @@ def test_html_reporter_delta_no_errors(findings):
     # Feature: tmac-v1-1-tfplan-delta, Property 15: HTMLReporter renders the delta section without errors
     result = _make_delta_scan_result(findings)
 
-    try:
-        html = HTMLReporter().generate(result)
-    except Exception as exc:
-        pytest.fail(f"HTMLReporter raised an exception: {exc}")
+    html = HTMLReporter().generate(result)
 
     assert "delta-summary" in html
     # Verify the counts appear in the output

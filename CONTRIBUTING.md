@@ -132,6 +132,14 @@ black src/ tests/
 mypy src/tmac/
 ```
 
+Los tres son obligatorios en el CI (job *Lint & types*): un PR no pasa si `ruff check src tests`, `black --check src tests` o `mypy src` reportan errores. Ruff y black usan líneas de 100 caracteres (`pyproject.toml`).
+
+Los commits de solo formato se listan en `.git-blame-ignore-revs`; para que `git blame` los salte:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
 ---
 
 ## 3. Contribute new rules

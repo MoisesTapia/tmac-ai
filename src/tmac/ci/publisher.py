@@ -14,6 +14,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from tmac.ci.comment import MARKER
 
@@ -64,7 +65,7 @@ class HttpTransport:
         self,
         method: str,
         url: str,
-        headers: dict,
+        headers: dict[str, str],
         body: bytes | None,
     ) -> HttpResponse:
         """Perform an HTTP request and return the response.
@@ -128,7 +129,7 @@ class CommentPublisher(ABC):
 
     # Expose token only to sub-classes for header construction
     @property
-    def _token(self) -> str:  # type: ignore[return]
+    def _token(self) -> str:
         return self.__token
 
     # ------------------------------------------------------------------
@@ -227,7 +228,7 @@ class GitHubCommentPublisher(CommentPublisher):
     Validates: Requirements 3.2, 3.3, 3.4, 3.5, 3.7, 4.4
     """
 
-    def _auth_headers(self) -> dict:
+    def _auth_headers(self) -> dict[str, str]:
         """Build GitHub auth headers.  Token never logged (R3.5)."""
         return {
             "Authorization": f"Bearer {self._token}",
@@ -265,7 +266,7 @@ class GitHubCommentPublisher(CommentPublisher):
             PublishPermissionError: on HTTP 403.
         """
         url = self._comments_url(ctx) + "?per_page=100&sort=created&direction=asc"
-        marked: list[dict] = []
+        marked: list[dict[str, Any]] = []
 
         while url:
             resp = self._transport.request("GET", url, self._auth_headers(), None)
@@ -356,7 +357,7 @@ class GitLabCommentPublisher(CommentPublisher):
         super().__init__(transport, token)
         self._use_job_token = use_job_token
 
-    def _auth_headers(self) -> dict:
+    def _auth_headers(self) -> dict[str, str]:
         """Build GitLab auth headers.  Token never logged (R3.5)."""
         if self._use_job_token:
             return {
@@ -397,7 +398,7 @@ class GitLabCommentPublisher(CommentPublisher):
             PublishPermissionError: on HTTP 403.
         """
         url = self._notes_url(ctx) + "?sort=asc&order_by=created_at&per_page=100"
-        marked: list[dict] = []
+        marked: list[dict[str, Any]] = []
 
         while url:
             resp = self._transport.request("GET", url, self._auth_headers(), None)
