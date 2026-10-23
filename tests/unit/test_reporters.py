@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Union
 
 import pytest
 from hypothesis import given, settings, strategies as st
+from markupsafe import escape
 
 from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
 from tmac.reporters.html import HTMLReporter
@@ -198,8 +199,8 @@ def test_property_15_html_reporter_stride_as_badges(stride_value: Union[str, Lis
     output = reporter.generate(result)
     # The template should render at least one badge-stride element
     assert "badge-stride" in output
-    # The stride value should appear in the output
-    assert stride_str in output
+    # The stride value should appear in the output (HTML-escaped)
+    assert str(escape(stride_str)) in output
 
 
 # ---------------------------------------------------------------------------
@@ -908,3 +909,39 @@ def test_property_14_report_consistency_invariant(
     # Markdown: executive summary line contains findings_introduced
     md_output = MarkdownReporter().generate(result)
     assert f"This plan introduces {n} new threats" in md_output
+
+
+# ---------------------------------------------------------------------------
+# HTML report must escape attacker-controllable values (XSS)
+# ---------------------------------------------------------------------------
+
+class TestHTMLReporterEscaping:
+    PAYLOAD = '<script>alert("xss")</script>'
+
+    def test_resource_fields_are_html_escaped(self):
+        finding = _make_finding(
+            resource_name=self.PAYLOAD,
+            file_path=self.PAYLOAD,
+            description=self.PAYLOAD,
+            mitigation=self.PAYLOAD,
+        )
+        html = HTMLReporter().generate(_make_scan_result(findings=[finding]))
+        assert self.PAYLOAD not in html
+        assert "&lt;script&gt;" in html
+
+    @pytest.mark.parametrize(
+        "ref",
+        ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,<b>x</b>", "vbscript:x"],
+    )
+    def test_non_http_reference_links_are_neutralised(self, ref):
+        finding = _make_finding(references=[ref])
+        html = HTMLReporter().generate(_make_scan_result(findings=[finding]))
+        assert 'href="#"' in html
+        assert "href=\"javascript" not in html.lower()
+
+    def test_https_reference_links_are_kept(self):
+        url = "https://docs.aws.amazon.com/AmazonS3/latest/userguide/acls.html"
+        finding = _make_finding(references=[url])
+        html = HTMLReporter().generate(_make_scan_result(findings=[finding]))
+        assert f'href="{url}"' in html
+        assert 'rel="noopener noreferrer"' in html

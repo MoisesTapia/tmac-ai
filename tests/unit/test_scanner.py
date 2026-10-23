@@ -195,3 +195,48 @@ def test_property_1_run_scan_valid_scan_result(n_files):
         assert result.rules_loaded > 0
         assert result.statistics.total_findings == len(result.findings)
         assert result.statistics.total_resources >= 0
+
+
+# ---------------------------------------------------------------------------
+# tmac:ignore is bound to the exact resource (file + type + name)
+# ---------------------------------------------------------------------------
+
+IGNORED_PUBLIC_BUCKET_TF = """\
+    # tmac:ignore
+    resource "aws_s3_bucket" "main" {
+      acl = "public-read"
+    }
+
+    resource "aws_security_group" "main" {
+      ingress {
+        from_port   = 22
+        to_port     = 22
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+      }
+    }
+"""
+
+UNIGNORED_PUBLIC_BUCKET_TF = """\
+    resource "aws_s3_bucket" "main" {
+      acl = "public-read"
+    }
+"""
+
+
+class TestIgnoreScope:
+    def test_ignore_does_not_leak_to_other_type_with_same_name(self, tmp_path):
+        """Ignoring aws_s3_bucket.main must not silence aws_security_group.main."""
+        _write_tf(tmp_path, "main.tf", IGNORED_PUBLIC_BUCKET_TF)
+        result = Scanner().run_scan(str(tmp_path))
+        types = {f.resource_type for f in result.findings}
+        assert "aws_security_group" in types
+        assert "aws_s3_bucket" not in types
+
+    def test_ignore_does_not_leak_to_other_file_with_same_name(self, tmp_path):
+        """Ignoring aws_s3_bucket.main in a.tf must not silence aws_s3_bucket.main in b.tf."""
+        _write_tf(tmp_path, "a.tf", IGNORED_PUBLIC_BUCKET_TF)
+        _write_tf(tmp_path, "b.tf", UNIGNORED_PUBLIC_BUCKET_TF)
+        result = Scanner().run_scan(str(tmp_path))
+        s3_files = {Path(f.file_path).name for f in result.findings if f.resource_type == "aws_s3_bucket"}
+        assert s3_files == {"b.tf"}
