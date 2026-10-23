@@ -3,9 +3,17 @@ Shared pytest fixtures for TMAC test suite.
 
 Validates: Requirements 11.1
 """
+import os
 from pathlib import Path
 
 import pytest
+from hypothesis import settings
+
+# CI profile: no per-example deadline (cold runners make the first example slow)
+# and derandomized examples so a red build is reproducible. Selected via
+# HYPOTHESIS_PROFILE=ci; local runs keep Hypothesis defaults.
+settings.register_profile("ci", deadline=None, derandomize=True, print_blob=True)
+settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))
 
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics

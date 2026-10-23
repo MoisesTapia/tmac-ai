@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly re-audit so newly published CVEs are caught even without new commits.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# Least privilege: nothing in this workflow needs to write to the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONPATH: src
+  HYPOTHESIS_PROFILE: ci
+
+# Third-party actions are pinned to full commit SHAs (tags are mutable).
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install locked dev dependencies (hash-verified)
+        run: python -m pip install --require-hashes -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest -q --cov=tmac --cov-report=term --cov-fail-under=90
+
+  runtime-py310:
+    # Runtime still supports 3.10 (dev tooling needs 3.11+), so smoke-test the
+    # CLI against the locked runtime deps only.
+    name: Runtime smoke test (py3.10)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+      - name: Install locked runtime dependencies (hash-verified)
+        run: python -m pip install --require-hashes -r requirements.txt
+      - name: Scan fixtures and require findings
+        # Guards against parser regressions that silently yield 0 findings
+        # (e.g. an incompatible python-hcl2 release).
+        run: |
+          set +e
+          python -m tmac.cli scan --dir tests/fixtures --report json --output tmac-smoke.json --quiet
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ] && [ "$code" -ne 2 ]; then
+            echo "Expected exit code 1 or 2 (findings present), got $code"; exit 1
+          fi
+          python -c "import json,sys; n=len(json.load(open('tmac-smoke.json'))['runs'][0]['results']); print(f'{n} findings'); sys.exit(0 if n > 0 else 1)"
+
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install locked dev dependencies (hash-verified)
+        run: python -m pip install --require-hashes -r requirements-dev.txt
+      - name: Audit runtime lockfile
+        run: python -m pip_audit --require-hashes --disable-pip -r requirements.txt
+      - name: Audit dev lockfile
+        run: python -m pip_audit --require-hashes --disable-pip -r requirements-dev.txt
+
+  lint:
+    # Report-only until the existing ruff/black/mypy backlog is cleaned up.
+    # TODO: remove continue-on-error once `ruff check`, `black --check` and `mypy` pass.
+    name: Lint & types (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install locked dev dependencies (hash-verified)
+        run: python -m pip install --require-hashes -r requirements-dev.txt
+      - name: ruff
+        if: always()
+        run: python -m ruff check src tests
+      - name: black
+        if: always()
+        run: python -m black --check src tests
+      - name: mypy
+        if: always()
+        run: python -m mypy src
