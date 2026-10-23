@@ -21,6 +21,7 @@ ConditionOp = Literal[
     "contains",
     "not_contains",
     "regex",
+    "not_regex",
     "exists",
     "not_exists",
 ]

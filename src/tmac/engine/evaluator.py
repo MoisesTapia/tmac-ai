@@ -8,6 +8,21 @@ from tmac.models.rule import CheckCondition
 logger = logging.getLogger(__name__)
 
 
+def _collect(node: Any, parts: list[str]) -> list[Any]:
+    """Values at ``parts`` below ``node``, descending through nested lists of blocks.
+
+    e.g. environment[*].environment_variable[*].type in HCL, where every block level is a
+    list. Lists at the end of the path (e.g. cidr_blocks) are returned as-is, not flattened.
+    """
+    if not parts:
+        return [node]
+    if isinstance(node, dict):
+        return _collect(node[parts[0]], parts[1:]) if parts[0] in node else []
+    if isinstance(node, list):
+        return [v for item in node if isinstance(item, dict) for v in _collect(item, parts)]
+    return []
+
+
 class Evaluator:
     """Evaluates rule conditions against resource attributes."""
 
@@ -77,20 +92,7 @@ class Evaluator:
                 # We have a list of blocks (e.g. multiple ingress rules).
                 # Collect the value of `part` from every element and return the list
                 # so the caller can apply `any` semantics across all blocks.
-                remaining_parts = parts[i + 1 :]
-                result = []
-                for item in current:
-                    if isinstance(item, dict):
-                        sub: Any = item.get(part, None)
-                        # Descend into remaining path parts within this element
-                        for rpart in remaining_parts:
-                            if isinstance(sub, dict):
-                                sub = sub.get(rpart, None)
-                            else:
-                                sub = None
-                                break
-                        if sub is not None:
-                            result.append(sub)
+                result = [v for v in _collect(current, parts[i:]) if v is not None]
                 return result if result else None
             else:
                 return None
@@ -143,5 +145,11 @@ class Evaluator:
                 return False
             pattern = re.compile(str(expected_values[0]))
             return bool(pattern.search(str(actual_value)))
+        if condition == "not_regex":
+            # Like regex, an absent/empty value never matches (use not_exists for absence).
+            if not actual_value or not expected_values:
+                return False
+            pattern = re.compile(str(expected_values[0]))
+            return not pattern.search(str(actual_value))
 
         return False
