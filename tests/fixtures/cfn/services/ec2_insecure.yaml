@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Web:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-12345678
+      MetadataOptions: {HttpTokens: optional}
+      NetworkInterfaces:
+        - {DeviceIndex: "0", AssociatePublicIpAddress: "true", SubnetId: !Ref PublicSubnet}
+  Data:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: us-east-1a
+      Size: 10
+  Template:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions: {HttpTokens: optional}

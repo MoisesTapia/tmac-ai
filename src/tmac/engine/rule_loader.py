@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 REQUIRED_FILE_FIELDS = {"version", "rules"}
 REQUIRED_RULE_FIELDS = {"id", "name", "resource_type", "check", "severity", "stride"}
 
+RULES_DIR = Path(__file__).parent.parent / "rules"
+BUILTIN_RULE_DIRS = (RULES_DIR / "aws", RULES_DIR / "cfn")
+
 
 class RuleLoader:
     """Loads and parses the threat rules from YAML.
@@ -28,13 +31,15 @@ class RuleLoader:
         self.issues = []
         rules: dict[str, ThreatRule] = {}
 
-        # Load built-in rules (threats.yaml + threats_extended.yaml, etc.)
-        base_dir = Path(__file__).parent.parent / "rules" / "aws"
-        builtin_files = sorted(base_dir.glob("threats*.yaml"))
-        if not builtin_files:
-            self._issue(base_dir, "Built-in rules files not found")
-        for threats_file in builtin_files:
-            self._load_file(threats_file, rules)
+        # Built-in rules: Terraform (aws/threats*.yaml, incl. threats_extended.yaml) and
+        # CloudFormation (cfn/threats*.yaml). Rules only apply to their own resource_type,
+        # so loading both never mixes frameworks.
+        for builtin_dir in BUILTIN_RULE_DIRS:
+            builtin_files = sorted(builtin_dir.glob("threats*.yaml"))
+            if not builtin_files:
+                self._issue(builtin_dir, "Built-in rules files not found")
+            for threats_file in builtin_files:
+                self._load_file(threats_file, rules)
 
         # Optional custom rules
         if extra_rules_dir:

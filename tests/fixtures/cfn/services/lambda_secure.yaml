@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  Token: {Type: String, NoEcho: true}
+Resources:
+  Fn:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: app.handler
+      ReservedConcurrentExecutions: 10
+      TracingConfig: {Mode: Active}
+      Environment:
+        Variables:
+          DB_PASSWORD: "{{resolve:secretsmanager:db:SecretString:password}}"
+          API_TOKEN: !Ref Token

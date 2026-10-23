@@ -352,7 +352,14 @@ class TestRuleValidation:
     def test_all_built_in_rules_are_valid(self, caplog):
         import logging
 
+        loader = RuleLoader()
         with caplog.at_level(logging.WARNING):
-            rules = RuleLoader().load_rules()
-        assert len(rules) == 520  # threats.yaml + threats_extended.yaml
+            rules = loader.load_rules()
+        assert loader.issues == []
         assert "invalid" not in caplog.text
+        terraform = [r for r in rules if r.id.startswith("TMAC-AWS-")]
+        cloudformation = [r for r in rules if r.id.startswith("TMAC-CFN-")]
+        assert (len(terraform), len(cloudformation)) == (520, 43)
+        # Each framework's rules target only its own resource types.
+        assert all(r.resource_type.startswith("aws_") for r in terraform)
+        assert all(r.resource_type.startswith("AWS::") for r in cloudformation)

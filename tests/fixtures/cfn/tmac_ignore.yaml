@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  # tmac:ignore
+  IgnoredBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+
+  # tmac:ignore[TMAC-CFN-S3-001]
+  # tmac:ignore[TMAC-CFN-S3-002]
+  PartialBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+  InlineBucket:  # tmac:ignore[TMAC-CFN-S3-003]
+    Type: AWS::S3::Bucket
+  MetadataBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      tmac:
+        ignore: [TMAC-CFN-S3-005]
+  PlainBucket:
+    Type: AWS::S3::Bucket

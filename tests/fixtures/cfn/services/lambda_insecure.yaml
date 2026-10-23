@@ -1,0 +1,12 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Fn:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: app.handler
+      ReservedConcurrentExecutions: 0
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          DB_PASSWORD: hunter2

@@ -1,7 +1,8 @@
 import logging
 import os
 import sys
-from typing import Any, NoReturn
+from collections.abc import Callable
+from typing import Any, NoReturn, TypeVar
 
 import click
 from click.core import ParameterSource
@@ -15,12 +16,16 @@ from tmac.graph.grouping import group_by_name
 from tmac.graph.metadata import render_metadata
 from tmac.graph.service import DiagramError, DiagramService
 from tmac.models.finding import Finding, ScanResult
+from tmac.parsers.base import BaseParser
+from tmac.parsers.cloudformation import CloudFormationParser
 from tmac.parsers.terraform import TerraformParser
 from tmac.reporters import get_reporter
 from tmac.scanner import ScanError, Scanner
 
 SEVERITY_CHOICES = ["critical", "high", "medium", "low", "info"]
 MAX_ISSUES_SHOWN = 10
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 @click.group()
@@ -29,47 +34,83 @@ def cli() -> None:
     """TMAC (Threat Modeling as Code) - Static Analysis for IaC."""
 
 
+def _directory_scan_options(func: F) -> F:
+    """Options shared by the directory scanners (`scan`, `cfn`)."""
+    options: list[Callable[[Any], Any]] = [
+        click.option(
+            "--dir",
+            "-d",
+            "directory",
+            type=click.Path(),
+            help="Directory to scan (default: scan.dir from config, else '.').",
+        ),
+        click.option(
+            "--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format."
+        ),
+        click.option("--output", "-o", type=click.Path(), help="Output file path."),
+        click.option(
+            "--rules-dir", type=click.Path(exists=True), help="Additional rules directory."
+        ),
+        click.option(
+            "--config", type=click.Path(), default=".tmac.yaml", help="Configuration file path."
+        ),
+        click.option(
+            "--fail-on", type=click.Choice(SEVERITY_CHOICES), help="Severity threshold for exit 1."
+        ),
+        click.option(
+            "--severity",
+            type=click.Choice(["all"] + SEVERITY_CHOICES),
+            help="Minimum severity to show.",
+        ),
+        click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output."),
+        click.option(
+            "--exclude",
+            "-e",
+            "exclude",
+            multiple=True,
+            type=click.STRING,
+            help="Glob patterns to exclude (repeatable).",
+        ),
+        click.option(
+            "--lenient",
+            is_flag=True,
+            help="Don't exit 3 when files can't be parsed or rules are invalid.",
+        ),
+        click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output."),
+        click.option("--verbose", "-v", is_flag=True, help="Enable debug logging."),
+        click.pass_context,
+    ]
+    for option in reversed(options):
+        func = option(func)
+    return func
+
+
 @cli.command()
-@click.option(
-    "--dir",
-    "-d",
-    "directory",
-    type=click.Path(),
-    help="Directory to scan (default: scan.dir from config, else '.').",
-)
-@click.option("--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format.")
-@click.option("--output", "-o", type=click.Path(), help="Output file path.")
-@click.option("--rules-dir", type=click.Path(exists=True), help="Additional rules directory.")
-@click.option("--config", type=click.Path(), default=".tmac.yaml", help="Configuration file path.")
-@click.option(
-    "--fail-on", type=click.Choice(SEVERITY_CHOICES), help="Severity threshold for exit 1."
-)
-@click.option(
-    "--severity", type=click.Choice(["all"] + SEVERITY_CHOICES), help="Minimum severity to show."
-)
-@click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
-@click.option(
-    "--exclude",
-    "-e",
-    "exclude",
-    multiple=True,
-    type=click.STRING,
-    help="Glob patterns to exclude (repeatable).",
-)
-@click.option(
-    "--lenient", is_flag=True, help="Don't exit 3 when files can't be parsed or rules are invalid."
-)
-@click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output.")
+@_directory_scan_options
 @click.option(
     "--diagram",
     "with_diagram",
     is_flag=True,
     help="Embed an architecture diagram (Mermaid) in HTML/MD reports.",
 )
-@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
-@click.pass_context
-def scan(
+def scan(ctx: click.Context, **opts: Any) -> None:
+    """Scan Terraform / OpenTofu code (.tf, .tofu) for security threats."""
+    _run_directory_scan(ctx, TerraformParser(), "tmac-report", "Scan complete", **opts)
+
+
+@cli.command()
+@_directory_scan_options
+def cfn(ctx: click.Context, **opts: Any) -> None:
+    """Scan AWS CloudFormation templates (YAML/JSON) for security threats."""
+    _run_directory_scan(ctx, CloudFormationParser(), "tmac-cfn-report", "CFN scan complete", **opts)
+
+
+def _run_directory_scan(
     ctx: click.Context,
+    parser: BaseParser,
+    default_report_name: str,
+    done_message: str,
+    *,
     directory: str | None,
     report: str | None,
     output: str | None,
@@ -81,23 +122,22 @@ def scan(
     exclude: tuple[str, ...],
     lenient: bool,
     no_color: bool,
-    with_diagram: bool,
     verbose: bool,
+    with_diagram: bool = False,
 ) -> None:
-    """Scan infrastructure code for security threats."""
     _setup(verbose, no_color)
     cfg = _load_cli_config(ctx, config)
     scan_cfg, report_cfg = cfg.get("scan", {}), cfg.get("report", {})
 
     # Precedence: CLI flag > .tmac.yaml > built-in default
     fmt = report or report_cfg.get("format", "html")
-    out_file = output or f"tmac-report.{fmt}"
+    out_file = output or f"{default_report_name}.{fmt}"
     threshold = fail_on or report_cfg.get("fail_on", "critical")
     min_sev = severity or report_cfg.get("severity", "all")
     target_dir = directory or scan_cfg.get("dir") or "."
 
     try:
-        result = Scanner().run_scan(
+        result = Scanner(parser=parser).run_scan(
             directory=target_dir,
             rules_dir=rules_dir,
             exclude_patterns=list(exclude),
@@ -108,9 +148,10 @@ def scan(
     except ScanError as exc:
         _fail(str(exc))
 
-    # Build the architecture diagram only when requested and for HTML/MD reports.
+    # Build the architecture diagram only when requested and for HTML/MD reports
+    # (the dependency graph is built from Terraform sources).
     diagram_src: str | None = None
-    if with_diagram and fmt in ("html", "md"):
+    if with_diagram and isinstance(parser, TerraformParser) and fmt in ("html", "md"):
         try:
             graph = DiagramService().build_graph(
                 target_dir, exclude_patterns=list(exclude), simplify=True
@@ -122,7 +163,8 @@ def scan(
     _write_report(result, fmt, out_file, diagram=diagram_src)
     if not quiet:
         click.echo(
-            f"Scan complete: {result.statistics.total_findings} findings. Report saved to {out_file}"
+            f"{done_message}: {result.statistics.total_findings} findings. "
+            f"Report saved to {out_file}"
         )
 
     _check_issues(result, lenient)
@@ -131,7 +173,11 @@ def scan(
 
 @cli.command()
 @click.option(
-    "--plan-file", "-p", required=True, type=click.Path(), help="Path to the tfplan.json."
+    "--plan-file",
+    "-p",
+    required=True,
+    type=click.Path(),
+    help="Path to the plan JSON (`terraform show -json` or `tofu show -json`).",
 )
 @click.option("--report", "-r", type=click.Choice(["html", "json", "md"]), help="Output format.")
 @click.option("--output", "-o", type=click.Path(), help="Output file path.")
