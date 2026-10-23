@@ -359,7 +359,7 @@ class TestRuleValidation:
         assert "invalid" not in caplog.text
         terraform = [r for r in rules if r.id.startswith("TMAC-AWS-")]
         cloudformation = [r for r in rules if r.id.startswith("TMAC-CFN-")]
-        assert (len(terraform), len(cloudformation)) == (520, 43)
+        assert (len(terraform), len(cloudformation)) == (1072, 43)
         # Each framework's rules target only its own resource types.
         assert all(r.resource_type.startswith("aws_") for r in terraform)
         assert all(r.resource_type.startswith("AWS::") for r in cloudformation)
