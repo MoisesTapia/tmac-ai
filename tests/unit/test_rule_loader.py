@@ -261,3 +261,70 @@ def test_property_17_finding_tags_propagated_from_rule(tags):
 
     assert len(findings) == 1
     assert findings[0].tags == tags
+
+
+# ---------------------------------------------------------------------------
+# Rule value validation (severity / stride / condition / regex)
+# ---------------------------------------------------------------------------
+
+class TestRuleValidation:
+    def test_values_are_normalized_case_insensitively(self):
+        rule = ThreatRule(**_make_valid_rule_data(
+            severity="critical",
+            stride="information disclosure",
+            check={"attribute": "acl", "condition": "EQUALS", "values": ["public-read"]},
+        ))
+        assert rule.severity == "Critical"
+        assert rule.stride == "Information Disclosure"
+        assert rule.check.condition == "equals"
+
+    @pytest.mark.parametrize("field, value", [
+        ("severity", "Critcal"),
+        ("stride", "Infomation Disclosure"),
+    ])
+    def test_typo_in_severity_or_stride_is_rejected(self, field, value):
+        with pytest.raises(ValueError, match=f"invalid {field}"):
+            ThreatRule(**_make_valid_rule_data(**{field: value}))
+
+    def test_unknown_condition_is_rejected(self):
+        with pytest.raises(ValueError, match="invalid condition"):
+            CheckCondition(attribute="acl", condition="equal", values=["x"])
+
+    def test_condition_without_values_is_rejected(self):
+        with pytest.raises(ValueError, match="requires at least one value"):
+            CheckCondition(attribute="acl", condition="equals", values=[])
+
+    def test_exists_conditions_need_no_values(self):
+        assert CheckCondition(attribute="acl", condition="not_exists").values == []
+
+    def test_invalid_regex_is_rejected(self):
+        with pytest.raises(ValueError, match="invalid regex"):
+            CheckCondition(attribute="name", condition="regex", values=["(unclosed"])
+
+    def test_invalid_nested_and_check_is_rejected(self):
+        with pytest.raises(ValueError, match="invalid condition"):
+            CheckCondition(
+                attribute="acl", condition="equals", values=["x"],
+                and_check={"attribute": "b", "condition": "nope", "values": ["y"]},
+            )
+
+    def test_invalid_rule_is_skipped_without_dropping_the_rest_of_the_file(self, tmp_path, caplog):
+        import logging
+        data = _make_valid_file_data(rules=[
+            _make_valid_rule_data(id="TMAC-TEST-BAD", severity="Critcal"),
+            _make_valid_rule_data(id="TMAC-TEST-GOOD"),
+        ])
+        _write_yaml(tmp_path, "custom.yaml", data)
+        with caplog.at_level(logging.WARNING):
+            rules = RuleLoader().load_rules(str(tmp_path))
+        ids = {r.id for r in rules}
+        assert "TMAC-TEST-GOOD" in ids
+        assert "TMAC-TEST-BAD" not in ids
+        assert "TMAC-TEST-BAD" in caplog.text
+
+    def test_all_built_in_rules_are_valid(self, caplog):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            rules = RuleLoader().load_rules()
+        assert len(rules) == 520  # threats.yaml + threats_extended.yaml
+        assert "invalid" not in caplog.text
