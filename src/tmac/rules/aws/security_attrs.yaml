@@ -55,6 +55,769 @@ security_attrs:
   aws_cloudwatch_event_bus:
     - kms_key_identifier
 
+  # ----------------------------------------------------------------
+  # Storage Services
+  # ----------------------------------------------------------------
+  aws_backup_vault:
+    - kms_key_arn
+    - policy
+    - force_destroy
+    - tags
+
+  aws_backup_plan:
+    - rule
+    - tags
+
+  aws_backup_selection:
+    - condition
+    - resources
+
+  aws_backup_vault_lock_configuration:
+    - min_retention_days
+    - max_retention_days
+    - changeable_for_days
+
+  aws_ebs_snapshot:
+    - encrypted
+    - kms_key_id
+    - permanent_restore
+
+  aws_ebs_volume:
+    - encrypted
+    - kms_key_id
+    - multi_attach_enabled
+    - type
+    - final_snapshot
+
+  aws_efs_mount_target:
+    - subnet_id
+    - security_groups
+
+  aws_efs_file_system_policy:
+    - policy
+
+  aws_fsx_windows_file_system:
+    - kms_key_id
+    - automatic_backup_retention_days
+    - deployment_type
+    - audit_log_configuration
+    - active_directory_id
+    - self_managed_active_directory
+    - security_group_ids
+    - storage_capacity
+
+  aws_fsx_lustre_file_system:
+    - kms_key_id
+    - automatic_backup_retention_days
+    - import_path
+    - export_path
+    - deployment_type
+    - per_unit_storage_throughput
+    - security_group_ids
+
+  aws_fsx_ontap_file_system:
+    - kms_key_id
+    - automatic_backup_retention_days
+    - deployment_type
+    - fsx_admin_password
+    - security_group_ids
+
+  aws_fsx_ontap_storage_virtual_machine:
+    - root_volume_security_style
+
+  aws_fsx_ontap_volume:
+    - snaplock_configuration
+
+  aws_fsx_openzfs_file_system:
+    - kms_key_id
+    - automatic_backup_retention_days
+    - root_volume_configuration
+    - security_group_ids
+    - deployment_type
+
+  aws_fsx_openzfs_volume:
+    - data_compression_type
+    - nfs_exports
+
+  aws_fsx_file_cache:
+    - kms_key_id
+    - security_group_ids
+    - subnet_ids
+    - data_repository_associations
+    - file_cache_type_version
+
+  aws_drs_replication_configuration_template:
+    - ebs_encryption
+    - ebs_encryption_key_arn
+    - create_public_ip
+    - data_plane_routing
+    - replication_server_instance_type
+    - bandwidth_throttling
+    - replication_servers_security_groups_ids
+
+  aws_storagegateway_gateway:
+    - cloudwatch_log_group_arn
+    - maintenance_start_time
+    - smb_security_strategy
+
+  aws_storagegateway_smb_file_share:
+    - kms_key_arn
+    - kms_encrypted
+    - valid_user_list
+    - invalid_user_list
+    - authentication
+    - smb_acl_enabled
+
+  aws_storagegateway_nfs_file_share:
+    - kms_key_arn
+    - kms_encrypted
+    - client_list
+    - squash
+
+  aws_storagegateway_cache:
+    - disk_id
+
+  # ----------------------------------------------------------------
+  # ML / AI Services
+  # ----------------------------------------------------------------
+  aws_sagemaker_domain:
+    - app_network_access_type
+    - kms_key_id
+    - auth_mode
+    - vpc_id
+    - subnet_ids
+    - retention_policy
+    - domain_settings
+    - default_user_settings
+
+  aws_sagemaker_endpoint_configuration:
+    - kms_key_arn
+    - production_variants
+    - data_capture_config
+    - async_inference_config
+    - shadow_production_variants
+
+  aws_sagemaker_model:
+    - enable_network_isolation
+    - execution_role_arn
+    - vpc_config
+    - primary_container
+
+  aws_sagemaker_notebook_instance:
+    - kms_key_id
+    - direct_internet_access
+    - subnet_id
+    - security_groups
+    - role_arn
+    - lifecycle_config_name
+    - root_access
+    - instance_type
+
+  aws_sagemaker_training_job:
+    - enable_inter_container_traffic_encryption
+    - enable_network_isolation
+    - output_data_config
+    - vpc_config
+    - resource_config
+    - input_data_config
+    - role_arn
+
+  aws_sagemaker_flow_definition:
+    - output_config
+    - role_arn
+
+  aws_sagemaker_human_task_ui:
+    - tags
+
+  aws_sagemaker_workteam:
+    - member_definitions
+    - workforce_name
+    - notification_configuration
+
+  aws_bedrock_model_invocation_logging_configuration:
+    - logging_config
+
+  aws_bedrock_guardrail:
+    - topic_policy_config
+    - content_policy_config
+    - sensitive_information_policy_config
+    - word_policy_config
+    - grounding_policy_config
+    - kms_key_arn
+
+  aws_bedrock_knowledge_base:
+    - storage_configuration
+    - role_arn
+
+  aws_bedrock_agent:
+    - agent_resource_role_arn
+    - guardrail_configuration
+    - customer_encryption_key_arn
+
+  aws_comprehend_entity_recognizer:
+    - output_data_config
+    - volume_kms_key_id
+    - vpc_config
+    - data_access_role_arn
+
+  aws_comprehend_document_classifier:
+    - output_data_config
+    - volume_kms_key_id
+    - vpc_config
+    - data_access_role_arn
+
+  aws_rekognition_collection:
+    - collection_id
+
+  aws_rekognition_stream_processor:
+    - output
+    - role_arn
+    - notification_channel
+    - input
+    - data_sharing_preference
+
+  aws_lex_bot:
+    - role_arn
+    - data_privacy
+    - test_bot_alias_tags
+
+  aws_lex_bot_alias:
+    - bot_version
+    - conversation_log_settings
+
+  aws_kendra_index:
+    - server_side_encryption_configuration
+    - user_context_policy
+    - role_arn
+    - capacity_units
+    - user_token_configurations
+    - edition
+    - document_metadata_configuration_updates
+
+  aws_forecast_dataset:
+    - encryption_config
+    - data_frequency
+    - domain
+
+  aws_forecast_dataset_group:
+    - dataset_arns
+
+  aws_frauddetector_detector:
+    - rule_execution_mode
+    - detector_version_status
+
+  aws_frauddetector_model:
+    - tags
+
+  aws_frauddetector_event_type:
+    - labels
+    - entity_types
+
+  aws_frauddetector_entity_type:
+    - name
+
+  aws_frauddetector_variable:
+    - variable_type
+
+  aws_frauddetector_outcome:
+    - name
+
+  aws_personalize_dataset_group:
+    - kms_key_arn
+    - role_arn
+
+  aws_personalize_dataset:
+    - schema_arn
+
+  aws_personalize_solution:
+    - event_type
+
+  aws_personalize_campaign:
+    - campaign_config
+    - min_provisioned_tps
+
+  aws_polly_lexicon:
+    - content
+    - name
+
+  aws_transcribe_transcription_job:
+    - output_encryption_kms_key_id
+    - output_bucket_name
+    - content_redaction
+    - media
+
+  aws_transcribe_medical_transcription_job:
+    - content_identification_type
+    - specialty
+    - output_encryption_kms_key_id
+
+  aws_transcribe_vocabulary:
+    - tags
+
+  aws_translate_terminology:
+    - encryption_key
+    - data
+
+  aws_textract_adapter:
+    - auto_update
+
+  aws_lookoutequipment_dataset:
+    - server_side_kms_key_id
+    - dataset_schema
+    - ingestion_input_configuration
+
+  aws_lookoutequipment_inference_scheduler:
+    - data_output_configuration
+    - role_arn
+    - data_delay_offset_in_minutes
+
+  aws_lookoutmetrics_anomaly_detector:
+    - kms_key_arn
+    - anomaly_detector_config
+    - metric_source
+
+  aws_lookoutmetrics_alert:
+    - action
+
+  aws_lookoutvision_project:
+    - name
+
+  aws_monitron_project:
+    - kms_key_arn
+    - name
+
+  aws_panorama_application_instance:
+    - device_id
+    - runtime_role_arn
+    - manifest_payload
+    - name
+
+  aws_panorama_package_version:
+    - package_name
+
+  aws_healthlake_fhir_datastore:
+    - sse_configuration
+    - datastore_type_version
+    - preload_data_config
+    - identity_provider_configuration
+
+  aws_deepcomposer_composition:
+    - name
+
+  aws_deepracer_model:
+    - name
+
+  aws_qbusiness_application:
+    - encryption_configuration
+    - identity_center_application_arn
+    - attachments_configuration
+
+  aws_qbusiness_index:
+    - tags
+
+  aws_qbusiness_data_source:
+    - role_arn
+    - document_enrichment_configuration
+
+  aws_codegurureviewer_repository_association:
+    - repository
+    - kms_key_details
+
+  aws_codeguruprofiler_profiling_group:
+    - anomaly_detection_opted_out
+    - agent_orchestration_config
+
+  aws_devopsguru_resource_collection:
+    - cloudformation
+    - tags_collection
+
+  aws_devopsguru_notification_channel:
+    - sns
+    - filters
+
+  aws_devopsguru_service_integration:
+    - ops_center
+    - logs_anomaly_detection
+
+  # ----------------------------------------------------------------
+  # Security & Identity Services
+  # ----------------------------------------------------------------
+  aws_detective_graph:
+    - tags
+
+  aws_detective_member:
+    - disable_email_notification
+    - email_address
+
+  aws_detective_organization_admin_account:
+    - account_id
+
+  aws_guardduty_detector:
+    - enable
+    - datasources
+    - finding_publishing_frequency
+    - tags
+
+  aws_guardduty_ipset:
+    - location
+    - activate
+
+  aws_guardduty_filter:
+    - action
+    - finding_criteria
+
+  aws_inspector2_enabler:
+    - resource_types
+    - account_ids
+
+  aws_inspector2_organization_configuration:
+    - auto_enable
+
+  aws_inspector2_member_association:
+    - account_id
+
+  aws_inspector2_cis_scan_configuration:
+    - targets
+    - tags
+
+  aws_macie2_account:
+    - status
+    - finding_publishing_frequency
+    - tags
+
+  aws_macie2_findings_filter:
+    - action
+    - finding_criteria
+
+  aws_macie2_classification_job:
+    - job_type
+    - s3_job_definition
+
+  aws_macie2_custom_data_identifier:
+    - regex
+    - keywords
+
+  aws_macie2_organization_admin_account:
+    - admin_account_id
+
+  aws_securitylake_data_lake:
+    - configuration
+    - meta_store_manager_role_arn
+    - tags
+
+  aws_securitylake_subscriber:
+    - subscriber_identity
+    - access_types
+
+  aws_securitylake_subscriber_notification:
+    - configuration
+
+  aws_securitylake_aws_log_source:
+    - source
+
+  aws_verifiedpermissions_policy_store:
+    - validation_settings
+    - description
+    - tags
+
+  aws_verifiedpermissions_policy:
+    - definition
+
+  aws_verifiedpermissions_policy_template:
+    - statement
+
+  aws_verifiedpermissions_identity_source:
+    - configuration
+
+  aws_auditmanager_account_registration:
+    - kms_key
+
+  aws_auditmanager_assessment:
+    - assessment_reports_destination
+    - roles
+    - tags
+
+  aws_auditmanager_framework:
+    - control_sets
+    - tags
+
+  aws_auditmanager_control:
+    - control_mapping_sources
+    - tags
+
+  aws_cloudhsm_v2_cluster:
+    - subnet_ids
+    - source_backup_identifier
+    - hsm_type
+    - tags
+
+  aws_cloudhsm_v2_hsm:
+    - availability_zone
+
+  aws_directory_service_directory:
+    - type
+    - password
+    - vpc_settings
+    - tags
+
+  aws_directory_service_log_subscription:
+    - log_group_name
+
+  aws_directory_service_conditional_forwarder:
+    - remote_domain_name
+
+  aws_fms_admin_account:
+    - account_id
+
+  aws_fms_policy:
+    - remediation_enabled
+    - exclude_map
+    - include_map
+    - resource_tags
+    - resource_type
+    - resource_type_list
+    - delete_unused_fm_managed_resources
+    - security_service_policy_data
+    - tags
+
+  aws_networkfirewall_firewall:
+    - encryption_configuration
+    - delete_protection
+    - subnet_mapping
+    - tags
+
+  aws_networkfirewall_firewall_policy:
+    - firewall_policy
+
+  aws_networkfirewall_logging_configuration:
+    - logging_configuration
+
+  aws_networkfirewall_rule_group:
+    - rule_group
+    - tags
+
+  aws_ram_resource_share:
+    - allow_external_principals
+    - permission_arns
+    - name
+    - tags
+
+  aws_ram_principal_association:
+    - principal
+
+  aws_ram_resource_association:
+    - resource_arn
+
+  aws_ram_resource_share_accepter:
+    - share_arn
+
+  aws_securityhub_account:
+    - enable_default_standards
+
+  aws_securityhub_standards_subscription:
+    - standards_arn
+
+  aws_securityhub_finding_aggregator:
+    - linking_mode
+
+  aws_securityhub_organization_admin_account:
+    - admin_account_id
+
+  aws_securityhub_organization_configuration:
+    - auto_enable_controls
+
+  aws_securityhub_action_target:
+    - name
+
+  aws_securityhub_insight:
+    - filters
+
+  aws_securityhub_product_subscription:
+    - product_arn
+
+  aws_shield_protection:
+    - resource_arn
+    - health_check_ids
+    - tags
+
+  aws_shield_protection_group:
+    - aggregation
+    - tags
+
+  aws_shield_proactive_engagement:
+    - enabled
+
+  aws_ssoadmin_permission_set:
+    - name
+    - session_duration
+    - managed_policy_arns
+    - tags
+
+  aws_ssoadmin_account_assignment:
+    - principal_type
+    - principal_id
+
+  aws_ssoadmin_customer_managed_policy_attachment:
+    - customer_managed_policy_reference
+
+  aws_ssoadmin_instance_access_control_attributes:
+    - instance_access_control_attributes
+
+  aws_ssoadmin_permissions_boundary_attachment:
+    - permissions_boundary
+
+  # ----------------------------------------------------------------
+  # IoT Services
+  # ----------------------------------------------------------------
+  aws_iot_policy:
+    - policy
+    - tags
+
+  aws_iot_certificate:
+    - active
+    - csr
+
+  aws_iot_thing:
+    - name
+    - thing_type_name
+    - attributes
+
+  aws_iot_thing_group:
+    - parent_group_name
+    - tags
+
+  aws_iot_thing_type:
+    - tags
+
+  aws_iot_topic_rule:
+    - enabled
+    - error_action
+    - s3
+    - lambda
+    - kinesis
+    - tags
+
+  aws_iot_domain_configuration:
+    - authorizer_config
+    - tags
+
+  aws_iot_logging_options:
+    - default_log_level
+    - role_arn
+
+  aws_iot_account_audit_configuration:
+    - audit_check_configurations
+    - audit_notification_target_configurations
+
+  aws_iot_security_profile:
+    - behaviors
+    - alert_targets
+    - tags
+
+  aws_iot_mitigation_action:
+    - action_params
+    - role_arn
+
+  aws_iot_provisioning_template:
+    - enabled
+    - provisioning_role_arn
+
+  aws_iot1click_project:
+    - tags
+
+  aws_iotanalytics_channel:
+    - channel_storage
+    - retention_period
+    - tags
+
+  aws_iotanalytics_datastore:
+    - datastore_storage
+    - retention_period
+    - tags
+
+  aws_iotanalytics_pipeline:
+    - pipeline_activity
+    - tags
+
+  aws_iotanalytics_dataset:
+    - content_delivery_rules
+    - retention_period
+    - tags
+
+  aws_iotevents_detector_model:
+    - role_arn
+    - evaluation_method
+    - detector_model_definition
+    - tags
+
+  aws_iotevents_input:
+    - tags
+
+  aws_iotevents_alarm_model:
+    - role_arn
+    - alarm_action
+    - tags
+
+  aws_greengrassv2_component_version:
+    - inline_recipe
+    - lambda_function
+    - tags
+
+  aws_greengrassv2_deployment:
+    - components
+    - deployment_policies
+    - iot_job_configuration
+    - tags
+
+  aws_iotsitewise_portal:
+    - portal_auth_mode
+    - alarms
+    - tags
+
+  aws_iotsitewise_gateway:
+    - gateway_platform
+    - tags
+
+  aws_iotsitewise_access_policy:
+    - access_policy_permission
+
+  aws_iotsitewise_asset_model:
+    - asset_model_hierarchy
+    - tags
+
+  aws_iottwinmaker_workspace:
+    - role
+    - s3_location
+    - tags
+
+  aws_iottwinmaker_scene:
+    - tags
+
+  aws_iottwinmaker_entity:
+    - components
+    - tags
+
+  aws_iottwinmaker_component_type:
+    - data_connector
+    - tags
+
+  aws_iotfleetwise_fleet:
+    - tags
+
+  aws_iotfleetwise_vehicle:
+    - decoder_manifest_arn
+    - model_manifest_arn
+    - tags
+
+  aws_iotfleetwise_campaign:
+    - data_destination_configs
+    - compression
+    - signals_to_collect
+    - tags
+
+  aws_iotfleetwise_signal_catalog:
+    - tags
+
 satellites:
   aws_flow_log: "VPC Flow Logs"
   aws_s3_bucket_server_side_encryption_configuration: "S3 Encryption"
@@ -62,3 +825,96 @@ satellites:
   aws_s3_bucket_versioning: "S3 Versioning"
   aws_s3_bucket_public_access_block: "S3 Public Access Block"
   aws_cloudtrail: "CloudTrail Logging"
+  # Security & Identity satellites
+  aws_detective_member: "Detective Member Account"
+  aws_detective_organization_admin_account: "Detective Org Admin"
+  aws_guardduty_ipset: "GuardDuty Threat Intel IPSet"
+  aws_guardduty_filter: "GuardDuty Finding Filter"
+  aws_inspector2_organization_configuration: "Inspector Org Config"
+  aws_inspector2_member_association: "Inspector Member Account"
+  aws_inspector2_cis_scan_configuration: "Inspector CIS Scan Config"
+  aws_macie2_findings_filter: "Macie Findings Filter"
+  aws_macie2_classification_job: "Macie Classification Job"
+  aws_macie2_custom_data_identifier: "Macie Custom Identifier"
+  aws_macie2_organization_admin_account: "Macie Org Admin"
+  aws_securitylake_subscriber: "Security Lake Subscriber"
+  aws_securitylake_subscriber_notification: "Security Lake Subscriber Notification"
+  aws_securitylake_aws_log_source: "Security Lake Log Source"
+  aws_verifiedpermissions_policy: "Verified Permissions Policy"
+  aws_verifiedpermissions_policy_template: "Verified Permissions Template"
+  aws_verifiedpermissions_identity_source: "Verified Permissions Identity Source"
+  aws_auditmanager_account_registration: "Audit Manager Registration"
+  aws_auditmanager_control: "Audit Manager Control"
+  aws_cloudhsm_v2_hsm: "CloudHSM HSM Instance"
+  aws_directory_service_log_subscription: "Directory Service Log Forwarding"
+  aws_directory_service_conditional_forwarder: "Directory Service Trust Forwarder"
+  aws_fms_admin_account: "FMS Admin Account"
+  aws_networkfirewall_firewall_policy: "Network Firewall Policy"
+  aws_networkfirewall_logging_configuration: "Network Firewall Logging"
+  aws_networkfirewall_rule_group: "Network Firewall Rule Group"
+  aws_ram_principal_association: "RAM Principal Association"
+  aws_ram_resource_association: "RAM Resource Association"
+  aws_ram_resource_share_accepter: "RAM Share Accepter"
+  aws_securityhub_standards_subscription: "Security Hub Standards"
+  aws_securityhub_finding_aggregator: "Security Hub Finding Aggregator"
+  aws_securityhub_organization_admin_account: "Security Hub Org Admin"
+  aws_securityhub_organization_configuration: "Security Hub Org Config"
+  aws_securityhub_action_target: "Security Hub Action Target"
+  aws_securityhub_insight: "Security Hub Insight"
+  aws_securityhub_product_subscription: "Security Hub Product Integration"
+  aws_shield_protection_group: "Shield Protection Group"
+  aws_shield_proactive_engagement: "Shield Proactive Engagement"
+  aws_ssoadmin_account_assignment: "Identity Center Account Assignment"
+  aws_ssoadmin_customer_managed_policy_attachment: "Identity Center Customer Policy"
+  aws_ssoadmin_instance_access_control_attributes: "Identity Center ABAC Config"
+  aws_ssoadmin_permissions_boundary_attachment: "Identity Center Permissions Boundary"
+  # IoT satellites
+  aws_iot_logging_options: "IoT Core Logging Config"
+  aws_iot_account_audit_configuration: "IoT Defender Audit Config"
+  aws_iot_security_profile: "IoT Defender Security Profile"
+  aws_iot_mitigation_action: "IoT Defender Mitigation Action"
+  aws_iot_provisioning_template: "IoT Fleet Provisioning"
+  aws_iotanalytics_pipeline: "IoT Analytics Pipeline"
+  aws_iotanalytics_dataset: "IoT Analytics Dataset"
+  aws_iotevents_alarm_model: "IoT Events Alarm Model"
+  aws_greengrassv2_deployment: "Greengrass v2 Deployment"
+  aws_iotsitewise_access_policy: "SiteWise Access Policy"
+  aws_iotsitewise_gateway: "SiteWise Gateway Config"
+  aws_iottwinmaker_entity: "TwinMaker Entity Config"
+  aws_iottwinmaker_component_type: "TwinMaker Component Type"
+  aws_iotfleetwise_vehicle: "FleetWise Vehicle Config"
+  aws_iotfleetwise_campaign: "FleetWise Campaign Config"
+  # Storage satellites
+  aws_backup_vault_lock_configuration: "Backup Vault Lock (WORM)"
+  aws_backup_plan: "Backup Plan Config"
+  aws_backup_selection: "Backup Selection Scope"
+  aws_efs_mount_target: "EFS Mount Target Network"
+  aws_efs_file_system_policy: "EFS Resource Policy"
+  aws_fsx_ontap_storage_virtual_machine: "FSx ONTAP SVM Config"
+  aws_fsx_ontap_volume: "FSx ONTAP Volume Config"
+  aws_fsx_openzfs_volume: "FSx OpenZFS Volume Config"
+  aws_storagegateway_smb_file_share: "Storage Gateway SMB Share"
+  aws_storagegateway_nfs_file_share: "Storage Gateway NFS Share"
+  aws_storagegateway_cache: "Storage Gateway Cache Disk"
+  aws_drs_replication_configuration_template: "DRS Replication Config"
+  aws_ebs_snapshot: "EBS Snapshot Security"
+  # ML / AI satellites
+  aws_bedrock_model_invocation_logging_configuration: "Bedrock Invocation Logging"
+  aws_bedrock_guardrail: "Bedrock Guardrail"
+  aws_sagemaker_notebook_instance: "SageMaker Notebook Security"
+  aws_sagemaker_training_job: "SageMaker Training Security"
+  aws_sagemaker_endpoint_configuration: "SageMaker Endpoint Security"
+  aws_sagemaker_model: "SageMaker Model Security"
+  aws_sagemaker_flow_definition: "A2I Human Review Config"
+  aws_sagemaker_workteam: "A2I Workforce Config"
+  aws_kendra_index: "Kendra Index Security"
+  aws_healthlake_fhir_datastore: "HealthLake FHIR Datastore Security"
+  aws_lookoutequipment_inference_scheduler: "Lookout Equipment Inference Security"
+  aws_lookoutmetrics_alert: "Lookout Metrics Alert Config"
+  aws_devopsguru_notification_channel: "DevOps Guru Notification Config"
+  aws_devopsguru_service_integration: "DevOps Guru Integration Config"
+  aws_codegurureviewer_repository_association: "CodeGuru Reviewer Security"
+  aws_rekognition_stream_processor: "Rekognition Stream Security"
+  aws_lex_bot_alias: "Lex Bot Alias Security"
+  aws_panorama_application_instance: "Panorama Edge Security"
+  aws_qbusiness_data_source: "Amazon Q Data Source Security"

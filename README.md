@@ -7,7 +7,7 @@
 ![Version](https://img.shields.io/badge/version-1.6.0%20%22Ixtla%22-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-![Rules](https://img.shields.io/badge/rules-560%2B-orange)
+![Rules](https://img.shields.io/badge/rules-1100%2B-orange)
 
 </div>
 
@@ -27,7 +27,7 @@ CloudFormation templates **before deployment**. It scans the full infrastructure
 
 ## Key Features
 
-- **Terraform & OpenTofu analysis (`tmac scan`)** — static scan of `.tf` and `.tofu` files against **520+ STRIDE rules** covering **105 AWS resource types**.
+- **Terraform & OpenTofu analysis (`tmac scan`)** — static scan of `.tf` and `.tofu` files against **1,072 STRIDE rules** covering **268 AWS resource types**.
 - **CloudFormation analysis (`tmac cfn`)** — YAML and JSON templates (intrinsic functions included) against **43 STRIDE rules** for 11 AWS services.
 - **Risk delta analysis (`tmac plan`)** — detects threats only in the resources a Terraform plan will create, modify, or destroy. Answers: *"what new risk does this PR introduce?"*
 - **Native CI/CD agent (`tmac ci`)** — analyzes only the `.tf`/`.tofu` files changed in a push/PR, posts a narrative comment on the PR/MR, and uploads the report as an artifact.
@@ -89,7 +89,7 @@ Full documentation lives in the [`DOCS/`](DOCS/README.md) directory.
 | [Command reference](DOCS/COMMANDS.md) | Complete guide to `scan`, `plan`, `ci`, and `diagram`. |
 | [Examples](DOCS/EXAMPLES.md) | Basic, intermediate, and advanced usage — console and CI/CD. |
 | [CI/CD integration](DOCS/CICD.md) | GitHub Actions, GitLab CI, Docker, and pre-commit pipelines. |
-| [Rule catalog](DOCS/RULES.md) | The 520 rules by service and severity. |
+| [Rule catalog](DOCS/RULES.md) | All rules (Terraform and CloudFormation) by service and severity. |
 | [Writing rules](DOCS/WRITING_RULES.md) | Rule format, condition operators, and custom rules. |
 | [Architecture](DOCS/ARCHITECTURE.md) | Project layout and the full-state vs. risk-delta model. |
 | [AWS STRIDE mapping](DOCS/aws_stride_mapping.md) | How AWS services map to STRIDE categories. |
@@ -110,7 +110,8 @@ tmac scan --dir examples/enterprise --report html --output report.html --diagram
 
 ## Rule Catalog
 
-TMAC v1.6.0 includes **520 rules** covering **105 AWS resource types**.
+TMAC includes **1,072 Terraform rules** covering **268 AWS resource types** and **43
+CloudFormation rules**.
 
 | Severity | Rules |
 | :--- | :--- |

@@ -214,20 +214,54 @@ tmac ci [options]
 
 ### PR/MR comment format
 
+Findings are grouped by severity in collapsible sections; each row links to the file and line
+in the PR head (GitHub). Names and paths taken from the code under review are escaped, so a
+crafted resource name cannot alter the comment. For plan (`--plan-file`) results an **Action**
+column (`NEW` / `MODIFIED` / `REMOVED`) is added.
+
 ```
 <!-- tmac:pr-comment:v1 -->
-## 🔴 TMAC Security Review — 2 threats detected
 
-This PR modifies 3 `.tf` files and introduces the following threats:
+## 🛡️ TMAC Threat Model Analysis
 
-| Severity | Resource | Rule | STRIDE | Action | Mitigation |
-|---|---|---|---|---|---|
-| 🔴 Critical | `aws_s3_bucket.uploads` | TMAC-AWS-S3-001 | Information Disclosure | NEW | Set ACL to `private` |
-| 🟠 High | `aws_security_group.web` | TMAC-AWS-SG-001 | Tampering | MODIFIED | Restrict port 22 |
+**Status:** 🚫 BLOCKED
 
-**Status:** ❌ BLOCKED — Critical findings were detected.
-[View full report](artifacts/tmac-report.md)
+**Summary:** 2 threats introduced, 0 resolved
+
+### Severity Breakdown
+| Severity | Count |
+|----------|-------|
+| 🔴 Critical | 1 |
+| 🟠 High | 1 |
+| 🟡 Medium | 0 |
+| 🟢 Low | 0 |
+| 🔵 Info | 0 |
+
+### Findings
+
+<details>
+<summary>🔴 Critical — 1 finding</summary>
+
+| Resource | Rule | File | STRIDE | Mitigation |
+|----------|------|------|--------|------------|
+| `aws_s3_bucket.uploads` | `TMAC-AWS-S3-001` | [`main.tf:12`](https://github.com/org/repo/blob/feature-branch/main.tf#L12) | Information Disclosure | Change the 'acl' attribute to 'private'... |
+
+</details>
+
+<details>
+<summary>🟠 High — 1 finding</summary>
+
+| Resource | Rule | File | STRIDE | Mitigation |
+|----------|------|------|--------|------------|
+| `aws_security_group.web` | `TMAC-AWS-SG-001` | [`sg.tf:5`](https://github.com/org/repo/blob/feature-branch/sg.tf#L5) | Tampering | Restrict SSH access to known CIDR ranges... |
+
+</details>
+
+📎 Full report: tmac-report.md
 ```
+
+Each severity section is collapsed by default — click to expand. The report artifact is always
+written locally, even when no CI token is available.
 
 ### Idempotent publishing behavior
 

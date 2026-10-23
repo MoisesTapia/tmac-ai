@@ -399,3 +399,47 @@ def test_unresolved_references_never_compare(sentinel):
         assert Evaluator().evaluate(cond, {"a": sentinel}) is False
     exists = CheckCondition(attribute="a", condition="exists")
     assert Evaluator().evaluate(exists, {"a": sentinel}) is True
+
+
+# ---------------------------------------------------------------------------
+# not_regex (used by threats_extended.yaml, e.g. TMAC-AWS-GGV2-002)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("artifacts:\n  - uri: s3://b/a.zip\n    digest: abc", False),
+        ("artifacts:\n  - uri: s3://b/a.zip", True),
+        (None, False),  # absent never matches; use not_exists for absence
+        ({"Ref": "Recipe"}, False),  # unresolved reference is never compared
+    ],
+)
+def test_not_regex(value, expected):
+    cond = CheckCondition(attribute="inline_recipe", condition="not_regex", values=["digest"])
+    attrs = {} if value is None else {"inline_recipe": value}
+    assert Evaluator().evaluate(cond, attrs) is expected
+
+
+# ---------------------------------------------------------------------------
+# Nested lists of blocks (block inside block, as python-hcl2 returns them)
+# ---------------------------------------------------------------------------
+
+SSE_CONFIG = {"rule": [{"apply_server_side_encryption_by_default": [{"sse_algorithm": "AES256"}]}]}
+
+
+def test_path_through_nested_block_lists_is_resolved():
+    path = "rule.apply_server_side_encryption_by_default.sse_algorithm"
+    assert Evaluator().resolve_attribute(path, SSE_CONFIG) == ["AES256"]
+    equals = CheckCondition(attribute=path, condition="equals", values=["AES256"])
+    absent = CheckCondition(attribute=path, condition="not_exists")
+    assert Evaluator().evaluate(equals, SSE_CONFIG) is True
+    assert Evaluator().evaluate(absent, SSE_CONFIG) is False  # it IS declared
+
+
+def test_leaf_lists_are_not_flattened():
+    attrs = {"ingress": [{"cidr_blocks": ["10.0.0.0/8"]}, {"cidr_blocks": ["0.0.0.0/0"]}]}
+    assert Evaluator().resolve_attribute("ingress.cidr_blocks", attrs) == [
+        ["10.0.0.0/8"],
+        ["0.0.0.0/0"],
+    ]

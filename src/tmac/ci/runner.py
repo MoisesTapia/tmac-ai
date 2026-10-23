@@ -447,22 +447,23 @@ class CIRunner:
         out_file = output or f"tmac-report.{fmt}"
 
         # ------------------------------------------------------------------
-        # Step 3: Write the Report_Artifact (only when token is present OR
-        # publish is disabled — skip upload when token is missing per R4.3)
+        # Step 3: Write the Report_Artifact locally (always).
+        # When token is missing, skip the upload and warn, but still write
+        # the file so the report is available locally (R4.3).
         # ------------------------------------------------------------------
-        if token:
-            reporter = self._build_reporter(fmt)
-            report_content = reporter.generate(result)
-            try:
-                with open(out_file, "w", encoding="utf-8") as fh:
-                    fh.write(report_content)
-                logger.debug("CIRunner: report written to '%s'", out_file)
-            except OSError as exc:
-                msg = _secrets.redact(f"Could not write report to '{out_file}': {exc}", token)
-                print(msg, file=sys.stderr)
-                # Don't abort — proceed with findings-based exit
-        else:
-            # Token missing: skip artifact upload, report missing token (R4.3)
+        reporter = self._build_reporter(fmt)
+        report_content = reporter.generate(result)
+        try:
+            with open(out_file, "w", encoding="utf-8") as fh:
+                fh.write(report_content)
+            logger.debug("CIRunner: report written to '%s'", out_file)
+        except OSError as exc:
+            msg = _secrets.redact(f"Could not write report to '{out_file}': {exc}", token)
+            print(msg, file=sys.stderr)
+            # Don't abort — proceed with findings-based exit
+
+        if not token:
+            # Token missing: skip artifact upload and comment publishing (R4.3)
             print(
                 "Warning: No CI token found (GITHUB_TOKEN / CI_JOB_TOKEN / TMAC_TOKEN). "
                 "Skipping artifact upload and comment publishing.",
@@ -487,6 +488,12 @@ class CIRunner:
             max_length=max_length,
             introduced=introduced,
             resolved=resolved,
+            repo_url=(
+                f"https://github.com/{ctx.repo}" if ctx.platform == "github" and ctx.repo else ""
+            ),
+            # Link to the PR head (files may not exist / differ on the default branch).
+            ref=ctx.head_ref or os.environ.get("GITHUB_SHA", "") or "HEAD",
+            source_root=directory,
         )
         body = formatter.format(result, comment_ctx)
         if result.issues:
