@@ -1,6 +1,9 @@
 from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
+# IgnoreMap: resource key (name, or address for tfplan) → ["*"] (global) or ["RULE-ID-1", ...]
+IgnoreMap = Dict[str, List[str]]
+
 class ResourceModel(BaseModel):
     resource_type: str
     name: str

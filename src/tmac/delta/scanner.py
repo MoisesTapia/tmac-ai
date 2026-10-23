@@ -6,20 +6,18 @@ Validates: Requirements 3.1–3.8, 6.1–6.6
 
 import logging
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.engine.evaluator import Evaluator
+from tmac.engine.matcher import group_rules_by_type
 from tmac.engine.rule_loader import RuleLoader
 from tmac.models.finding import ScanMetadata, ScanStatistics
-from tmac.models.resource import ResourceModel
+from tmac.models.resource import IgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
 from tmac.parsers.tfplan import TfplanParser
 
 logger = logging.getLogger(__name__)
-
-# IgnoreMap: resource_address → ["*"] (global) or ["RULE-ID-1", ...]
-IgnoreMap = Dict[str, List[str]]
 
 
 class DeltaScanError(Exception):
@@ -67,6 +65,7 @@ class DeltaScanner:
 
         rules = self._rule_loader.load_rules(rules_dir)
         logger.debug("Loaded %d rules", len(rules))
+        rules_by_type = group_rules_by_type(rules)
 
         counts = {ChangeAction.create: 0, ChangeAction.update: 0,
                   ChangeAction.delete: 0, ChangeAction.replace: 0}
@@ -81,11 +80,12 @@ class DeltaScanner:
                 logger.debug("Ignoring resource %s (tmac:ignore *)", change.address)
                 continue
 
+            applicable = rules_by_type.get(change.resource_type, [])
             logger.debug(
                 "Evaluating %d rules against %s (%s)",
-                len(rules), change.address, change.action.value,
+                len(applicable), change.address, change.action.value,
             )
-            introduced, resolved = self._evaluate_change(change, rules)
+            introduced, resolved = self._evaluate_change(change, applicable)
             all_findings.extend(introduced)
             total_resolved += resolved
 
@@ -98,15 +98,7 @@ class DeltaScanner:
             counts.get(ChangeAction.replace, 0),
         )
 
-        stats = ScanStatistics(
-            total_resources=len(changes),
-            total_findings=len(all_findings),
-            critical=sum(1 for f in all_findings if f.severity.lower() == "critical"),
-            high=sum(1 for f in all_findings if f.severity.lower() == "high"),
-            medium=sum(1 for f in all_findings if f.severity.lower() == "medium"),
-            low=sum(1 for f in all_findings if f.severity.lower() == "low"),
-            info=sum(1 for f in all_findings if f.severity.lower() == "info"),
-        )
+        stats = ScanStatistics.from_findings(all_findings, total_resources=len(changes))
 
         return DeltaScanResult(
             metadata=ScanMetadata(

@@ -240,3 +240,57 @@ class TestIgnoreScope:
         result = Scanner().run_scan(str(tmp_path))
         s3_files = {Path(f.file_path).name for f in result.findings if f.resource_type == "aws_s3_bucket"}
         assert s3_files == {"b.tf"}
+
+
+# ---------------------------------------------------------------------------
+# Scanner is format-agnostic: discovery and parsing come from the parser
+# ---------------------------------------------------------------------------
+
+from tmac.models.resource import ResourceModel  # noqa: E402
+from tmac.parsers.base import BaseParser  # noqa: E402
+
+
+class _FakeParser(BaseParser):
+    """Treats every *.fake file whose first line is 'FAKE' as one public S3 bucket."""
+
+    file_patterns = ("*.fake", "*.fk")
+
+    def can_parse(self, file_path):
+        return Path(file_path).read_text(encoding="utf-8").startswith("FAKE")
+
+    def parse(self, file_path):
+        return [ResourceModel(
+            resource_type="aws_s3_bucket", name=Path(file_path).stem,
+            attributes={"acl": "public-read"}, source_file=file_path,
+        )]
+
+
+class TestPluggableParser:
+    def test_scanner_uses_parser_patterns_and_can_parse(self, tmp_path):
+        (tmp_path / "a.fake").write_text("FAKE", encoding="utf-8")
+        (tmp_path / "b.fk").write_text("FAKE", encoding="utf-8")
+        (tmp_path / "c.fake").write_text("not mine", encoding="utf-8")   # rejected by can_parse
+        _write_tf(tmp_path, "main.tf", PUBLIC_TF)                        # not this parser's pattern
+        result = Scanner(parser=_FakeParser()).run_scan(str(tmp_path))
+        assert result.files_scanned == 2
+        assert {f.resource_name for f in result.findings} == {"a", "b"}
+        assert {f.file_path for f in result.findings} == {str(tmp_path / "a.fake"), str(tmp_path / "b.fk")}
+
+    def test_default_parser_is_terraform(self):
+        from tmac.parsers.terraform import TerraformParser
+        assert isinstance(Scanner().parser, TerraformParser)
+
+    def test_parser_without_patterns_is_rejected(self):
+        class _NoPatterns(BaseParser):
+            def parse(self, file_path):
+                return []
+        with pytest.raises(ValueError, match="file_patterns"):
+            Scanner(parser=_NoPatterns())
+
+    def test_min_severity_filter_and_statistics(self, tmp_path):
+        _write_tf(tmp_path, "main.tf", PUBLIC_TF)
+        full = Scanner().run_scan(str(tmp_path))
+        critical = Scanner().run_scan(str(tmp_path), min_severity="critical")
+        assert all(f.severity == "Critical" for f in critical.findings)
+        assert critical.statistics.total_findings == critical.statistics.critical == len(critical.findings)
+        assert full.statistics.total_findings >= critical.statistics.total_findings

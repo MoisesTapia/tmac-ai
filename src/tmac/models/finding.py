@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Sequence
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -32,6 +32,15 @@ class ScanStatistics(BaseModel):
     medium: int = 0
     low: int = 0
     info: int = 0
+
+    @classmethod
+    def from_findings(cls, findings: Sequence[Finding], total_resources: int) -> "ScanStatistics":
+        counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in findings:
+            sev = f.severity.lower()
+            if sev in counts:
+                counts[sev] += 1
+        return cls(total_resources=total_resources, total_findings=len(findings), **counts)
 
 class ScanResult(BaseModel):
     metadata: ScanMetadata

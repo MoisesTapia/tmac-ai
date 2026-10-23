@@ -2,12 +2,14 @@ import fnmatch
 import logging
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from tmac.config import ConfigError, load_config
 from tmac.engine.matcher import Matcher
 from tmac.engine.rule_loader import RuleLoader
+from tmac.engine.severity import filter_by_min_severity
 from tmac.models.finding import ScanMetadata, ScanResult, ScanStatistics
+from tmac.parsers.base import BaseParser
 from tmac.parsers.terraform import TerraformParser
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,17 @@ class ScanError(Exception):
 
 
 class Scanner:
-    """Orchestrates the full TMAC scan pipeline (SRP: no presentation logic)."""
+    """Orchestrates the full TMAC scan pipeline (SRP: no presentation logic).
+
+    Format-agnostic: file discovery and parsing are delegated to ``parser``
+    (Terraform by default). Supporting a new IaC format means writing a
+    BaseParser subclass, not a new scanner.
+    """
+
+    def __init__(self, parser: Optional[BaseParser] = None) -> None:
+        self.parser = parser or TerraformParser()
+        if not self.parser.file_patterns:
+            raise ValueError(f"{type(self.parser).__name__} declares no file_patterns")
 
     def run_scan(
         self,
@@ -47,29 +59,28 @@ class Scanner:
         cfg_exclude = cfg.get("scan", {}).get("exclude", [])
         all_excludes = list(exclude_patterns) + cfg_exclude
 
-        # Build the include set (resolved absolute paths) when include_paths is provided
-        include_set = {str(Path(p).resolve()) for p in include_paths} if include_paths is not None else None
+        # Restrict to include_paths (resolved absolute paths) when provided (CI delta mode)
+        include_set = (
+            {str(Path(p).resolve()) for p in include_paths} if include_paths is not None else None
+        )
 
-        # Discover .tf files, applying include restriction and exclude patterns
-        tf_files = [
-            f for f in scan_path.rglob("*.tf")
-            if (include_set is None or str(f.resolve()) in include_set)
-            and not _is_excluded(f, all_excludes)
-        ]
-        logger.debug("Discovered %d .tf files in %s", len(tf_files), directory)
+        files = self._discover_files(scan_path, all_excludes, include_set)
+        logger.debug(
+            "Discovered %d files (%s) in %s",
+            len(files), ", ".join(self.parser.file_patterns), directory,
+        )
 
         # Parse resources (tmac:ignore suppressions travel on each ResourceModel)
-        parser = TerraformParser()
         all_resources = []
         files_failed = 0
 
-        for tf_file in tf_files:
-            resources = parser.parse(str(tf_file))
+        for file in files:
+            resources = self.parser.parse(str(file))
             # Detect parse failure: non-empty file that returned no resources
             # (parser.parse returns [] on error per its implementation)
             if not resources:
                 try:
-                    file_size = tf_file.stat().st_size
+                    file_size = file.stat().st_size
                 except OSError:
                     file_size = 0
                 if file_size > 0:
@@ -85,35 +96,36 @@ class Scanner:
 
         # Match
         matcher = Matcher()
-        findings = matcher.match(all_resources, rules)
-
-        # Filter by min_severity
-        severity_levels = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
-        if min_severity != "all":
-            min_level = severity_levels.get(min_severity.lower(), 0)
-            findings = [f for f in findings if severity_levels.get(f.severity.lower(), 0) >= min_level]
-
-        stats = ScanStatistics(
-            total_resources=len(all_resources),
-            total_findings=len(findings),
-            critical=sum(1 for f in findings if f.severity.lower() == "critical"),
-            high=sum(1 for f in findings if f.severity.lower() == "high"),
-            medium=sum(1 for f in findings if f.severity.lower() == "medium"),
-            low=sum(1 for f in findings if f.severity.lower() == "low"),
-            info=sum(1 for f in findings if f.severity.lower() == "info"),
-        )
+        findings = filter_by_min_severity(matcher.match(all_resources, rules), min_severity)
 
         return ScanResult(
             metadata=ScanMetadata(
                 scanned_directory=str(directory),
                 execution_time_seconds=time.time() - start,
             ),
-            statistics=stats,
+            statistics=ScanStatistics.from_findings(findings, total_resources=len(all_resources)),
             findings=findings,
-            files_scanned=len(tf_files),
+            files_scanned=len(files),
             rules_loaded=len(rules),
             files_failed=files_failed,
         )
+
+    def _discover_files(
+        self, scan_path: Path, excludes: List[str], include_set: Optional[Set[str]] = None
+    ) -> List[Path]:
+        """Files matching the parser's patterns, minus excludes, deduplicated and sorted.
+
+        When ``include_set`` is given, only those (resolved, absolute) paths are kept.
+        """
+        found = {
+            f
+            for pattern in self.parser.file_patterns
+            for f in scan_path.rglob(pattern)
+            if f.is_file()
+            and (include_set is None or str(f.resolve()) in include_set)
+            and not _is_excluded(f, excludes)
+        }
+        return sorted(f for f in found if self.parser.can_parse(str(f)))
 
 
 def _is_excluded(file_path: Path, patterns: List[str]) -> bool:

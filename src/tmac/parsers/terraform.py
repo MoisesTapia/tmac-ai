@@ -4,13 +4,11 @@ import re
 from io import StringIO
 from typing import Dict, List, Optional, Tuple
 from tmac.parsers.base import BaseParser
-from tmac.models.resource import ResourceModel
+from tmac.models.resource import IgnoreMap, ResourceModel
 
 logger = logging.getLogger(__name__)
 
-# IgnoreMap: resource_name → ["*"] (global ignore) or ["RULE-ID-1", ...] (per-rule)
-IgnoreMap = Dict[str, List[str]]
-# Same, keyed by (resource_type, resource_name) — unique within a file.
+# Like IgnoreMap, but keyed by (resource_type, resource_name) — unique within a file.
 ResourceIgnoreMap = Dict[Tuple[str, str], List[str]]
 LineMap = Dict[Tuple[str, str], int]
 
@@ -26,6 +24,8 @@ def merge_ignores(existing: List[str], new: List[str]) -> List[str]:
 
 class TerraformParser(BaseParser):
     """Parser for Terraform HCL format (.tf files)."""
+
+    file_patterns = ("*.tf",)
 
     def parse(self, file_path: str) -> List[ResourceModel]:
         resources: List[ResourceModel] = []

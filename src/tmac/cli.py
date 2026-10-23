@@ -4,18 +4,14 @@ import sys
 
 import click
 
-from tmac.reporters.base import BaseReporter
-from tmac.reporters.html import HTMLReporter
-from tmac.reporters.json_report import JSONReporter
-from tmac.reporters.markdown import MarkdownReporter
 from tmac.delta.scanner import DeltaScanError, DeltaScanner
 from tmac.graph.service import DiagramError, DiagramService
 from tmac.graph.diagrams import IMAGE_FORMATS, render_graph, render_image
 from tmac.graph.grouping import group_by_name
 from tmac.graph.metadata import render_metadata
+from tmac.engine.severity import SEVERITY_LEVELS
+from tmac.reporters import get_reporter
 from tmac.scanner import ScanError, Scanner
-
-SEVERITY_LEVELS = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
 
 @click.group()
@@ -84,15 +80,7 @@ def scan(
         except DiagramError as exc:
             click.echo(f"Warning: could not generate the diagram: {exc}", err=True)
 
-    reporter: BaseReporter
-    if fmt == "html":
-        reporter = HTMLReporter()
-    elif fmt == "md":
-        reporter = MarkdownReporter()
-    else:
-        reporter = JSONReporter()
-
-    report_content = reporter.generate(result, diagram=diagram_src)
+    report_content = get_reporter(fmt).generate(result, diagram=diagram_src)
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(report_content)
 
@@ -137,15 +125,7 @@ def plan(
         click.echo(str(exc), err=True)
         sys.exit(3)
 
-    reporter: BaseReporter
-    if fmt == "html":
-        reporter = HTMLReporter()
-    elif fmt == "md":
-        reporter = MarkdownReporter()
-    else:
-        reporter = JSONReporter()
-
-    report_content = reporter.generate(result)
+    report_content = get_reporter(fmt).generate(result)
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(report_content)
 

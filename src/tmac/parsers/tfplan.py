@@ -9,13 +9,10 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 from tmac.delta.models import ChangeAction, PlannedChange
-from tmac.models.resource import ResourceModel
+from tmac.models.resource import IgnoreMap, ResourceModel
 from tmac.parsers.base import BaseParser
 
 logger = logging.getLogger(__name__)
-
-# IgnoreMap: resource_address → ["*"] (global ignore) or ["RULE-ID-1", ...]
-IgnoreMap = Dict[str, List[str]]
 
 
 class TfplanParser(BaseParser):
