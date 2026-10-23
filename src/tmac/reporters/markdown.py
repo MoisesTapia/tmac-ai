@@ -1,12 +1,15 @@
-from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
-from tmac.reporters.base import BaseReporter
-from tmac.models.finding import ScanResult
+
+from jinja2 import Environment, FileSystemLoader
+
 from tmac.delta.models import DeltaScanResult
+from tmac.models.finding import ScanResult
+from tmac.reporters.base import BaseReporter
+
 
 class MarkdownReporter(BaseReporter):
     """Generates a Markdown report intended for Pull Request comments."""
-    
+
     def generate(self, result: ScanResult) -> str:
         templates_dir = Path(__file__).parent.parent / "templates"
         env = Environment(loader=FileSystemLoader(templates_dir))

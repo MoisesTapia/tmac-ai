@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 from tmac.models.rule import CheckCondition
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class Evaluator:
     """Evaluates rule conditions against resource attributes."""
 
-    def evaluate(self, condition: CheckCondition, attributes: Dict[str, Any]) -> bool:
+    def evaluate(self, condition: CheckCondition, attributes: dict[str, Any]) -> bool:
         """
         Evaluate a single check condition against the resource attributes.
         Returns True if the resource MATCHES the condition (meaning a finding),
@@ -57,11 +57,11 @@ class Evaluator:
 
         return matched
 
-    def resolve_attribute(self, attribute_path: str, attributes: Dict[str, Any]) -> Any:
+    def resolve_attribute(self, attribute_path: str, attributes: dict[str, Any]) -> Any:
         """Resolve a dotted attribute path; values from repeated blocks come back as a list."""
         return self._get_attribute_value(attribute_path, attributes)
 
-    def _get_attribute_value(self, attribute_path: str, attributes: Dict[str, Any]) -> Any:
+    def _get_attribute_value(self, attribute_path: str, attributes: dict[str, Any]) -> Any:
         parts = attribute_path.split(".")
         current: Any = attributes
         for i, part in enumerate(parts):
@@ -90,7 +90,9 @@ class Evaluator:
                 return None
         return current
 
-    def _evaluate_condition(self, condition: str, expected_values: List[Any], actual_value: Any) -> bool:
+    def _evaluate_condition(
+        self, condition: str, expected_values: list[Any], actual_value: Any
+    ) -> bool:
         if condition == "exists":
             return actual_value is not None
         if condition == "not_exists":

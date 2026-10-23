@@ -1,13 +1,12 @@
-from typing import Dict, List, Optional
+from tmac.engine.evaluator import Evaluator
+from tmac.models.finding import Finding
 from tmac.models.resource import IgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
-from tmac.models.finding import Finding
-from tmac.engine.evaluator import Evaluator
 
 
-def group_rules_by_type(rules: List[ThreatRule]) -> Dict[str, List[ThreatRule]]:
+def group_rules_by_type(rules: list[ThreatRule]) -> dict[str, list[ThreatRule]]:
     """Index rules by resource_type so each resource only sees applicable rules."""
-    rules_by_type: Dict[str, List[ThreatRule]] = {}
+    rules_by_type: dict[str, list[ThreatRule]] = {}
     for rule in rules:
         rules_by_type.setdefault(rule.resource_type, []).append(rule)
     return rules_by_type
@@ -21,11 +20,11 @@ class Matcher:
 
     def match(
         self,
-        resources: List[ResourceModel],
-        rules: List[ThreatRule],
-        ignore_map: Optional[IgnoreMap] = None,
-    ) -> List[Finding]:
-        findings: List[Finding] = []
+        resources: list[ResourceModel],
+        rules: list[ThreatRule],
+        ignore_map: IgnoreMap | None = None,
+    ) -> list[Finding]:
+        findings: list[Finding] = []
         ignore_map = ignore_map or {}
         rules_by_type = group_rules_by_type(rules)
 

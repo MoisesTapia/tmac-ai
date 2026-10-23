@@ -6,7 +6,6 @@ Validates: Requirements 3.1–3.8, 6.1–6.6
 
 import logging
 import time
-from typing import List, Optional, Tuple
 
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.engine.evaluator import Evaluator
@@ -22,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class DeltaScanError(Exception):
     """Raised when the delta scan pipeline cannot proceed."""
-    pass
 
 
 class DeltaScanner:
@@ -43,11 +41,11 @@ class DeltaScanner:
     def run(
         self,
         plan_file: str,
-        rules_dir: Optional[str] = None,
-        ignore_map: Optional[IgnoreMap] = None,
+        rules_dir: str | None = None,
+        ignore_map: IgnoreMap | None = None,
         min_severity: str = "all",
         verbose: bool = False,
-        resource_ignores: Optional[ResourceIgnoreMap] = None,
+        resource_ignores: ResourceIgnoreMap | None = None,
     ) -> DeltaScanResult:
         """Execute the full delta analysis pipeline.
 
@@ -74,9 +72,13 @@ class DeltaScanner:
         logger.debug("Loaded %d rules", len(rules))
         rules_by_type = group_rules_by_type(rules)
 
-        counts = {ChangeAction.create: 0, ChangeAction.update: 0,
-                  ChangeAction.delete: 0, ChangeAction.replace: 0}
-        all_findings: List[DeltaFinding] = []
+        counts = {
+            ChangeAction.create: 0,
+            ChangeAction.update: 0,
+            ChangeAction.delete: 0,
+            ChangeAction.replace: 0,
+        }
+        all_findings: list[DeltaFinding] = []
         total_resolved = 0
 
         for change in changes:
@@ -94,7 +96,9 @@ class DeltaScanner:
             ]
             logger.debug(
                 "Evaluating %d rules against %s (%s)",
-                len(applicable), change.address, change.action.value,
+                len(applicable),
+                change.address,
+                change.action.value,
             )
             introduced, resolved = self._evaluate_change(change, applicable)
             all_findings.extend(introduced)
@@ -102,7 +106,8 @@ class DeltaScanner:
 
         logger.debug(
             "Parsed %d planned changes from %s (create=%d, update=%d, delete=%d, replace=%d)",
-            len(changes), plan_file,
+            len(changes),
+            plan_file,
             counts.get(ChangeAction.create, 0),
             counts.get(ChangeAction.update, 0),
             counts.get(ChangeAction.delete, 0),
@@ -123,7 +128,8 @@ class DeltaScanner:
             findings_introduced=len(all_findings),
             findings_resolved=total_resolved,
             resources_created=counts.get(ChangeAction.create, 0),
-            resources_updated=counts.get(ChangeAction.update, 0) + counts.get(ChangeAction.replace, 0),
+            resources_updated=counts.get(ChangeAction.update, 0)
+            + counts.get(ChangeAction.replace, 0),
             resources_deleted=counts.get(ChangeAction.delete, 0),
             plan_file=plan_file,
             issues=list(self._rule_loader.issues),
@@ -149,9 +155,7 @@ class DeltaScanner:
             raise DeltaScanError(f"Cannot read plan file {plan_file}: {exc}") from exc
 
         if not isinstance(data, dict) or "resource_changes" not in data:
-            raise DeltaScanError(
-                f"Plan file {plan_file} does not contain 'resource_changes' field"
-            )
+            raise DeltaScanError(f"Plan file {plan_file} does not contain 'resource_changes' field")
 
     def _build_resource_model(
         self,
@@ -171,8 +175,8 @@ class DeltaScanner:
     def _evaluate_change(
         self,
         change: PlannedChange,
-        rules: List[ThreatRule],
-    ) -> Tuple[List[DeltaFinding], int]:
+        rules: list[ThreatRule],
+    ) -> tuple[list[DeltaFinding], int]:
         """Evaluate a PlannedChange against all rules according to its action.
 
         Returns:
@@ -185,7 +189,7 @@ class DeltaScanner:
                              in after but not before → introduced
                              in before but not after → resolved
         """
-        introduced: List[DeltaFinding] = []
+        introduced: list[DeltaFinding] = []
         resolved = 0
 
         # Filter rules applicable to this resource type

@@ -6,7 +6,6 @@ Validates: Requirements 1.1–1.12, 6.5
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
 
 from tmac.delta.models import ChangeAction, PlannedChange
 from tmac.models.resource import IgnoreMap, ResourceModel
@@ -28,10 +27,10 @@ class TfplanParser(BaseParser):
     # BaseParser interface
     # ------------------------------------------------------------------
 
-    def parse(self, file_path: str) -> List[ResourceModel]:
+    def parse(self, file_path: str) -> list[ResourceModel]:
         """Implements BaseParser. Returns ResourceModels built from 'after' attributes."""
         changes = self.parse_plan(file_path)
-        resources: List[ResourceModel] = []
+        resources: list[ResourceModel] = []
         for change in changes:
             if change.after is not None:
                 resources.append(
@@ -49,7 +48,7 @@ class TfplanParser(BaseParser):
     # Primary method
     # ------------------------------------------------------------------
 
-    def parse_plan(self, file_path: str) -> List[PlannedChange]:
+    def parse_plan(self, file_path: str) -> list[PlannedChange]:
         """Parse a tfplan.json and return a list of PlannedChange objects.
 
         Returns an empty list (with a warning) if the file does not exist,
@@ -72,8 +71,8 @@ class TfplanParser(BaseParser):
             logger.warning("No 'resource_changes' field in %s — returning empty result", file_path)
             return []
 
-        changes: List[PlannedChange] = []
-        counts: Dict[str, int] = {"create": 0, "update": 0, "delete": 0, "replace": 0}
+        changes: list[PlannedChange] = []
+        counts: dict[str, int] = {"create": 0, "update": 0, "delete": 0, "replace": 0}
 
         for rc in data["resource_changes"]:
             address = rc.get("address", "")
@@ -91,8 +90,8 @@ class TfplanParser(BaseParser):
 
             # Enforce before/after semantics per action
             if action == ChangeAction.create:
-                before: Optional[Dict] = None
-                after: Optional[Dict] = raw_after if isinstance(raw_after, dict) else {}
+                before: dict | None = None
+                after: dict | None = raw_after if isinstance(raw_after, dict) else {}
             elif action == ChangeAction.delete:
                 before = raw_before if isinstance(raw_before, dict) else {}
                 after = None
@@ -155,7 +154,7 @@ class TfplanParser(BaseParser):
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _extract_resource_type_and_name(self, address: str) -> Tuple[str, str]:
+    def _extract_resource_type_and_name(self, address: str) -> tuple[str, str]:
         """Extract resource_type and resource_name from a tfplan address.
 
         Simple:  'aws_s3_bucket.data'              → ('aws_s3_bucket', 'data')
@@ -167,7 +166,7 @@ class TfplanParser(BaseParser):
         # Fallback for malformed addresses
         return address, address
 
-    def _map_action(self, actions: List[str]) -> Optional[ChangeAction]:
+    def _map_action(self, actions: list[str]) -> ChangeAction | None:
         """Map a tfplan actions list to a ChangeAction enum value.
 
         ['create']          → ChangeAction.create

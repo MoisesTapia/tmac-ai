@@ -10,7 +10,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from tmac.delta.models import ChangeAction, PlannedChange
+from tmac.delta.models import ChangeAction
 from tmac.models.resource import ResourceModel
 from tmac.parsers.tfplan import TfplanParser
 
@@ -25,6 +25,7 @@ def parser() -> TfplanParser:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _write_plan(tmp_path: Path, data: dict) -> str:
     p = tmp_path / "plan.json"
@@ -53,6 +54,7 @@ def _minimal_plan(address: str, actions: list, before=None, after=None) -> dict:
 # ---------------------------------------------------------------------------
 # Fixture-based tests
 # ---------------------------------------------------------------------------
+
 
 def test_parse_create_action(parser: TfplanParser):
     """parse_plan() with create_with_threat.json returns PlannedChange with action=create,
@@ -93,8 +95,9 @@ def test_parse_update_action(parser: TfplanParser):
 
 def test_noop_resources_omitted(parser: TfplanParser, tmp_path: Path):
     """Resources with action no-op are not included in the result."""
-    data = _minimal_plan("aws_s3_bucket.data", ["no-op"],
-                         before={"acl": "private"}, after={"acl": "private"})
+    data = _minimal_plan(
+        "aws_s3_bucket.data", ["no-op"], before={"acl": "private"}, after={"acl": "private"}
+    )
     path = _write_plan(tmp_path, data)
     changes = parser.parse_plan(path)
     assert changes == []
@@ -125,6 +128,7 @@ def test_nonexistent_file_returns_empty(parser: TfplanParser):
 # Address parsing tests
 # ---------------------------------------------------------------------------
 
+
 def test_address_parsing_simple(parser: TfplanParser):
     """'aws_s3_bucket.data' → resource_type='aws_s3_bucket', resource_name='data'."""
     rt, rn = parser._extract_resource_type_and_name("aws_s3_bucket.data")
@@ -142,6 +146,7 @@ def test_address_parsing_module(parser: TfplanParser):
 # ---------------------------------------------------------------------------
 # BaseParser interface test
 # ---------------------------------------------------------------------------
+
 
 def test_parse_base_interface_returns_resource_models(parser: TfplanParser):
     """parse() (BaseParser interface) returns ResourceModels built from 'after' attributes."""
@@ -163,6 +168,7 @@ def test_parse_base_interface_excludes_delete(parser: TfplanParser):
 # ---------------------------------------------------------------------------
 # _map_action tests
 # ---------------------------------------------------------------------------
+
 
 def test_map_action_create(parser: TfplanParser):
     assert parser._map_action(["create"]) == ChangeAction.create
@@ -227,6 +233,7 @@ def test_property_1_before_after_semantics(
 # Feature: tmac-v1-1-tfplan-delta, Property 2
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(n_noop=st.integers(min_value=1, max_value=5))
 def test_property_2_noop_omitted(tmp_path: Path, parser: TfplanParser, n_noop: int):
@@ -256,14 +263,13 @@ def test_property_2_noop_omitted(tmp_path: Path, parser: TfplanParser, n_noop: i
 # Feature: tmac-v1-1-tfplan-delta, Property 3
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     action=st.sampled_from(["create", "update", "delete"]),
     acl=st.sampled_from(["private", "public-read"]),
 )
-def test_property_3_deterministic(
-    tmp_path: Path, parser: TfplanParser, action: str, acl: str
-):
+def test_property_3_deterministic(tmp_path: Path, parser: TfplanParser, action: str, acl: str):
     """Property 3: parsing the same file twice produces identical results."""
     # Feature: tmac-v1-1-tfplan-delta, Property 3: El parser es determinista
     before = {"acl": acl} if action in ("update", "delete") else None
@@ -282,14 +288,13 @@ def test_property_3_deterministic(
 # Feature: tmac-v1-1-tfplan-delta, Property 4
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
     action=st.sampled_from(["create", "update", "delete"]),
     acl=st.sampled_from(["private", "public-read"]),
 )
-def test_property_4_round_trip(
-    tmp_path: Path, parser: TfplanParser, action: str, acl: str
-):
+def test_property_4_round_trip(tmp_path: Path, parser: TfplanParser, action: str, acl: str):
     """Property 4: serializing PlannedChange[] to JSON and re-parsing produces an equivalent list.
 
     Validates: Requirements 1.11, 1.12
@@ -314,9 +319,11 @@ def test_property_4_round_trip(
                 "type": change.resource_type,
                 "name": change.resource_name,
                 "change": {
-                    "actions": [change.action.value]
-                    if change.action != ChangeAction.replace
-                    else ["delete", "create"],
+                    "actions": (
+                        [change.action.value]
+                        if change.action != ChangeAction.replace
+                        else ["delete", "create"]
+                    ),
                     "before": change.before,
                     "after": change.after,
                 },
@@ -344,6 +351,7 @@ def test_property_4_round_trip(
 # Property 5: El parser maneja JSON inválido sin lanzar excepciones
 # Feature: tmac-v1-1-tfplan-delta, Property 5
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(bad_content=st.text(min_size=1, max_size=200).filter(lambda s: s.strip() != "{}"))

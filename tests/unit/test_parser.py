@@ -9,13 +9,15 @@ Covers:
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 12.1, 12.2, 12.3, 12.4
 """
 
-import pytest
 from pathlib import Path
-from hypothesis import given, settings, strategies as st
 
-from tmac.parsers.terraform import TerraformParser
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from tmac.engine.matcher import Matcher
 from tmac.engine.rule_loader import RuleLoader
+from tmac.parsers.terraform import TerraformParser
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -23,6 +25,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_tf(tmp_path: Path, content: str, name: str = "test.tf") -> str:
     p = tmp_path / name
@@ -33,6 +36,7 @@ def _make_tf(tmp_path: Path, content: str, name: str = "test.tf") -> str:
 # ---------------------------------------------------------------------------
 # Requirement 12.1 — valid file returns correct number of ResourceModel objects
 # ---------------------------------------------------------------------------
+
 
 def test_parse_multiple_resources_count(tmp_path):
     content = """
@@ -58,6 +62,7 @@ resource "aws_security_group" "sg_one" {
 # Requirement 12.2 — invalid syntax returns empty list without exception
 # ---------------------------------------------------------------------------
 
+
 def test_parse_invalid_syntax_returns_empty(tmp_path):
     content = "this is not valid terraform { {{ }"
     path = _make_tf(tmp_path, content)
@@ -69,6 +74,7 @@ def test_parse_invalid_syntax_returns_empty(tmp_path):
 # ---------------------------------------------------------------------------
 # Requirement 4.1 / Property 5 — line_number > 0 for all resources
 # ---------------------------------------------------------------------------
+
 
 def test_line_numbers_positive(tmp_path):
     content = """
@@ -101,12 +107,16 @@ def test_line_numbers_from_real_fixture():
 # Requirement 4.3 / Property 6 — tmac:ignore global suppresses all findings
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("ignore_comment,resource_line", [
-    # ignore on preceding line
-    ("# tmac:ignore\n", 'resource "aws_s3_bucket" "target" {\n  acl = "public-read"\n}\n'),
-    # ignore on same line as resource declaration
-    ("", 'resource "aws_s3_bucket" "target" { # tmac:ignore\n  acl = "public-read"\n}\n'),
-])
+
+@pytest.mark.parametrize(
+    "ignore_comment,resource_line",
+    [
+        # ignore on preceding line
+        ("# tmac:ignore\n", 'resource "aws_s3_bucket" "target" {\n  acl = "public-read"\n}\n'),
+        # ignore on same line as resource declaration
+        ("", 'resource "aws_s3_bucket" "target" { # tmac:ignore\n  acl = "public-read"\n}\n'),
+    ],
+)
 def test_tmac_ignore_global_suppresses_all_findings(tmp_path, ignore_comment, resource_line):
     """Property 6: global tmac:ignore suppresses all findings for the resource."""
     content = ignore_comment + resource_line
@@ -122,14 +132,15 @@ def test_tmac_ignore_global_suppresses_all_findings(tmp_path, ignore_comment, re
 
     findings = matcher.match(resources, rules, ignore_map=ignore_map)
     target_findings = [f for f in findings if f.resource_name == "target"]
-    assert target_findings == [], (
-        f"Expected no findings for globally ignored resource, got: {target_findings}"
-    )
+    assert (
+        target_findings == []
+    ), f"Expected no findings for globally ignored resource, got: {target_findings}"
 
 
 # ---------------------------------------------------------------------------
 # Requirement 4.4 / Property 7 — tmac:ignore[RULE-ID] suppresses only that rule
 # ---------------------------------------------------------------------------
+
 
 def test_tmac_ignore_rule_id_suppresses_only_specified_rule(tmp_path):
     """Property 7: tmac:ignore[RULE-ID] suppresses only the named rule."""
@@ -163,6 +174,7 @@ resource "aws_s3_bucket" "partial_ignore" {
 # Requirement 4.6 — multiple consecutive tmac:ignore[RULE-ID] comments
 # ---------------------------------------------------------------------------
 
+
 def test_multiple_consecutive_ignore_rule_ids(tmp_path):
     content = """\
 # tmac:ignore[TMAC-AWS-SG-001]
@@ -184,6 +196,7 @@ resource "aws_security_group" "multi_ignored" {
 # ---------------------------------------------------------------------------
 # Requirement 4.7 / Property 8 — parsing is deterministic
 # ---------------------------------------------------------------------------
+
 
 def test_parse_deterministic(tmp_path):
     """Property 8: parsing the same file twice yields identical ResourceModel sets."""
@@ -215,6 +228,7 @@ resource "aws_security_group" "det_sg" {
 # Property 8 (Hypothesis) — determinism over arbitrary valid resource names
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(
     res_name=st.from_regex(r"[a-z][a-z0-9_]{0,19}", fullmatch=True),
@@ -222,7 +236,9 @@ resource "aws_security_group" "det_sg" {
 )
 def test_parse_deterministic_hypothesis(res_name, bucket_name):
     """Property 8 (PBT): parsing is deterministic for any valid resource name."""
-    import tempfile, os
+    import os
+    import tempfile
+
     content = f'resource "aws_s3_bucket" "{res_name}" {{\n  bucket = "{bucket_name}"\n}}\n'
     with tempfile.NamedTemporaryFile(mode="w", suffix=".tf", delete=False, encoding="utf-8") as f:
         f.write(content)
@@ -243,13 +259,16 @@ def test_parse_deterministic_hypothesis(res_name, bucket_name):
 # Property 5 (Hypothesis) — line_number > 0 for any valid resource
 # ---------------------------------------------------------------------------
 
+
 @settings(max_examples=100)
 @given(
     res_name=st.from_regex(r"[a-z][a-z0-9_]{0,19}", fullmatch=True),
 )
 def test_line_number_positive_hypothesis(res_name):
     """Property 5 (PBT): line_number > 0 for any valid resource in a .tf file."""
-    import tempfile, os
+    import os
+    import tempfile
+
     content = f'resource "aws_s3_bucket" "{res_name}" {{\n  bucket = "test"\n}}\n'
     with tempfile.NamedTemporaryFile(mode="w", suffix=".tf", delete=False, encoding="utf-8") as f:
         f.write(content)
@@ -267,6 +286,7 @@ def test_line_number_positive_hypothesis(res_name):
 # Fixture file smoke test — all fixture .tf files parse without error
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("fixture_file", list(FIXTURES.glob("*.tf")))
 def test_fixture_files_parse_without_error(fixture_file):
     """Requirement 12.5: all fixture .tf files return at least one ResourceModel."""
@@ -279,6 +299,7 @@ def test_fixture_files_parse_without_error(fixture_file):
 # ---------------------------------------------------------------------------
 # _prescan unit tests — line_map correctness
 # ---------------------------------------------------------------------------
+
 
 def test_prescan_line_map_accuracy():
     content = """\

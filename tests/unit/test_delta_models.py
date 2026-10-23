@@ -9,10 +9,10 @@ from hypothesis import strategies as st
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.models.finding import Finding, ScanMetadata, ScanStatistics
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_finding(**kwargs) -> Finding:
     defaults = dict(
@@ -66,6 +66,7 @@ def _make_scan_statistics() -> ScanStatistics:
 # PlannedChange tests
 # ---------------------------------------------------------------------------
 
+
 def test_planned_change_accepts_all_fields():
     """PlannedChange acepta todos los campos y los serializa correctamente."""
     pc = PlannedChange(
@@ -117,6 +118,7 @@ def test_planned_change_delete_after_none():
 # ChangeAction tests
 # ---------------------------------------------------------------------------
 
+
 def test_change_action_has_exactly_four_values():
     """ChangeAction tiene exactamente los valores create, update, delete, replace."""
     values = {a.value for a in ChangeAction}
@@ -134,6 +136,7 @@ def test_change_action_is_str_enum():
 # ---------------------------------------------------------------------------
 # DeltaFinding tests
 # ---------------------------------------------------------------------------
+
 
 def test_delta_finding_inherits_finding_fields():
     """DeltaFinding hereda todos los campos de Finding."""
@@ -187,6 +190,7 @@ def test_delta_finding_update_accepts_both_values():
 # ---------------------------------------------------------------------------
 # DeltaScanResult tests
 # ---------------------------------------------------------------------------
+
 
 def test_delta_scan_result_inherits_scan_result_fields():
     """DeltaScanResult hereda todos los campos de ScanResult."""

@@ -1,8 +1,9 @@
 import logging
-import yaml  # type: ignore
 from pathlib import Path
-from typing import List, Dict, Optional
+
+import yaml  # type: ignore
 from pydantic import ValidationError
+
 from tmac.models.finding import ScanIssue
 from tmac.models.rule import ThreatRule
 
@@ -20,11 +21,11 @@ class RuleLoader:
     """
 
     def __init__(self) -> None:
-        self.issues: List[ScanIssue] = []
+        self.issues: list[ScanIssue] = []
 
-    def load_rules(self, extra_rules_dir: Optional[str] = None) -> List[ThreatRule]:
+    def load_rules(self, extra_rules_dir: str | None = None) -> list[ThreatRule]:
         self.issues = []
-        rules: Dict[str, ThreatRule] = {}
+        rules: dict[str, ThreatRule] = {}
 
         # Load built-in rules
         base_dir = Path(__file__).parent.parent / "rules" / "aws"
@@ -65,7 +66,7 @@ class RuleLoader:
             return False
         return True
 
-    def _load_file(self, file_path: Path, rules_dict: Dict[str, ThreatRule]) -> None:
+    def _load_file(self, file_path: Path, rules_dict: dict[str, ThreatRule]) -> None:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)

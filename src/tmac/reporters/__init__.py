@@ -1,12 +1,14 @@
 """Reporters module for TMAC."""
-from typing import Callable, Dict
+
+from collections.abc import Callable
+from typing import Dict
 
 from tmac.reporters.base import BaseReporter
 from tmac.reporters.html import HTMLReporter
 from tmac.reporters.json_report import JSONReporter
 from tmac.reporters.markdown import MarkdownReporter
 
-REPORTERS: Dict[str, Callable[[], BaseReporter]] = {
+REPORTERS: dict[str, Callable[[], BaseReporter]] = {
     "html": HTMLReporter,
     "json": JSONReporter,
     "md": MarkdownReporter,

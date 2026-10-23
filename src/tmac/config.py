@@ -1,7 +1,8 @@
 import logging
-import yaml  # type: ignore
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
+import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,9 @@ ALLOWED_SEVERITY = ALLOWED_FAIL_ON | {"all"}
 
 class ConfigError(Exception):
     """Raised when the config file has syntax errors or is unreadable."""
-    pass
 
 
-def load_config(config_path: str = ".tmac.yaml") -> Dict[str, Any]:
+def load_config(config_path: str = ".tmac.yaml") -> dict[str, Any]:
     path = Path(config_path)
     if not path.exists():
         return {}
@@ -48,7 +48,7 @@ def load_config(config_path: str = ".tmac.yaml") -> Dict[str, Any]:
             config_path,
             sorted(unknown_top),
         )
-    result: Dict[str, Any] = {k: v for k, v in data.items() if k in ALLOWED_TOP_KEYS}
+    result: dict[str, Any] = {k: v for k, v in data.items() if k in ALLOWED_TOP_KEYS}
 
     # Validate scan section
     if "scan" in result and isinstance(result["scan"], dict):
