@@ -366,3 +366,58 @@ def test_ci_help_no_token_option():
     assert "--fail-on" in result.output, (
         "Expected --fail-on in help output"
     )
+
+
+# ---------------------------------------------------------------------------
+# Fail closed: an incomplete scan exits 3 in `tmac ci` too (unless lenient)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("lenient, expected_exit", [(False, 3), (True, 0)])
+def test_incomplete_scan_exits_3_unless_lenient(tmp_path, capsys, lenient, expected_exit):
+    from tmac.ci.runner import CIRunner
+    from tmac.models.finding import ScanIssue
+
+    (tmp_path / "broken.tf").write_text('resource "aws_s3_bucket" "b" {\n  acl = \n', encoding="utf-8")
+    with patch.dict(os.environ, {"GITHUB_TOKEN": "t0ken-value"}), patch(
+        "tmac.ci.comment.CommentFormatter.format", return_value="<!-- tmac:pr-comment:v1 -->"
+    ) as fmt:
+        exit_code = CIRunner().run(
+            directory=str(tmp_path),
+            plan_file=None,
+            fail_on="high",
+            report_fmt="md",
+            output=str(tmp_path / "report.md"),
+            delta_only=False,
+            comment=False,
+            exclude=[],
+            ctx=_minimal_ci_context(str(tmp_path)),
+            lenient=lenient,
+        )
+    assert exit_code == expected_exit
+    assert fmt.called  # the comment body is still built
+    assert (tmp_path / "report.md").exists()  # and the report still written
+    err = capsys.readouterr().err
+    assert "the scan is incomplete" in err and "broken.tf" in err
+
+
+def test_complete_scan_keeps_findings_based_exit(tmp_path):
+    from tmac.ci.runner import CIRunner
+
+    (tmp_path / "main.tf").write_text('resource "aws_s3_bucket" "b" {\n  acl = "private"\n}\n')
+    exit_code = CIRunner().run(
+        directory=str(tmp_path),
+        plan_file=None,
+        fail_on="critical",
+        report_fmt="md",
+        output=str(tmp_path / "report.md"),
+        delta_only=False,
+        comment=False,
+        exclude=[],
+        ctx=_minimal_ci_context(str(tmp_path)),
+    )
+    assert exit_code == 0
+
+
+def test_ci_command_exposes_lenient():
+    assert "--lenient" in CliRunner().invoke(cli, ["ci", "--help"]).output

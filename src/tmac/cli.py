@@ -249,6 +249,7 @@ def diagram(
 @click.option("--output", "-o", type=click.Path(), default=None, help="Output file path for the report.")
 @click.option("--platform", type=click.Choice(["github", "gitlab"]), default=None, help="CI platform (auto-detected when not provided).")
 @click.option("--exclude", "-e", multiple=True, help="Glob patterns to exclude (repeatable).")
+@click.option("--lenient", is_flag=True, help="Don't exit 3 when files can't be parsed or rules are invalid.")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress stdout output.")
 @click.option("--no-color", "no_color", is_flag=True, help="Disable ANSI color output.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
@@ -264,6 +265,7 @@ def ci(
     output: str,
     platform: str,
     exclude: tuple,
+    lenient: bool,
     quiet: bool,
     no_color: bool,
     verbose: bool,
@@ -303,6 +305,7 @@ def ci(
         comment=comment,
         exclude=list(exclude),
         ctx=ctx,
+        lenient=lenient,
     )
     sys.exit(exit_code)
 

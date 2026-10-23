@@ -327,6 +327,7 @@ class CIRunner:
         comment: bool,
         exclude: List[str],
         ctx: CIContext,
+        lenient: bool = False,
     ) -> int:
         """Run the CI pipeline and return the findings-based exit code.
 
@@ -348,6 +349,9 @@ class CIRunner:
             comment:    Whether to publish a PR/MR comment.
             exclude:    Glob patterns to exclude from scanning.
             ctx:        The populated ``CIContext``.
+            lenient:    When *False* (default), an incomplete scan (unparseable
+                        files, invalid rules) exits 3 even if no findings were
+                        produced; the report and comment are still published.
 
         Returns:
             Integer exit code (0, 1, 2, or 3).
@@ -489,6 +493,11 @@ class CIRunner:
             resolved=resolved,
         )
         body = formatter.format(result, comment_ctx)
+        if result.issues:
+            body += (
+                f"\n\n> ⚠️ **Incomplete scan:** {len(result.issues)} file(s)/rule(s) could not be "
+                "processed, so this result may be missing findings. See the job log.\n"
+            )
         body = _secrets.redact(body, token)
 
         # ------------------------------------------------------------------
@@ -522,8 +531,17 @@ class CIRunner:
             logger.debug("CIRunner: comment skipped — no token.")
 
         # ------------------------------------------------------------------
-        # Step 6: Return findings-based exit code
+        # Step 6: Fail closed on an incomplete scan, else findings-based exit code
         # ------------------------------------------------------------------
+        if result.issues:
+            print(
+                f"Warning: the scan is incomplete ({len(result.issues)} issue(s)):",
+                file=sys.stderr,
+            )
+            for issue in result.issues:
+                print(f"  [{issue.kind}] {_secrets.redact(issue.message, token)}", file=sys.stderr)
+            if not lenient:
+                return 3
         return self._compute_exit_code(result.findings, fail_on)
 
     # -----------------------------------------------------------------
