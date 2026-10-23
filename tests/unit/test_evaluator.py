@@ -362,3 +362,40 @@ def test_property_10_exists_not_exists_complement(value):
     assert evaluator.evaluate(cond_not_exists, attrs_with) is False
     assert evaluator.evaluate(cond_exists, attrs_without) is False
     assert evaluator.evaluate(cond_not_exists, attrs_without) is True
+
+
+# ---------------------------------------------------------------------------
+# not_contains is a whole-collection check (v1.2.0)
+# ---------------------------------------------------------------------------
+
+FLOWLOGS_TAG = {"Key": "FlowLogs", "Value": "enabled"}
+
+
+@pytest.mark.parametrize(
+    "tags, expected",
+    [
+        (None, True),  # absent collection contains nothing
+        ([{"Key": "Name", "Value": "main"}], True),
+        ([{"Key": "Name", "Value": "main"}, FLOWLOGS_TAG], False),  # not any-semantics
+        ([FLOWLOGS_TAG], False),  # single block, unwrapped before comparison
+    ],
+)
+def test_not_contains_checks_the_whole_collection(tags, expected):
+    cond = CheckCondition(attribute="Tags", condition="not_contains", values=[FLOWLOGS_TAG])
+    attrs = {} if tags is None else {"Tags": tags}
+    assert Evaluator().evaluate(cond, attrs) is expected
+
+
+def test_not_contains_on_strings_is_unchanged():
+    cond = CheckCondition(attribute="policy", condition="not_contains", values=['"sts:ExternalId"'])
+    assert Evaluator().evaluate(cond, {"policy": '{"Action": "sts:AssumeRole"}'}) is True
+    assert Evaluator().evaluate(cond, {"policy": '{"Condition": "sts:ExternalId"}'}) is False
+
+
+@pytest.mark.parametrize("sentinel", [{"Ref": "Param"}, {"Sub": "${X}"}, {"If": ["C", 1, 2]}])
+def test_unresolved_references_never_compare(sentinel):
+    for condition, values in [("equals", [sentinel]), ("not_equals", [True]), ("in", [sentinel])]:
+        cond = CheckCondition(attribute="a", condition=condition, values=values)
+        assert Evaluator().evaluate(cond, {"a": sentinel}) is False
+    exists = CheckCondition(attribute="a", condition="exists")
+    assert Evaluator().evaluate(exists, {"a": sentinel}) is True

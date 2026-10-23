@@ -7,6 +7,25 @@ IgnoreMap = dict[str, list[str]]
 # Same, keyed by (resource_type, resource_name).
 ResourceIgnoreMap = dict[tuple[str, str], list[str]]
 
+# CloudFormation intrinsic functions, as normalized by CloudFormationParser:
+# `!Ref X` / {"Ref": X} -> {"Ref": X}; `!Sub s` / {"Fn::Sub": s} -> {"Sub": s}; etc.
+INTRINSIC_FUNCTIONS = frozenset(
+    {
+        "Ref", "Base64", "Cidr", "FindInMap", "GetAtt", "GetAZs", "ImportValue", "Join",
+        "Length", "Select", "Split", "Sub", "ToJsonString", "Transform",
+        "And", "Equals", "If", "Not", "Or", "Condition",
+    }
+)  # fmt: skip
+
+
+def is_unresolved_reference(value: Any) -> bool:
+    """True for a normalized intrinsic-function value ({"Ref": ...}, {"Sub": ...}, ...).
+
+    Such a value is present but only known at deploy time, so rules can tell that it
+    exists but cannot compare it.
+    """
+    return isinstance(value, dict) and len(value) == 1 and next(iter(value)) in INTRINSIC_FUNCTIONS
+
 
 class ResourceModel(BaseModel):
     resource_type: str
