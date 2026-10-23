@@ -100,3 +100,44 @@ def test_scan_root_inside_excluded_name_is_still_scanned(tmp_path):
     (root / "main.tf").write_text(PUBLIC_TF, encoding="utf-8")
     # config={} so the repo's own .tmac.yaml (which excludes .terraform) doesn't apply.
     assert Scanner().run_scan(str(root), config={}).files_scanned == 1
+
+
+# ---------------------------------------------------------------------------
+# OpenTofu in `tmac ci` (changed-file set) and `tmac diagram`
+# ---------------------------------------------------------------------------
+
+
+def _git(repo: Path, *args: str) -> None:
+    import subprocess
+
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+def test_ci_changed_files_include_tofu(tmp_path):
+    from tmac.ci.git_diff import changed_tf_files
+
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "t")
+    (tmp_path / "README.md").write_text("x", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "base")
+    _git(tmp_path, "checkout", "-q", "-b", "feature")
+    (tmp_path / "main.tofu").write_text(PUBLIC_TF, encoding="utf-8")
+    (tmp_path / "vars.tf").write_text('variable "x" {}\n', encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("ignored", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-q", "-m", "change")
+
+    assert changed_tf_files("main", "feature", repo_dir=str(tmp_path)) == ["main.tofu", "vars.tf"]
+    assert changed_tf_files("main", "feature", repo_dir=str(tmp_path), pattern="*.tf") == [
+        "vars.tf"
+    ]
+
+
+def test_diagram_reads_tofu_sources(tmp_path):
+    from tmac.graph.service import DiagramService
+
+    (tmp_path / "main.tofu").write_text(PUBLIC_TF, encoding="utf-8")
+    resources = DiagramService().parse_resources(str(tmp_path))
+    assert [r.resource_type for r in resources] == ["aws_s3_bucket"]

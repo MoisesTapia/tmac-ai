@@ -134,18 +134,31 @@ class Scanner:
         trees (node_modules, .terraform, virtualenvs) are never read. When
         ``include_set`` is given, only those (resolved, absolute) paths are kept.
         """
-        found: list[Path] = []
-        for root, dirs, files in os.walk(scan_path):
-            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
-            for name in files:
-                if not any(fnmatch.fnmatch(name, p) for p in self.parser.file_patterns):
-                    continue
-                path = Path(root) / name
-                if include_set is not None and str(path.resolve()) not in include_set:
-                    continue
-                if not _is_excluded(path, excludes) and self.parser.can_parse(str(path)):
-                    found.append(path)
-        return sorted(found)
+        return discover_files(scan_path, self.parser, excludes, include_set)
+
+
+def discover_files(
+    scan_path: Path,
+    parser: BaseParser,
+    excludes: list[str],
+    include_set: set[str] | None = None,
+) -> list[Path]:
+    """Files under scan_path that ``parser`` handles, minus excludes, sorted.
+
+    Shared by Scanner and the diagram service so both see the same files.
+    """
+    found: list[Path] = []
+    for root, dirs, files in os.walk(scan_path):
+        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
+        for name in files:
+            if not any(fnmatch.fnmatch(name, p) for p in parser.file_patterns):
+                continue
+            path = Path(root) / name
+            if include_set is not None and str(path.resolve()) not in include_set:
+                continue
+            if not _is_excluded(path, excludes) and parser.can_parse(str(path)):
+                found.append(path)
+    return sorted(found)
 
 
 def _is_excluded(file_path: Path, patterns: list[str]) -> bool:

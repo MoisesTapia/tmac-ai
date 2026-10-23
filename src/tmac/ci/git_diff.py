@@ -8,6 +8,7 @@ Only stdlib dependencies: subprocess, fnmatch.
 
 import fnmatch
 import subprocess
+from collections.abc import Sequence
 from os import fspath
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def changed_tf_files(
     base_ref: str,
     head_ref: str,
     repo_dir: str = ".",
-    pattern: str = "*.tf",
+    pattern: str | Sequence[str] = ("*.tf", "*.tofu"),
 ) -> list[str]:
     """Return the Changed_File_Set for a git range.
 
@@ -54,7 +55,8 @@ def changed_tf_files(
         base_ref: The base git ref (e.g. the merge-base SHA, branch name, or tag).
         head_ref: The head git ref (e.g. the PR/MR head SHA or branch).
         repo_dir: Path to the git repository root.  Defaults to ``"."``.
-        pattern:  Glob pattern applied to the file's basename.  Defaults to ``"*.tf"``.
+        pattern:  Glob pattern(s) applied to the file's basename.  Defaults to
+                  ``("*.tf", "*.tofu")`` (Terraform and OpenTofu sources).
 
     Returns:
         A sorted, de-duplicated list of relative file paths.
@@ -85,6 +87,8 @@ def changed_tf_files(
         check=True,
     )
 
+    patterns = (pattern,) if isinstance(pattern, str) else tuple(pattern)
+
     # --- Steps 3 & 4: parse output, extract paths, filter ---
     paths: set[str] = set()
     for line in result.stdout.splitlines():
@@ -107,7 +111,7 @@ def changed_tf_files(
             file_path = parts[1]
 
         basename = Path(file_path).name
-        if fnmatch.fnmatch(basename, pattern):
+        if any(fnmatch.fnmatch(basename, p) for p in patterns):
             paths.add(file_path)
 
     # --- Step 5: return sorted, de-duplicated list ---

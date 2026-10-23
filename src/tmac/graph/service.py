@@ -9,7 +9,7 @@ from tmac.graph.filters import DEFAULT_NOISE_TYPES, filter_graph
 from tmac.graph.metadata import MetadataExtractor, ResourceMetadata
 from tmac.models.resource import ResourceModel
 from tmac.parsers.terraform import TerraformParser
-from tmac.scanner import _is_excluded
+from tmac.scanner import discover_files
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +30,10 @@ class DiagramService:
         if not scan_path.exists() or not scan_path.is_dir():
             raise DiagramError(f"Directory not accessible: {directory}")
 
-        exclude_patterns = exclude_patterns or []
-        tf_files = [f for f in scan_path.rglob("*.tf") if not _is_excluded(f, exclude_patterns)]
-        logger.debug("Discovered %d .tf files in %s", len(tf_files), directory)
-
         parser = TerraformParser()
+        tf_files = discover_files(scan_path, parser, exclude_patterns or [])
+        logger.debug("Discovered %d .tf/.tofu files in %s", len(tf_files), directory)
+
         all_resources: list[ResourceModel] = []
         for tf_file in tf_files:
             all_resources.extend(parser.parse(str(tf_file)))
