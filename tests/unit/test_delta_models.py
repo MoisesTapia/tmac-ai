@@ -9,47 +9,47 @@ from hypothesis import strategies as st
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.models.finding import Finding, ScanMetadata, ScanStatistics
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_finding(**kwargs) -> Finding:
-    defaults = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="data",
-        file_path="main.tf",
-        line_number=1,
-        matched_attribute="acl",
-        description="Bucket is publicly accessible.",
-        mitigation="Set acl to private.",
-    )
+    defaults = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "data",
+        "file_path": "main.tf",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "Bucket is publicly accessible.",
+        "mitigation": "Set acl to private.",
+    }
     defaults.update(kwargs)
     return Finding(**defaults)
 
 
 def _make_delta_finding(**kwargs) -> DeltaFinding:
-    defaults = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="data",
-        file_path="main.tf",
-        line_number=1,
-        matched_attribute="acl",
-        description="Bucket is publicly accessible.",
-        mitigation="Set acl to private.",
-        change_action=ChangeAction.update,
-        changed_attribute="acl",
-        value_before="private",
-        value_after="public-read",
-    )
+    defaults = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "data",
+        "file_path": "main.tf",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "Bucket is publicly accessible.",
+        "mitigation": "Set acl to private.",
+        "change_action": ChangeAction.update,
+        "changed_attribute": "acl",
+        "value_before": "private",
+        "value_after": "public-read",
+    }
     defaults.update(kwargs)
     return DeltaFinding(**defaults)
 
@@ -65,6 +65,7 @@ def _make_scan_statistics() -> ScanStatistics:
 # ---------------------------------------------------------------------------
 # PlannedChange tests
 # ---------------------------------------------------------------------------
+
 
 def test_planned_change_accepts_all_fields():
     """PlannedChange accepts all fields and serializes them correctly."""
@@ -117,6 +118,7 @@ def test_planned_change_delete_after_none():
 # ChangeAction tests
 # ---------------------------------------------------------------------------
 
+
 def test_change_action_has_exactly_four_values():
     """ChangeAction has exactly the values create, update, delete, replace."""
     values = {a.value for a in ChangeAction}
@@ -134,6 +136,7 @@ def test_change_action_is_str_enum():
 # ---------------------------------------------------------------------------
 # DeltaFinding tests
 # ---------------------------------------------------------------------------
+
 
 def test_delta_finding_inherits_finding_fields():
     """DeltaFinding inherits all fields from Finding."""
@@ -187,6 +190,7 @@ def test_delta_finding_update_accepts_both_values():
 # ---------------------------------------------------------------------------
 # DeltaScanResult tests
 # ---------------------------------------------------------------------------
+
 
 def test_delta_scan_result_inherits_scan_result_fields():
     """DeltaScanResult inherits all fields from ScanResult."""

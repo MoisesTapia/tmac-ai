@@ -8,7 +8,7 @@ graph where each edge represents "resource A references resource B".
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 from tmac.models.resource import ResourceModel
 
@@ -19,7 +19,17 @@ from tmac.models.resource import ResourceModel
 _REFERENCE_RE = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\.([A-Za-z_][A-Za-z0-9_-]*)")
 
 # Prefixes that are not referenceable resources (variables, locals, data, etc.)
-_NON_RESOURCE_PREFIXES = {"var", "local", "module", "data", "each", "count", "self", "path", "terraform"}
+_NON_RESOURCE_PREFIXES = {
+    "var",
+    "local",
+    "module",
+    "data",
+    "each",
+    "count",
+    "self",
+    "path",
+    "terraform",
+}
 
 
 @dataclass(frozen=True)
@@ -49,17 +59,17 @@ class GraphEdge:
 class ResourceGraph:
     """Directed graph of resources and their dependencies."""
 
-    nodes: List[GraphNode] = field(default_factory=list)
-    edges: List[GraphEdge] = field(default_factory=list)
+    nodes: list[GraphNode] = field(default_factory=list)
+    edges: list[GraphEdge] = field(default_factory=list)
 
-    def node_ids(self) -> Set[str]:
+    def node_ids(self) -> set[str]:
         return {n.id for n in self.nodes}
 
 
 class GraphBuilder:
     """Builds a ResourceGraph from a list of ResourceModel."""
 
-    def build(self, resources: List[ResourceModel]) -> ResourceGraph:
+    def build(self, resources: list[ResourceModel]) -> ResourceGraph:
         nodes = [
             GraphNode(
                 resource_type=r.resource_type,
@@ -71,8 +81,8 @@ class GraphBuilder:
         ]
         valid_ids = {n.id for n in nodes}
 
-        edges: List[GraphEdge] = []
-        seen: Set[Tuple[str, str, str]] = set()
+        edges: list[GraphEdge] = []
+        seen: set[tuple[str, str, str]] = set()
 
         for resource in resources:
             source_id = f"{resource.resource_type}.{resource.name}"
@@ -83,13 +93,15 @@ class GraphBuilder:
                         key = (source_id, ref_id, attr_name)
                         if key not in seen:
                             seen.add(key)
-                            edges.append(GraphEdge(source=source_id, target=ref_id, attribute=attr_name))
+                            edges.append(
+                                GraphEdge(source=source_id, target=ref_id, attribute=attr_name)
+                            )
 
         return ResourceGraph(nodes=nodes, edges=edges)
 
-    def _extract_references(self, value: Any) -> Set[str]:
+    def _extract_references(self, value: Any) -> set[str]:
         """Recursively extract ``type.name`` references from an attribute value."""
-        refs: Set[str] = set()
+        refs: set[str] = set()
         if isinstance(value, str):
             for match in _REFERENCE_RE.finditer(value):
                 res_type, res_name = match.group(1), match.group(2)

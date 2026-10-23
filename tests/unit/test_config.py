@@ -3,18 +3,20 @@ Unit tests for src/tmac/config.py
 
 Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5
 """
-import pytest
+
 import textwrap
 from pathlib import Path
 
-from hypothesis import given, settings, strategies as st
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
-from tmac.config import load_config, ConfigError, ALLOWED_TOP_KEYS
-
+from tmac.config import ALLOWED_TOP_KEYS, ConfigError, load_config
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def write_yaml(tmp_path: Path, content: str) -> str:
     cfg = tmp_path / ".tmac.yaml"
@@ -25,6 +27,7 @@ def write_yaml(tmp_path: Path, content: str) -> str:
 # ---------------------------------------------------------------------------
 # Unit tests
 # ---------------------------------------------------------------------------
+
 
 def test_unknown_top_keys_emits_warning_and_returns_valid_only(tmp_path, caplog):
     """Unknown top-level keys trigger a warning; only valid keys are returned."""
@@ -38,6 +41,7 @@ def test_unknown_top_keys_emits_warning_and_returns_valid_only(tmp_path, caplog)
         """,
     )
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.config"):
         result = load_config(cfg_path)
 
@@ -58,6 +62,7 @@ def test_scan_exclude_non_list_emits_warning_and_is_ignored(tmp_path, caplog):
         """,
     )
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.config"):
         result = load_config(cfg_path)
 
@@ -78,6 +83,7 @@ def test_scan_exclude_non_string_items_emits_warning_and_is_ignored(tmp_path, ca
         """,
     )
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.config"):
         result = load_config(cfg_path)
 
@@ -95,6 +101,7 @@ def test_report_format_invalid_emits_warning_and_is_absent(tmp_path, caplog):
         """,
     )
     import logging
+
     with caplog.at_level(logging.WARNING, logger="tmac.config"):
         result = load_config(cfg_path)
 
@@ -184,17 +191,16 @@ def test_property_18_unknown_keys_always_filtered(unknown_keys, include_valid):
 
     Validates: Requirements 10.1, 10.2
     """
-    import tempfile
     import os
+    import tempfile
+
     import yaml  # type: ignore
 
     data: dict = {k: "value" for k in unknown_keys}
     if include_valid:
         data["scan"] = {"dir": "./infra"}
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
         f.write(yaml.dump(data))
         cfg_path = f.name
 
@@ -203,14 +209,36 @@ def test_property_18_unknown_keys_always_filtered(unknown_keys, include_valid):
 
         # All returned keys must be in ALLOWED_TOP_KEYS
         for key in result:
-            assert key in ALLOWED_TOP_KEYS, (
-                f"load_config() returned unexpected key '{key}' — only {ALLOWED_TOP_KEYS} are allowed"
-            )
+            assert (
+                key in ALLOWED_TOP_KEYS
+            ), f"load_config() returned unexpected key '{key}' — only {ALLOWED_TOP_KEYS} are allowed"
 
         # None of the unknown keys should appear in the result
         for key in unknown_keys:
-            assert key not in result, (
-                f"Unknown key '{key}' should have been filtered out but was present in result"
-            )
+            assert (
+                key not in result
+            ), f"Unknown key '{key}' should have been filtered out but was present in result"
     finally:
         os.unlink(cfg_path)
+
+
+# ---------------------------------------------------------------------------
+# report.fail_on / report.severity validation
+# ---------------------------------------------------------------------------
+
+
+def test_report_fail_on_and_severity_are_normalized(tmp_path):
+    cfg = tmp_path / ".tmac.yaml"
+    cfg.write_text("report:\n  fail_on: HIGH\n  severity: Medium\n", encoding="utf-8")
+    assert load_config(str(cfg))["report"] == {"fail_on": "high", "severity": "medium"}
+
+
+def test_invalid_report_fail_on_and_severity_are_dropped(tmp_path, caplog):
+    import logging
+
+    cfg = tmp_path / ".tmac.yaml"
+    cfg.write_text("report:\n  fail_on: everything\n  severity: 3\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        result = load_config(str(cfg))
+    assert result["report"] == {}
+    assert "report.fail_on" in caplog.text and "report.severity" in caplog.text

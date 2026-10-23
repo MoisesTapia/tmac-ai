@@ -10,9 +10,8 @@ import html
 import re
 import shutil
 import subprocess
-from typing import Dict, List, Optional
 
-from tmac.graph.builder import ResourceGraph
+from tmac.graph.builder import GraphNode, ResourceGraph
 
 
 def _sanitize_id(node_id: str) -> str:
@@ -28,14 +27,14 @@ def _short_label(node_id: str) -> str:
     return node_id
 
 
-Groups = Optional[Dict[str, List[str]]]
+Groups = dict[str, list[str]] | None
 
 
 class MermaidRenderer:
     """Renders the graph as a Mermaid diagram (flowchart)."""
 
     def render(self, graph: ResourceGraph, groups: Groups = None) -> str:
-        lines: List[str] = ["graph TD"]
+        lines: list[str] = ["graph TD"]
 
         if groups:
             grouped_ids = {nid for ids in groups.values() for nid in ids}
@@ -45,12 +44,16 @@ class MermaidRenderer:
                     node = next((n for n in graph.nodes if n.id == nid), None)
                     if node is None:
                         continue
-                    lines.append(f'        {_sanitize_id(nid)}["{node.resource_type}<br/>{node.name}"]')
+                    lines.append(
+                        f'        {_sanitize_id(nid)}["{node.resource_type}<br/>{node.name}"]'
+                    )
                 lines.append("    end")
             # Nodes without a group (just in case)
             for node in sorted(graph.nodes, key=lambda n: n.id):
                 if node.id not in grouped_ids:
-                    lines.append(f'    {_sanitize_id(node.id)}["{node.resource_type}<br/>{node.name}"]')
+                    lines.append(
+                        f'    {_sanitize_id(node.id)}["{node.resource_type}<br/>{node.name}"]'
+                    )
         else:
             for node in sorted(graph.nodes, key=lambda n: n.id):
                 nid = _sanitize_id(node.id)
@@ -71,20 +74,20 @@ class DotRenderer:
     """Renders the graph as Graphviz DOT."""
 
     def render(self, graph: ResourceGraph, groups: Groups = None) -> str:
-        lines: List[str] = [
+        lines: list[str] = [
             "digraph tmac_architecture {",
             "    rankdir=LR;",
             '    node [shape=box, style="rounded,filled", fillcolor="#e8f0fe", fontname="Helvetica"];',
             '    edge [fontname="Helvetica", fontsize=10, color="#5f6368"];',
         ]
 
-        def node_stmt(node) -> str:
+        def node_stmt(node: GraphNode) -> str:
             return f'{_sanitize_id(node.id)} [label="{node.resource_type}\\n{node.name}"];'
 
         if groups:
             grouped_ids = {nid for ids in groups.values() for nid in ids}
             for idx, (label, node_ids) in enumerate(groups.items()):
-                lines.append(f'    subgraph cluster_{idx} {{')
+                lines.append(f"    subgraph cluster_{idx} {{")
                 lines.append(f'        label="{label}";')
                 lines.append('        style="rounded";')
                 lines.append('        color="#9aa0a6";')
@@ -114,8 +117,8 @@ class DrawioRenderer:
     """Renders the graph as mxGraphModel XML (draw.io / diagrams.net)."""
 
     def render(self, graph: ResourceGraph, groups: Groups = None) -> str:
-        cells: List[str] = []
-        node_cell_ids: Dict[str, str] = {}
+        cells: list[str] = []
+        node_cell_ids: dict[str, str] = {}
 
         # Simple grid layout
         cols = max(1, int(len(graph.nodes) ** 0.5))
@@ -157,7 +160,7 @@ class DrawioRenderer:
         return (
             '<mxfile host="tmac">\n'
             '  <diagram name="TMAC Architecture">\n'
-            "    <mxGraphModel dx=\"800\" dy=\"600\" grid=\"1\" gridSize=\"10\" "
+            '    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" '
             'guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" '
             'pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">\n'
             "      <root>\n"
@@ -171,7 +174,7 @@ class DrawioRenderer:
         )
 
 
-_RENDERERS = {
+_RENDERERS: dict[str, type[MermaidRenderer | DotRenderer | DrawioRenderer]] = {
     "mermaid": MermaidRenderer,
     "dot": DotRenderer,
     "drawio": DrawioRenderer,
@@ -195,14 +198,18 @@ def graphviz_available() -> bool:
     return shutil.which("dot") is not None
 
 
-def render_image(graph: ResourceGraph, output_path: str, image_format: str, groups: Groups = None) -> None:
+def render_image(
+    graph: ResourceGraph, output_path: str, image_format: str, groups: Groups = None
+) -> None:
     """Render the graph to an image (png/svg/pdf) using Graphviz.
 
     Requires the `dot` binary installed. Raises RuntimeError if it is not available.
     """
     image_format = image_format.lower()
     if image_format not in IMAGE_FORMATS:
-        raise ValueError(f"Unsupported image format: {image_format}. Use: {', '.join(IMAGE_FORMATS)}")
+        raise ValueError(
+            f"Unsupported image format: {image_format}. Use: {', '.join(IMAGE_FORMATS)}"
+        )
     if not graphviz_available():
         raise RuntimeError(
             "Graphviz is not installed (`dot` binary not found). "

@@ -3,11 +3,6 @@
 Validates: Requirements R3.6, R4.1, R4.2, R4.3, R4.5
 """
 
-import os
-from unittest.mock import patch
-
-import pytest
-
 from tmac.ci.secrets import read_token, redact
 
 # ---------------------------------------------------------------------------
@@ -31,6 +26,7 @@ def _clear_all(env: dict) -> dict:
 # ---------------------------------------------------------------------------
 # read_token — env-var priority and fallback
 # ---------------------------------------------------------------------------
+
 
 class TestReadToken:
     """Tests for read_token(), verifying priority order and env-only reads."""
@@ -106,6 +102,7 @@ class TestReadToken:
 # ---------------------------------------------------------------------------
 # redact — placeholder substitution
 # ---------------------------------------------------------------------------
+
 
 class TestRedact:
     """Tests for redact(), verifying secret replacement with the fixed placeholder."""

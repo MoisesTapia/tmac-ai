@@ -1,48 +1,98 @@
-import hcl2
 import logging
 import re
 from io import StringIO
-from typing import Dict, List, Optional, Tuple
-from tmac.parsers.base import BaseParser
-from tmac.models.resource import ResourceModel
+from pathlib import Path
+
+import hcl2
+
+from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
+from tmac.parsers.base import BaseParser, ParseError
 
 logger = logging.getLogger(__name__)
 
-# IgnoreMap: resource_name → ["*"] (global ignore) or ["RULE-ID-1", ...] (per-rule)
-IgnoreMap = Dict[str, List[str]]
+LineMap = dict[tuple[str, str], int]
+
+
+def merge_ignores(existing: list[str], new: list[str]) -> list[str]:
+    """Merge rule-ID lists without duplicates; any "*" collapses the result to global."""
+    merged = list(existing)
+    for rid in new:
+        if rid not in merged:
+            merged.append(rid)
+    return ["*"] if "*" in merged else merged
 
 
 class TerraformParser(BaseParser):
-    """Parser for Terraform HCL format (.tf files)."""
+    """Parser for Terraform / OpenTofu HCL (.tf and .tofu files)."""
 
-    def parse(self, file_path: str) -> List[ResourceModel]:
-        resources: List[ResourceModel] = []
+    file_patterns = ("*.tf", "*.tofu")
+
+    def can_parse(self, file_path: str) -> bool:
+        # OpenTofu loads x.tofu instead of x.tf when both exist; mirror that so the
+        # overridden .tf file is not reported.
+        path = Path(file_path)
+        return not (path.suffix == ".tf" and path.with_suffix(".tofu").exists())
+
+    def parse(self, file_path: str) -> list[ResourceModel]:
+        """Lenient parse: logs a warning and returns [] if the file cannot be parsed."""
+        try:
+            return self.parse_strict(file_path)
+        except ParseError as e:
+            logger.warning("%s", e)
+            return []
+
+    def parse_strict(self, file_path: str) -> list[ResourceModel]:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-
-            line_map, ignore_map = self._prescan(content)
-
+            line_map, ignores = self._prescan_resources(content)
             parsed = hcl2.load(StringIO(content))  # type: ignore
-
-            if "resource" in parsed:
-                for block in parsed["resource"]:
-                    for res_type, res_dict in block.items():
-                        for res_name, res_attrs in res_dict.items():
-                            line_number = line_map.get((res_type, res_name), 0)
-                            resources.append(
-                                ResourceModel(
-                                    resource_type=res_type,
-                                    name=res_name,
-                                    attributes=res_attrs,
-                                    source_file=file_path,
-                                    line_number=line_number,
-                                )
-                            )
-            return resources
         except Exception as e:
-            logger.warning("Failed to parse %s: %s", file_path, e)
-            return []
+            raise ParseError(f"Failed to parse {file_path}: {e}") from e
+
+        resources: list[ResourceModel] = []
+        if "resource" in parsed:
+            for block in parsed["resource"]:
+                for res_type, res_dict in block.items():
+                    for res_name, res_attrs in res_dict.items():
+                        key = (res_type, res_name)
+                        resources.append(
+                            ResourceModel(
+                                resource_type=res_type,
+                                name=res_name,
+                                attributes=res_attrs,
+                                source_file=file_path,
+                                line_number=line_map.get(key, 0),
+                                ignored_rules=ignores.get(key, []),
+                            )
+                        )
+        return resources
+
+    def get_resource_ignores(self, file_path: str) -> ResourceIgnoreMap:
+        """Return tmac:ignore suppressions keyed by (resource_type, resource_name)."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            _, ignores = self._prescan_resources(content)
+            return ignores
+        except (OSError, ValueError) as e:
+            logger.warning("Failed to read ignore map from %s: %s", file_path, e)
+            return {}
+
+    def collect_resource_ignores(self, directory: str) -> ResourceIgnoreMap:
+        """Merge tmac:ignore suppressions from every .tf/.tofu file under ``directory``.
+
+        Used by ``tmac plan --source-dir``: plan JSON carries no comments, so
+        suppressions are matched to planned changes by (resource_type, resource_name).
+        """
+        merged: ResourceIgnoreMap = {}
+        sources = sorted(f for p in self.file_patterns for f in Path(directory).rglob(p))
+        for tf_file in sources:
+            if not self.can_parse(str(tf_file)):
+                continue
+            for key, rule_ids in self.get_resource_ignores(str(tf_file)).items():
+                merged[key] = merge_ignores(merged.get(key, []), rule_ids)
+        return merged
 
     def get_ignore_map(self, file_path: str) -> IgnoreMap:
         """Return the ignore_map for a file without full parsing."""
@@ -51,35 +101,48 @@ class TerraformParser(BaseParser):
                 content = f.read()
             _, ignore_map = self._prescan(content)
             return ignore_map
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.warning("Failed to read ignore map from %s: %s", file_path, e)
             return {}
 
-    def _prescan(self, content: str) -> Tuple[Dict[Tuple[str, str], int], IgnoreMap]:
+    def _prescan(self, content: str) -> tuple[LineMap, IgnoreMap]:
         """
-        Single-pass pre-scan of raw .tf content.
+        Pre-scan of raw .tf content with the ignore map keyed by resource name only.
+
+        Kept for backwards compatibility; resources of different types sharing a name
+        are merged here. parse() uses _prescan_resources() instead.
 
         Returns:
             line_map:   {(resource_type, resource_name): line_number}  (1-indexed)
             ignore_map: {resource_name: ["*"] | ["RULE-ID-1", ...]}
         """
-        line_map: Dict[Tuple[str, str], int] = {}
+        line_map, ignores = self._prescan_resources(content)
         ignore_map: IgnoreMap = {}
+        for (_, res_name), rule_ids in ignores.items():
+            ignore_map[res_name] = merge_ignores(ignore_map.get(res_name, []), rule_ids)
+        return line_map, ignore_map
+
+    def _prescan_resources(self, content: str) -> tuple[LineMap, ResourceIgnoreMap]:
+        """
+        Single-pass pre-scan of raw .tf content.
+
+        Returns:
+            line_map: {(resource_type, resource_name): line_number}  (1-indexed)
+            ignores:  {(resource_type, resource_name): ["*"] | ["RULE-ID-1", ...]}
+        """
+        line_map: LineMap = {}
+        ignore_map: ResourceIgnoreMap = {}
 
         lines = content.splitlines()
 
         # Accumulate consecutive tmac:ignore[RULE-ID] comments above a resource block.
         # pending_ignores holds the rule IDs (or ["*"] for global) collected so far.
-        pending_ignores: Optional[List[str]] = None
+        pending_ignores: list[str] | None = None
 
-        resource_re = re.compile(
-            r'^\s*resource\s+"([^"]+)"\s+"([^"]+)"'
-        )
+        resource_re = re.compile(r'^\s*resource\s+"([^"]+)"\s+"([^"]+)"')
         # Matches:  # tmac:ignore           → global
         # Matches:  # tmac:ignore[RULE-ID]  → per-rule
-        ignore_re = re.compile(
-            r"#\s*tmac:ignore(?:\[([^\]]+)\])?"
-        )
+        ignore_re = re.compile(r"#\s*tmac:ignore(?:\[([^\]]+)\])?")
 
         for lineno, line in enumerate(lines, start=1):
             res_match = resource_re.match(line)
@@ -92,7 +155,7 @@ class TerraformParser(BaseParser):
 
                 # Collect ignores: inline on the resource line takes precedence,
                 # then any accumulated pending_ignores from preceding lines.
-                all_ignores: List[str] = []
+                all_ignores: list[str] = []
 
                 if inline_ignore:
                     rule_id = inline_ignore.group(1)
@@ -104,16 +167,8 @@ class TerraformParser(BaseParser):
                             all_ignores.append(rid)
 
                 if all_ignores:
-                    existing = ignore_map.get(res_name, [])
-                    # Merge: if any entry is "*", collapse to global
-                    merged = list(existing)
-                    for rid in all_ignores:
-                        if rid not in merged:
-                            merged.append(rid)
-                    if "*" in merged:
-                        ignore_map[res_name] = ["*"]
-                    else:
-                        ignore_map[res_name] = merged
+                    key = (res_type, res_name)
+                    ignore_map[key] = merge_ignores(ignore_map.get(key, []), all_ignores)
 
                 # Reset pending after consuming (whether used or not)
                 pending_ignores = None

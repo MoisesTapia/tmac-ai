@@ -24,8 +24,8 @@ Requirements covered:
 import sys
 from pathlib import Path
 
-import yaml
 import pytest
+import yaml
 
 # Python 3.11+ ships tomllib in stdlib; fall back to the tomli back-port.
 if sys.version_info >= (3, 11):
@@ -76,33 +76,33 @@ class TestActionYml:
     def test_has_required_input_keys(self, action: dict) -> None:
         """R5.2–5.7: action.yml must declare all six expected inputs."""
         expected = {"dir", "fail-on", "delta-only", "comment", "report-format", "output"}
-        assert expected.issubset(set(action["inputs"].keys())), (
-            f"Missing inputs: {expected - set(action['inputs'].keys())}"
-        )
+        assert expected.issubset(
+            set(action["inputs"].keys())
+        ), f"Missing inputs: {expected - set(action['inputs'].keys())}"
 
     def test_input_default_dir(self, action: dict) -> None:
         """R5.2: dir default is '.'."""
-        assert action["inputs"]["dir"]["default"] == ".", (
-            f"Expected dir default '.', got {action['inputs']['dir']['default']!r}"
-        )
+        assert (
+            action["inputs"]["dir"]["default"] == "."
+        ), f"Expected dir default '.', got {action['inputs']['dir']['default']!r}"
 
     def test_input_default_fail_on(self, action: dict) -> None:
         """R5.3: fail-on default is 'high'."""
-        assert action["inputs"]["fail-on"]["default"] == "high", (
-            f"Expected fail-on default 'high', got {action['inputs']['fail-on']['default']!r}"
-        )
+        assert (
+            action["inputs"]["fail-on"]["default"] == "high"
+        ), f"Expected fail-on default 'high', got {action['inputs']['fail-on']['default']!r}"
 
     def test_input_default_delta_only(self, action: dict) -> None:
         """R5.4: delta-only default is 'true'."""
-        assert action["inputs"]["delta-only"]["default"] == "true", (
-            f"Expected delta-only default 'true', got {action['inputs']['delta-only']['default']!r}"
-        )
+        assert (
+            action["inputs"]["delta-only"]["default"] == "true"
+        ), f"Expected delta-only default 'true', got {action['inputs']['delta-only']['default']!r}"
 
     def test_input_default_comment(self, action: dict) -> None:
         """R5.5: comment default is 'true'."""
-        assert action["inputs"]["comment"]["default"] == "true", (
-            f"Expected comment default 'true', got {action['inputs']['comment']['default']!r}"
-        )
+        assert (
+            action["inputs"]["comment"]["default"] == "true"
+        ), f"Expected comment default 'true', got {action['inputs']['comment']['default']!r}"
 
     def test_input_default_report_format(self, action: dict) -> None:
         """R5.6: report-format default is 'Markdown'."""
@@ -113,9 +113,9 @@ class TestActionYml:
 
     def test_input_default_output(self, action: dict) -> None:
         """R5.7: output default is '' (empty string)."""
-        assert action["inputs"]["output"]["default"] == "", (
-            f"Expected output default '', got {action['inputs']['output']['default']!r}"
-        )
+        assert (
+            action["inputs"]["output"]["default"] == ""
+        ), f"Expected output default '', got {action['inputs']['output']['default']!r}"
 
     # --- permissions block (R4.7) -------------------------------------------
 
@@ -134,23 +134,23 @@ class TestActionYml:
 
     def test_permissions_pull_requests_write(self, action: dict) -> None:
         """R4.7: pull-requests permission must be 'write'."""
-        assert action["permissions"]["pull-requests"] == "write", (
-            f"Expected pull-requests: write, got {action['permissions']['pull-requests']!r}"
-        )
+        assert (
+            action["permissions"]["pull-requests"] == "write"
+        ), f"Expected pull-requests: write, got {action['permissions']['pull-requests']!r}"
 
     def test_permissions_contents_read(self, action: dict) -> None:
         """R4.7: contents permission must be 'read'."""
-        assert action["permissions"]["contents"] == "read", (
-            f"Expected contents: read, got {action['permissions']['contents']!r}"
-        )
+        assert (
+            action["permissions"]["contents"] == "read"
+        ), f"Expected contents: read, got {action['permissions']['contents']!r}"
 
     # --- runs block (R5.1) --------------------------------------------------
 
     def test_runs_using_composite(self, action: dict) -> None:
         """R5.1: action.yml must use the 'composite' runner type."""
-        assert action["runs"]["using"] == "composite", (
-            f"Expected runs.using == 'composite', got {action['runs']['using']!r}"
-        )
+        assert (
+            action["runs"]["using"] == "composite"
+        ), f"Expected runs.using == 'composite', got {action['runs']['using']!r}"
 
 
 # ===========================================================================
@@ -173,27 +173,27 @@ class TestGitLabTemplate:
 
     def test_variable_tmac_dir_default(self, gitlab_ci: dict) -> None:
         """R6.4: TMAC_DIR default must match Action default ('.')."""
-        assert gitlab_ci["variables"]["TMAC_DIR"] == ".", (
-            f"Expected TMAC_DIR '.', got {gitlab_ci['variables']['TMAC_DIR']!r}"
-        )
+        assert (
+            gitlab_ci["variables"]["TMAC_DIR"] == "."
+        ), f"Expected TMAC_DIR '.', got {gitlab_ci['variables']['TMAC_DIR']!r}"
 
     def test_variable_tmac_fail_on_default(self, gitlab_ci: dict) -> None:
         """R6.4: TMAC_FAIL_ON default must match Action default ('high')."""
-        assert gitlab_ci["variables"]["TMAC_FAIL_ON"] == "high", (
-            f"Expected TMAC_FAIL_ON 'high', got {gitlab_ci['variables']['TMAC_FAIL_ON']!r}"
-        )
+        assert (
+            gitlab_ci["variables"]["TMAC_FAIL_ON"] == "high"
+        ), f"Expected TMAC_FAIL_ON 'high', got {gitlab_ci['variables']['TMAC_FAIL_ON']!r}"
 
     def test_variable_tmac_delta_only_default(self, gitlab_ci: dict) -> None:
         """R6.4: TMAC_DELTA_ONLY default must match Action default ('true')."""
-        assert gitlab_ci["variables"]["TMAC_DELTA_ONLY"] == "true", (
-            f"Expected TMAC_DELTA_ONLY 'true', got {gitlab_ci['variables']['TMAC_DELTA_ONLY']!r}"
-        )
+        assert (
+            gitlab_ci["variables"]["TMAC_DELTA_ONLY"] == "true"
+        ), f"Expected TMAC_DELTA_ONLY 'true', got {gitlab_ci['variables']['TMAC_DELTA_ONLY']!r}"
 
     def test_variable_tmac_comment_default(self, gitlab_ci: dict) -> None:
         """R6.4: TMAC_COMMENT default must match Action default ('true')."""
-        assert gitlab_ci["variables"]["TMAC_COMMENT"] == "true", (
-            f"Expected TMAC_COMMENT 'true', got {gitlab_ci['variables']['TMAC_COMMENT']!r}"
-        )
+        assert (
+            gitlab_ci["variables"]["TMAC_COMMENT"] == "true"
+        ), f"Expected TMAC_COMMENT 'true', got {gitlab_ci['variables']['TMAC_COMMENT']!r}"
 
     # --- at least one runnable job (R6.1) ------------------------------------
 
@@ -213,8 +213,7 @@ class TestGitLabTemplate:
         tmac_job = gitlab_ci["tmac"]
         assert "artifacts" in tmac_job, "'tmac' job has no 'artifacts' section"
         assert tmac_job["artifacts"]["when"] == "always", (
-            f"Expected artifacts.when == 'always', "
-            f"got {tmac_job['artifacts']['when']!r}"
+            f"Expected artifacts.when == 'always', " f"got {tmac_job['artifacts']['when']!r}"
         )
 
     # --- tmac job rules -------------------------------------------------
@@ -224,9 +223,9 @@ class TestGitLabTemplate:
         assert "tmac" in gitlab_ci, "Expected a 'tmac' job key in the GitLab template"
         tmac_job = gitlab_ci["tmac"]
         assert "rules" in tmac_job, "'tmac' job has no 'rules' section"
-        assert len(tmac_job["rules"]) >= 2, (
-            f"Expected at least 2 rules entries, got {len(tmac_job['rules'])}"
-        )
+        assert (
+            len(tmac_job["rules"]) >= 2
+        ), f"Expected at least 2 rules entries, got {len(tmac_job['rules'])}"
 
 
 # ===========================================================================
@@ -246,10 +245,9 @@ class TestPyprojectToml:
     def test_version_is_1_6_0(self, pyproject: dict) -> None:
         """R8.7: package version must be exactly '1.6.0'."""
         # Support both [tool.poetry] and [project] layouts.
-        version = (
-            pyproject.get("tool", {}).get("poetry", {}).get("version")
-            or pyproject.get("project", {}).get("version")
-        )
+        version = pyproject.get("tool", {}).get("poetry", {}).get("version") or pyproject.get(
+            "project", {}
+        ).get("version")
         assert version == "1.6.0", f"Expected version '1.6.0', got {version!r}"
 
     # --- runtime deps (R8.4) ------------------------------------------------
@@ -259,18 +257,15 @@ class TestPyprojectToml:
         # [tool.poetry.dependencies] (exclude the 'python' key itself)
         poetry_deps = {
             k: v
-            for k, v in pyproject.get("tool", {})
-            .get("poetry", {})
-            .get("dependencies", {})
-            .items()
+            for k, v in pyproject.get("tool", {}).get("poetry", {}).get("dependencies", {}).items()
             if k.lower() != "python"
         }
         # [project] PEP 621 style
         pep621_deps = pyproject.get("project", {}).get("dependencies", [])
 
-        assert poetry_deps or pep621_deps, (
-            "No runtime dependencies found in [tool.poetry.dependencies] or [project.dependencies]"
-        )
+        assert (
+            poetry_deps or pep621_deps
+        ), "No runtime dependencies found in [tool.poetry.dependencies] or [project.dependencies]"
 
     # --- console script (R8.7 / task requirement) ---------------------------
 
@@ -282,12 +277,12 @@ class TestPyprojectToml:
         pep621_scripts = pyproject.get("project", {}).get("scripts", {})
 
         scripts = {**pep621_scripts, **poetry_scripts}
-        assert "tmac" in scripts, (
-            f"'tmac' console script not found. Declared scripts: {list(scripts.keys())}"
-        )
-        assert scripts["tmac"] == "tmac.cli:cli", (
-            f"Expected 'tmac' script entry to be 'tmac.cli:cli', got {scripts['tmac']!r}"
-        )
+        assert (
+            "tmac" in scripts
+        ), f"'tmac' console script not found. Declared scripts: {list(scripts.keys())}"
+        assert (
+            scripts["tmac"] == "tmac.cli:cli"
+        ), f"Expected 'tmac' script entry to be 'tmac.cli:cli', got {scripts['tmac']!r}"
 
 
 # ===========================================================================
@@ -304,15 +299,13 @@ class TestDockerfile:
 
     def test_entrypoint_is_tmac(self, dockerfile_text: str) -> None:
         """R9.1: Dockerfile ENTRYPOINT must be the 'tmac' command."""
-        assert 'ENTRYPOINT ["tmac"]' in dockerfile_text, (
-            "Dockerfile does not contain: ENTRYPOINT [\"tmac\"]"
-        )
+        assert (
+            'ENTRYPOINT ["tmac"]' in dockerfile_text
+        ), 'Dockerfile does not contain: ENTRYPOINT ["tmac"]'
 
     def test_pip_install_present(self, dockerfile_text: str) -> None:
         """R9.1: Dockerfile must install the package (pip install .)."""
-        assert "pip install" in dockerfile_text, (
-            "Dockerfile does not contain a pip install step"
-        )
+        assert "pip install" in dockerfile_text, "Dockerfile does not contain a pip install step"
 
 
 # ===========================================================================
@@ -336,13 +329,13 @@ class TestPreCommitHooks:
         """R10.4: tmac hook must scope to .tf files via 'files' pattern."""
         tmac_hook = next(h for h in hooks if h.get("id") == "tmac")
         files_pattern = tmac_hook.get("files", "")
-        assert r"\.tf" in files_pattern, (
-            f"Expected tmac hook 'files' to match .tf; got {files_pattern!r}"
-        )
+        assert (
+            r"\.tf" in files_pattern
+        ), f"Expected tmac hook 'files' to match .tf; got {files_pattern!r}"
 
     def test_tmac_hook_entry_is_tmac_scan(self, hooks: list) -> None:
         """R10.1: tmac hook entry must invoke 'tmac scan'."""
         tmac_hook = next(h for h in hooks if h.get("id") == "tmac")
-        assert tmac_hook.get("entry", "").startswith("tmac"), (
-            f"Expected hook entry to start with 'tmac', got {tmac_hook.get('entry')!r}"
-        )
+        assert tmac_hook.get("entry", "").startswith(
+            "tmac"
+        ), f"Expected hook entry to start with 'tmac', got {tmac_hook.get('entry')!r}"

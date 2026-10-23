@@ -1,7 +1,8 @@
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any
 
+from tmac.models.resource import is_unresolved_reference
 from tmac.models.rule import CheckCondition
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 class Evaluator:
     """Evaluates rule conditions against resource attributes."""
 
-    def evaluate(self, condition: CheckCondition, attributes: Dict[str, Any]) -> bool:
+    def evaluate(self, condition: CheckCondition, attributes: dict[str, Any]) -> bool:
         """
         Evaluate a single check condition against the resource attributes.
         Returns True if the resource MATCHES the condition (meaning a finding),
@@ -31,7 +32,12 @@ class Evaluator:
         # Also apply any-semantics to lists of scalars collected from multiple blocks
         # (e.g. ingress.from_port → [443, 22]).  Native scalar lists (e.g. cidr_blocks)
         # are handled by _evaluate_condition directly.
-        if isinstance(val, list) and val and all(isinstance(v, dict) for v in val):
+        if condition.condition == "not_contains":
+            # "The collection does not contain X" is a whole-collection check (e.g. a
+            # CloudFormation Tags list lacking a given {Key, Value}); any-semantics would
+            # match whenever any other element differs.
+            matched = self._evaluate_condition(condition.condition, condition.values, val)
+        elif isinstance(val, list) and val and all(isinstance(v, dict) for v in val):
             # List of block dicts — evaluate each block
             matched = any(
                 self._evaluate_condition(condition.condition, condition.values, item)
@@ -57,7 +63,11 @@ class Evaluator:
 
         return matched
 
-    def _get_attribute_value(self, attribute_path: str, attributes: Dict[str, Any]) -> Any:
+    def resolve_attribute(self, attribute_path: str, attributes: dict[str, Any]) -> Any:
+        """Resolve a dotted attribute path; values from repeated blocks come back as a list."""
+        return self._get_attribute_value(attribute_path, attributes)
+
+    def _get_attribute_value(self, attribute_path: str, attributes: dict[str, Any]) -> Any:
         parts = attribute_path.split(".")
         current: Any = attributes
         for i, part in enumerate(parts):
@@ -86,7 +96,9 @@ class Evaluator:
                 return None
         return current
 
-    def _evaluate_condition(self, condition: str, expected_values: List[Any], actual_value: Any) -> bool:
+    def _evaluate_condition(
+        self, condition: str, expected_values: list[Any], actual_value: Any
+    ) -> bool:
         if condition == "exists":
             return actual_value is not None
         if condition == "not_exists":
@@ -95,6 +107,11 @@ class Evaluator:
         # Convert list of single element to single element for comparison
         if isinstance(actual_value, list) and len(actual_value) == 1:
             actual_value = actual_value[0]
+
+        # Deploy-time value (CloudFormation !Ref, !Sub, ...): it exists, but it cannot be
+        # compared statically, so no comparison may produce a finding from it.
+        if is_unresolved_reference(actual_value):
+            return False
 
         if condition == "equals":
             return actual_value in expected_values if expected_values else False
@@ -111,6 +128,11 @@ class Evaluator:
                 return expected_values[0] in actual_value
             return False
         if condition == "not_contains":
+            # An absent collection contains nothing.
+            if actual_value is None:
+                return True
+            if isinstance(actual_value, dict):  # one-element list of blocks, unwrapped above
+                actual_value = [actual_value]
             if isinstance(actual_value, list):
                 return all(v not in actual_value for v in expected_values)
             elif isinstance(actual_value, str) and expected_values:

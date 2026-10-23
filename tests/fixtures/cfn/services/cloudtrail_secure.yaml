@@ -1,0 +1,9 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      IsLogging: true
+      EnableLogFileValidation: true
+      IsMultiRegionTrail: true
+      S3BucketName: !Ref TrailBucket

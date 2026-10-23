@@ -8,6 +8,7 @@ Only stdlib dependencies: subprocess, fnmatch.
 
 import fnmatch
 import subprocess
+from collections.abc import Sequence
 from os import fspath
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def changed_tf_files(
     base_ref: str,
     head_ref: str,
     repo_dir: str = ".",
-    pattern: str = "*.tf",
+    pattern: str | Sequence[str] = ("*.tf", "*.tofu"),
 ) -> list[str]:
     """Return the Changed_File_Set for a git range.
 
@@ -54,7 +55,8 @@ def changed_tf_files(
         base_ref: The base git ref (e.g. the merge-base SHA, branch name, or tag).
         head_ref: The head git ref (e.g. the PR/MR head SHA or branch).
         repo_dir: Path to the git repository root.  Defaults to ``"."``.
-        pattern:  Glob pattern applied to the file's basename.  Defaults to ``"*.tf"``.
+        pattern:  Glob pattern(s) applied to the file's basename.  Defaults to
+                  ``("*.tf", "*.tofu")`` (Terraform and OpenTofu sources).
 
     Returns:
         A sorted, de-duplicated list of relative file paths.
@@ -72,14 +74,20 @@ def changed_tf_files(
     # --- Step 2: compute the diff ---
     result = subprocess.run(
         [
-            "git", "-C", repo_path,
-            "diff", "--name-status", "--diff-filter=AMR",
+            "git",
+            "-C",
+            repo_path,
+            "diff",
+            "--name-status",
+            "--diff-filter=AMR",
             f"{base_ref}...{head_ref}",
         ],
         capture_output=True,
         text=True,
         check=True,
     )
+
+    patterns = (pattern,) if isinstance(pattern, str) else tuple(pattern)
 
     # --- Steps 3 & 4: parse output, extract paths, filter ---
     paths: set[str] = set()
@@ -103,7 +111,7 @@ def changed_tf_files(
             file_path = parts[1]
 
         basename = Path(file_path).name
-        if fnmatch.fnmatch(basename, pattern):
+        if any(fnmatch.fnmatch(basename, p) for p in patterns):
             paths.add(file_path)
 
     # --- Step 5: return sorted, de-duplicated list ---
@@ -114,10 +122,12 @@ def changed_tf_files(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _validate_ref(ref_label: str, ref_value: str, repo_path: str) -> None:
     """Run ``git rev-parse --verify`` for *ref_value*; raise GitRefError if it fails."""
     proc = subprocess.run(
         ["git", "-C", repo_path, "rev-parse", "--verify", ref_value],
+        check=False,  # the return code is inspected below
         capture_output=True,
         text=True,
     )

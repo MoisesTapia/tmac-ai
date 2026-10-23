@@ -1,7 +1,8 @@
 import logging
-import yaml  # type: ignore
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
+import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -9,14 +10,15 @@ ALLOWED_TOP_KEYS = {"scan", "report"}
 ALLOWED_SCAN_KEYS = {"dir", "exclude", "rules_dir"}
 ALLOWED_REPORT_KEYS = {"format", "fail_on", "severity"}
 ALLOWED_FORMATS = {"html", "json", "md"}
+ALLOWED_FAIL_ON = {"critical", "high", "medium", "low", "info"}
+ALLOWED_SEVERITY = ALLOWED_FAIL_ON | {"all"}
 
 
 class ConfigError(Exception):
     """Raised when the config file has syntax errors or is unreadable."""
-    pass
 
 
-def load_config(config_path: str = ".tmac.yaml") -> Dict[str, Any]:
+def load_config(config_path: str = ".tmac.yaml") -> dict[str, Any]:
     path = Path(config_path)
     if not path.exists():
         return {}
@@ -46,7 +48,7 @@ def load_config(config_path: str = ".tmac.yaml") -> Dict[str, Any]:
             config_path,
             sorted(unknown_top),
         )
-    result: Dict[str, Any] = {k: v for k, v in data.items() if k in ALLOWED_TOP_KEYS}
+    result: dict[str, Any] = {k: v for k, v in data.items() if k in ALLOWED_TOP_KEYS}
 
     # Validate scan section
     if "scan" in result and isinstance(result["scan"], dict):
@@ -95,5 +97,22 @@ def load_config(config_path: str = ".tmac.yaml") -> Dict[str, Any]:
                     sorted(ALLOWED_FORMATS),
                 )
                 del result["report"]["format"]
+
+        # Validate report.fail_on / report.severity (case-insensitive)
+        for key, allowed in (("fail_on", ALLOWED_FAIL_ON), ("severity", ALLOWED_SEVERITY)):
+            if key not in result["report"]:
+                continue
+            val = result["report"][key]
+            if isinstance(val, str) and val.lower() in allowed:
+                result["report"][key] = val.lower()
+            else:
+                logger.warning(
+                    "report.%s '%s' in %s is not valid (allowed: %s) — ignoring it",
+                    key,
+                    val,
+                    config_path,
+                    sorted(allowed),
+                )
+                del result["report"][key]
 
     return result

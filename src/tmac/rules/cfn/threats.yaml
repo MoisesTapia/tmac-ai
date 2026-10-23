@@ -1,0 +1,868 @@
+version: "1.0"
+metadata:
+  cloud: aws
+  framework: STRIDE
+  iac: cloudformation
+  description: "Base de datos de amenazas para TMAC v1.2.0 Ixtla - AWS CloudFormation"
+  maintainer: "TMAC Security Team"
+  last_updated: "2026-10-23"
+  # Equivalencia de tipos CloudFormation <-> Terraform (Requisito 24.3)
+  resource_type_mapping:
+    "AWS::S3::Bucket": "aws_s3_bucket"
+    "AWS::IAM::Policy": "aws_iam_policy"
+    "AWS::IAM::ManagedPolicy": "aws_iam_policy"
+    "AWS::IAM::Role": "aws_iam_role"
+    "AWS::IAM::User": "aws_iam_user"
+    "AWS::EC2::SecurityGroup": "aws_security_group"
+    "AWS::EC2::VPC": "aws_vpc"
+    "AWS::EC2::Instance": "aws_instance"
+    "AWS::EC2::LaunchTemplate": "aws_launch_template"
+    "AWS::EC2::Volume": "aws_ebs_volume"
+    "AWS::RDS::DBInstance": "aws_db_instance"
+    "AWS::DynamoDB::Table": "aws_dynamodb_table"
+    "AWS::KMS::Key": "aws_kms_key"
+    "AWS::Lambda::Function": "aws_lambda_function"
+    "AWS::CloudTrail::Trail": "aws_cloudtrail"
+    "AWS::ApiGateway::Method": "aws_api_gateway_method"
+    "AWS::ApiGateway::Stage": "aws_api_gateway_stage"
+
+# Notas de diseño:
+# - "== false o ausente" se expresa con `not_equals: [true, "true"]` (cubre ambos casos).
+#   CloudFormation acepta booleanos como string ("true"), por eso ambos valores.
+# - Valores dinámicos (!Ref, !Sub, !If, ...) no se comparan: una regla nunca dispara
+#   por un valor que solo se conoce al desplegar (ver is_unresolved_reference).
+# - El patrón regex  ^\*$|'\*'  detecta un "*" literal tanto en un string ("*") como
+#   dentro de una lista (['s3:GetObject', '*']), sin confundirlo con "s3:*" o "arn:...:*".
+# - Reglas Terraform sin equivalente directo en este archivo (Requisito 24.4):
+#   * TMAC-AWS-IAM-002 (aws_iam_user_policy): en CFN las políticas inline de usuario son
+#     la propiedad Policies de AWS::IAM::User. Pendiente.
+#   * TMAC-AWS-IAM-005 (aws_iam_access_key): equivale a AWS::IAM::AccessKey. Pendiente.
+#   * TMAC-AWS-IAM-009 (aws_iam_user_login_profile): en CFN es la propiedad LoginProfile
+#     del usuario; cubierto en parte por TMAC-CFN-IAM-006.
+#   * El resto de servicios de aws/threats.yaml fuera de los 11 de v1.2 (ECS, EKS, ...).
+
+rules:
+  # ============================================================
+  # SECCIÓN: S3 (AWS::S3::Bucket)
+  # ============================================================
+
+  - id: TMAC-CFN-S3-001
+    name: "S3 Bucket con Acceso Público (AccessControl)"
+    resource_type: "AWS::S3::Bucket"
+    check:
+      attribute: "AccessControl"
+      condition: "in"
+      values: ["PublicRead", "PublicReadWrite"]
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      El bucket S3 tiene una ACL pública (AccessControl). Cualquier usuario en internet
+      puede leer (o escribir) objetos del bucket.
+    mitigation: >
+      Elimina AccessControl o usa 'Private' y define PublicAccessBlockConfiguration con
+      BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls y RestrictPublicBuckets en true.
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+    tags: ["s3", "public-access", "data-exposure", "cfn"]
+
+  - id: TMAC-CFN-S3-002
+    name: "S3 Bucket sin Cifrado Explícito"
+    resource_type: "AWS::S3::Bucket"
+    check:
+      attribute: "BucketEncryption"
+      condition: "not_exists"
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El bucket no declara BucketEncryption, por lo que no se controla la clave ni el
+      algoritmo con el que se cifran los datos en reposo.
+    mitigation: >
+      Añade BucketEncryption con ServerSideEncryptionConfiguration usando aws:kms y una
+      clave KMS administrada por el cliente.
+    references:
+      - "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket-bucketencryption.html"
+    tags: ["s3", "encryption", "cfn"]
+
+  - id: TMAC-CFN-S3-003
+    name: "S3 Bucket sin Logging de Acceso"
+    resource_type: "AWS::S3::Bucket"
+    check:
+      attribute: "LoggingConfiguration"
+      condition: "not_exists"
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El bucket no registra accesos (LoggingConfiguration); no hay trazabilidad de quién
+      leyó o modificó objetos.
+    mitigation: >
+      Añade LoggingConfiguration con DestinationBucketName apuntando a un bucket de logs.
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html"
+    tags: ["s3", "logging", "cfn"]
+
+  - id: TMAC-CFN-S3-004
+    name: "S3 Bucket configurado como Sitio Web"
+    resource_type: "AWS::S3::Bucket"
+    check:
+      attribute: "WebsiteConfiguration"
+      condition: "exists"
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El bucket sirve contenido como sitio web estático (HTTP, sin TLS), lo que suele
+      requerir acceso público al contenido.
+    mitigation: >
+      Sirve el contenido mediante CloudFront con Origin Access Control y elimina
+      WebsiteConfiguration del bucket.
+    references:
+      - "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html"
+    tags: ["s3", "website", "cfn"]
+
+  - id: TMAC-CFN-S3-005
+    name: "S3 Bucket sin Object Lock"
+    resource_type: "AWS::S3::Bucket"
+    check:
+      attribute: "ObjectLockEnabled"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      Object Lock no está habilitado: los objetos pueden sobrescribirse o borrarse (por
+      error o por ransomware) sin protección WORM.
+    mitigation: >
+      Establece ObjectLockEnabled en true y define ObjectLockConfiguration con una regla
+      de retención para datos críticos.
+    references:
+      - "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+    tags: ["s3", "object-lock", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: IAM (AWS::IAM::Policy / ManagedPolicy / Role / User)
+  # ============================================================
+
+  - id: TMAC-CFN-IAM-001
+    name: "Política IAM con Resource '*'"
+    resource_type: "AWS::IAM::Policy"
+    check:
+      attribute: "PolicyDocument.Statement.Resource"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "High"
+    stride: "Elevation of Privilege"
+    description: >
+      Un statement de la política aplica a todos los recursos ("Resource": "*"),
+      contrario al principio de mínimo privilegio.
+    mitigation: >
+      Limita Resource a los ARNs concretos que la identidad necesita.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "least-privilege", "cfn"]
+
+  - id: TMAC-CFN-IAM-002
+    name: "Política IAM con Action '*'"
+    resource_type: "AWS::IAM::Policy"
+    check:
+      attribute: "PolicyDocument.Statement.Action"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      Un statement concede todas las acciones de todos los servicios ("Action": "*"):
+      equivale a privilegios de administrador.
+    mitigation: >
+      Enumera solo las acciones necesarias (por ejemplo s3:GetObject) en lugar de "*".
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "admin", "cfn"]
+
+  - id: TMAC-CFN-IAM-003
+    name: "Rol IAM asumible por Cualquier Principal"
+    resource_type: "AWS::IAM::Role"
+    check:
+      attribute: "AssumeRolePolicyDocument.Statement.Principal"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      La trust policy permite que cualquier principal ("*" o {"AWS": "*"}) asuma el rol,
+      incluidas cuentas AWS ajenas.
+    mitigation: >
+      Restringe Principal a cuentas, roles o servicios concretos y añade condiciones
+      (aws:PrincipalOrgID, sts:ExternalId).
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html"
+    tags: ["iam", "trust-policy", "cfn"]
+
+  - id: TMAC-CFN-IAM-004
+    name: "Rol IAM para Cuenta Externa sin sts:ExternalId"
+    resource_type: "AWS::IAM::Role"
+    check:
+      attribute: "AssumeRolePolicyDocument"
+      condition: "regex"
+      # Contiene un ARN de cuenta (no la propia vía ${AWS::AccountId}) y no exige ExternalId.
+      values: ['^(?!.*sts:ExternalId)(?!.*AWS::AccountId).*arn:aws:iam::']
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El rol puede ser asumido desde otra cuenta AWS sin exigir sts:ExternalId, lo que
+      expone al problema del "confused deputy".
+    mitigation: >
+      Añade Condition: {StringEquals: {"sts:ExternalId": "<valor-secreto>"}} al statement.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html"
+    tags: ["iam", "cross-account", "cfn"]
+
+  - id: TMAC-CFN-IAM-005
+    name: "Política IAM con iam:PassRole sobre '*'"
+    resource_type: "AWS::IAM::Policy"
+    check:
+      attribute: "PolicyDocument"
+      condition: "regex"
+      values: ['iam:PassRole']
+      and_check:
+        attribute: "PolicyDocument.Statement.Resource"
+        condition: "regex"
+        values: ['^\*$|''\*''']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      La política permite iam:PassRole sobre cualquier rol, lo que permite escalar
+      privilegios lanzando servicios con un rol más privilegiado.
+    mitigation: >
+      Limita iam:PassRole a ARNs de roles concretos y usa la condición iam:PassedToService.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html"
+    tags: ["iam", "passrole", "privilege-escalation", "cfn"]
+
+  - id: TMAC-CFN-IAM-006
+    name: "Usuario IAM con Acceso a Consola"
+    resource_type: "AWS::IAM::User"
+    check:
+      attribute: "LoginProfile"
+      condition: "exists"
+    severity: "Medium"
+    stride: "Spoofing"
+    description: >
+      Se crea un usuario IAM con contraseña de consola (LoginProfile). Las credenciales
+      de larga duración son un vector frecuente de suplantación.
+    mitigation: >
+      Usa IAM Identity Center (SSO) o roles federados en lugar de usuarios IAM con
+      contraseña. Si es imprescindible, exige MFA.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp"
+    tags: ["iam", "users", "cfn"]
+
+  - id: TMAC-CFN-IAM-007
+    name: "Política IAM Administrada con Action '*'"
+    resource_type: "AWS::IAM::ManagedPolicy"
+    check:
+      attribute: "PolicyDocument.Statement.Action"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      La política administrada concede todas las acciones ("Action": "*").
+    mitigation: >
+      Enumera solo las acciones necesarias en lugar de "*".
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "admin", "cfn"]
+
+  - id: TMAC-CFN-IAM-008
+    name: "Política IAM Administrada con Resource '*'"
+    resource_type: "AWS::IAM::ManagedPolicy"
+    check:
+      attribute: "PolicyDocument.Statement.Resource"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "High"
+    stride: "Elevation of Privilege"
+    description: >
+      Un statement de la política administrada aplica a todos los recursos.
+    mitigation: >
+      Limita Resource a los ARNs concretos que la identidad necesita.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "least-privilege", "cfn"]
+
+  - id: TMAC-CFN-IAM-009
+    name: "Rol IAM con Política Inline Action '*'"
+    resource_type: "AWS::IAM::Role"
+    check:
+      attribute: "Policies"
+      condition: "regex"
+      values: ['''Action'': (''\*''|\[[^\]]*''\*'')']
+    severity: "Critical"
+    stride: "Elevation of Privilege"
+    description: >
+      Una política inline del rol (Policies) concede todas las acciones ("Action": "*").
+    mitigation: >
+      Enumera solo las acciones necesarias o usa políticas administradas acotadas.
+    references:
+      - "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+    tags: ["iam", "admin", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: SECURITY GROUPS (AWS::EC2::SecurityGroup)
+  # ============================================================
+
+  - id: TMAC-CFN-SG-001
+    name: "Security Group con SSH abierto a Internet"
+    resource_type: "AWS::EC2::SecurityGroup"
+    check:
+      attribute: "SecurityGroupIngress.FromPort"
+      condition: "equals"
+      values: [22, "22"]
+      and_check:
+        attribute: "SecurityGroupIngress.CidrIp"
+        condition: "equals"
+        values: ["0.0.0.0/0"]
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      El puerto 22 (SSH) acepta tráfico desde 0.0.0.0/0, exponiendo el host a fuerza
+      bruta y explotación remota.
+    mitigation: >
+      Restringe CidrIp a rangos corporativos o usa AWS Systems Manager Session Manager.
+    references:
+      - "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+    tags: ["security-group", "ssh", "network", "cfn"]
+
+  - id: TMAC-CFN-SG-002
+    name: "Security Group con RDP abierto a Internet"
+    resource_type: "AWS::EC2::SecurityGroup"
+    check:
+      attribute: "SecurityGroupIngress.FromPort"
+      condition: "equals"
+      values: [3389, "3389"]
+      and_check:
+        attribute: "SecurityGroupIngress.CidrIp"
+        condition: "equals"
+        values: ["0.0.0.0/0"]
+    severity: "Critical"
+    stride: "Tampering"
+    description: >
+      El puerto 3389 (RDP) acepta tráfico desde 0.0.0.0/0; RDP expuesto es uno de los
+      vectores de ransomware más explotados.
+    mitigation: >
+      Restringe CidrIp a rangos corporativos o usa Fleet Manager / Session Manager.
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/connecting_to_windows_instance.html"
+    tags: ["security-group", "rdp", "network", "cfn"]
+
+  - id: TMAC-CFN-SG-003
+    name: "Security Group con Egress abierto a Internet"
+    resource_type: "AWS::EC2::SecurityGroup"
+    check:
+      attribute: "SecurityGroupEgress.CidrIp"
+      condition: "equals"
+      values: ["0.0.0.0/0"]
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      Una regla de salida permite tráfico hacia cualquier destino, facilitando la
+      exfiltración de datos.
+    mitigation: >
+      Limita SecurityGroupEgress a los destinos y puertos necesarios o usa VPC endpoints.
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html"
+    tags: ["security-group", "egress", "network", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: VPC (AWS::EC2::VPC)
+  # ============================================================
+
+  - id: TMAC-CFN-VPC-001
+    name: "VPC sin Flow Logs (tag FlowLogs)"
+    resource_type: "AWS::EC2::VPC"
+    check:
+      attribute: "Tags"
+      condition: "not_contains"
+      values:
+        - {Key: "FlowLogs", Value: "enabled"}
+        - {Key: "FlowLogs", Value: "Enabled"}
+        - {Key: "FlowLogs", Value: "true"}
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      La VPC no indica que tenga Flow Logs. NOTA DE LIMITACIÓN: el motor evalúa cada
+      recurso por separado y no puede correlacionar la VPC con un AWS::EC2::FlowLog; como
+      workaround (igual que TMAC-AWS-VPC-001) se exige el tag FlowLogs=enabled.
+    mitigation: >
+      Crea un AWS::EC2::FlowLog para la VPC y marca la VPC con el tag FlowLogs=enabled.
+    references:
+      - "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html"
+    tags: ["vpc", "flow-logs", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: EC2 (AWS::EC2::Instance / LaunchTemplate / Volume)
+  # ============================================================
+
+  - id: TMAC-CFN-EC2-001
+    name: "Instancia EC2 con IMDSv1 habilitado"
+    resource_type: "AWS::EC2::Instance"
+    check:
+      attribute: "MetadataOptions.HttpTokens"
+      condition: "equals"
+      values: ["optional"]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      HttpTokens=optional permite IMDSv1, explotable vía SSRF para robar las credenciales
+      del rol de la instancia.
+    mitigation: >
+      Establece MetadataOptions.HttpTokens en 'required' (IMDSv2).
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"
+    tags: ["ec2", "imds", "ssrf", "cfn"]
+
+  - id: TMAC-CFN-EC2-002
+    name: "Volumen EBS sin Cifrado"
+    resource_type: "AWS::EC2::Volume"
+    check:
+      attribute: "Encrypted"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      El volumen EBS no está cifrado (Encrypted ausente o false).
+    mitigation: >
+      Establece Encrypted en true (y KmsKeyId) o habilita el cifrado EBS por defecto.
+    references:
+      - "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html"
+    tags: ["ec2", "ebs", "encryption", "cfn"]
+
+  - id: TMAC-CFN-EC2-003
+    name: "Instancia EC2 con IP Pública"
+    resource_type: "AWS::EC2::Instance"
+    check:
+      attribute: "NetworkInterfaces.AssociatePublicIpAddress"
+      condition: "equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Tampering"
+    description: >
+      La instancia recibe una IP pública y queda expuesta directamente a internet.
+    mitigation: >
+      Coloca la instancia en una subred privada y expón el servicio mediante un ALB/NLB.
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-instance-addressing.html"
+    tags: ["ec2", "public-ip", "network", "cfn"]
+
+  - id: TMAC-CFN-EC2-004
+    name: "Launch Template con IMDSv1 habilitado"
+    resource_type: "AWS::EC2::LaunchTemplate"
+    check:
+      attribute: "LaunchTemplateData.MetadataOptions.HttpTokens"
+      condition: "equals"
+      values: ["optional"]
+    severity: "Critical"
+    stride: "Spoofing"
+    description: >
+      Las instancias lanzadas con esta plantilla permiten IMDSv1 (HttpTokens=optional).
+    mitigation: >
+      Establece LaunchTemplateData.MetadataOptions.HttpTokens en 'required'.
+    references:
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"
+    tags: ["ec2", "imds", "ssrf", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: RDS (AWS::RDS::DBInstance)
+  # ============================================================
+
+  - id: TMAC-CFN-RDS-001
+    name: "Instancia RDS sin Cifrado en Reposo"
+    resource_type: "AWS::RDS::DBInstance"
+    check:
+      attribute: "StorageEncrypted"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El almacenamiento de la base de datos no está cifrado. (Para instancias Aurora el
+      cifrado se define en el AWS::RDS::DBCluster.)
+    mitigation: >
+      Establece StorageEncrypted en true y KmsKeyId con una clave administrada por el cliente.
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
+    tags: ["rds", "encryption", "cfn"]
+
+  - id: TMAC-CFN-RDS-002
+    name: "Instancia RDS Accesible Públicamente"
+    resource_type: "AWS::RDS::DBInstance"
+    check:
+      attribute: "PubliclyAccessible"
+      condition: "equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La base de datos tiene un endpoint público y puede recibir conexiones desde internet.
+    mitigation: >
+      Establece PubliclyAccessible en false y colócala en subredes privadas.
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"
+    tags: ["rds", "public-access", "cfn"]
+
+  - id: TMAC-CFN-RDS-003
+    name: "Instancia RDS sin Multi-AZ"
+    resource_type: "AWS::RDS::DBInstance"
+    check:
+      attribute: "MultiAZ"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      Sin Multi-AZ, una falla de la zona de disponibilidad deja la base de datos fuera de servicio.
+    mitigation: >
+      Establece MultiAZ en true para cargas productivas.
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html"
+    tags: ["rds", "availability", "cfn"]
+
+  - id: TMAC-CFN-RDS-004
+    name: "Instancia RDS sin Protección contra Borrado"
+    resource_type: "AWS::RDS::DBInstance"
+    check:
+      attribute: "DeletionProtection"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      La base de datos puede eliminarse (por error o por un actor malicioso) sin protección.
+    mitigation: >
+      Establece DeletionProtection en true y DeletionPolicy: Snapshot en el recurso.
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteInstance.html"
+    tags: ["rds", "deletion-protection", "cfn"]
+
+  - id: TMAC-CFN-RDS-005
+    name: "Instancia RDS sin Exportación de Logs a CloudWatch"
+    resource_type: "AWS::RDS::DBInstance"
+    check:
+      attribute: "EnableCloudwatchLogsExports"
+      condition: "not_exists"
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      Los logs del motor (auditoría, errores) no se exportan a CloudWatch.
+    mitigation: >
+      Define EnableCloudwatchLogsExports con los tipos de log del motor (p. ej. audit, error).
+    references:
+      - "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html"
+    tags: ["rds", "logging", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: DYNAMODB (AWS::DynamoDB::Table)
+  # ============================================================
+
+  - id: TMAC-CFN-DDB-001
+    name: "Tabla DynamoDB sin Cifrado con KMS"
+    resource_type: "AWS::DynamoDB::Table"
+    check:
+      attribute: "SSESpecification.SSEEnabled"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La tabla usa la clave propiedad de AWS en lugar de una clave KMS controlada por el
+      cliente; no hay control ni auditoría sobre el uso de la clave.
+    mitigation: >
+      Define SSESpecification con SSEEnabled: true, SSEType: KMS y KMSMasterKeyId.
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html"
+    tags: ["dynamodb", "encryption", "cfn"]
+
+  - id: TMAC-CFN-DDB-002
+    name: "Tabla DynamoDB sin Point-in-Time Recovery"
+    resource_type: "AWS::DynamoDB::Table"
+    check:
+      attribute: "PointInTimeRecoverySpecification.PointInTimeRecoveryEnabled"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "Medium"
+    stride: "Denial of Service"
+    description: >
+      Sin PITR no es posible restaurar la tabla a un punto anterior tras borrados o
+      corrupción de datos.
+    mitigation: >
+      Define PointInTimeRecoverySpecification con PointInTimeRecoveryEnabled: true.
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/PointInTimeRecovery.html"
+    tags: ["dynamodb", "backup", "cfn"]
+
+  - id: TMAC-CFN-DDB-003
+    name: "Tabla DynamoDB sin Protección contra Borrado"
+    resource_type: "AWS::DynamoDB::Table"
+    check:
+      attribute: "DeletionProtectionEnabled"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Denial of Service"
+    description: >
+      La tabla puede eliminarse sin protección.
+    mitigation: >
+      Establece DeletionProtectionEnabled en true.
+    references:
+      - "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithTables.Basics.html#WorkingWithTables.Basics.DeletionProtection"
+    tags: ["dynamodb", "deletion-protection", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: KMS (AWS::KMS::Key)
+  # ============================================================
+
+  - id: TMAC-CFN-KMS-001
+    name: "Clave KMS sin Rotación Automática"
+    resource_type: "AWS::KMS::Key"
+    check:
+      attribute: "EnableKeyRotation"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      La clave no rota automáticamente; el material criptográfico se usa indefinidamente.
+    mitigation: >
+      Establece EnableKeyRotation en true (claves simétricas).
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html"
+    tags: ["kms", "rotation", "cfn"]
+
+  - id: TMAC-CFN-KMS-002
+    name: "Clave KMS Deshabilitada"
+    resource_type: "AWS::KMS::Key"
+    # Sustituye a "PendingWindowInDays < 7" de la spec original: CloudFormation no admite
+    # valores menores a 7 y el DSL no tiene comparaciones numéricas. Equivale a TMAC-AWS-KMS-002.
+    check:
+      attribute: "Enabled"
+      condition: "equals"
+      values: [false, "false"]
+    severity: "Medium"
+    stride: "Denial of Service"
+    description: >
+      La clave se crea deshabilitada; los datos cifrados con ella quedan inaccesibles.
+    mitigation: >
+      Establece Enabled en true o elimina la clave si no se usa.
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/enabling-keys.html"
+    tags: ["kms", "availability", "cfn"]
+
+  - id: TMAC-CFN-KMS-003
+    name: "Política de Clave KMS Abierta a Cualquier Principal"
+    resource_type: "AWS::KMS::Key"
+    check:
+      attribute: "KeyPolicy.Statement.Principal"
+      condition: "regex"
+      values: ['^\*$|''\*''']
+    severity: "Critical"
+    stride: "Information Disclosure"
+    description: >
+      La política de la clave concede permisos a cualquier principal ("*").
+    mitigation: >
+      Restringe Principal a cuentas y roles concretos.
+    references:
+      - "https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html"
+    tags: ["kms", "key-policy", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: LAMBDA (AWS::Lambda::Function)
+  # ============================================================
+
+  - id: TMAC-CFN-LMD-001
+    name: "Lambda con Secretos en Variables de Entorno"
+    resource_type: "AWS::Lambda::Function"
+    check:
+      attribute: "Environment.Variables"
+      condition: "regex"
+      # Nombre de variable sensible con valor literal (no '{{resolve:...}}' ni !Ref).
+      values: ['(?i)''[^'']*(password|passwd|pwd|secret|token|api_?key|access_?key|private_?key)[^'']*'': ''(?!\{\{resolve:)']
+    severity: "High"
+    stride: "Information Disclosure"
+    description: >
+      Una variable de entorno con nombre sensible tiene un valor literal en el template:
+      el secreto queda en el código, en la consola y en el historial de CloudFormation.
+    mitigation: >
+      Usa referencias dinámicas ('{{resolve:secretsmanager:...}}') o lee el secreto en
+      tiempo de ejecución desde Secrets Manager / SSM Parameter Store.
+    references:
+      - "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references.html"
+    tags: ["lambda", "secrets", "cfn"]
+
+  - id: TMAC-CFN-LMD-002
+    name: "Lambda sin Tracing Activo (X-Ray)"
+    resource_type: "AWS::Lambda::Function"
+    check:
+      attribute: "TracingConfig.Mode"
+      condition: "not_equals"
+      values: ["Active"]
+    severity: "Low"
+    stride: "Repudiation"
+    description: >
+      La función no tiene tracing activo, lo que dificulta reconstruir las invocaciones.
+    mitigation: >
+      Define TracingConfig con Mode: Active.
+    references:
+      - "https://docs.aws.amazon.com/lambda/latest/dg/services-xray.html"
+    tags: ["lambda", "tracing", "cfn"]
+
+  - id: TMAC-CFN-LMD-003
+    name: "Lambda con Concurrencia Reservada en Cero"
+    resource_type: "AWS::Lambda::Function"
+    check:
+      attribute: "ReservedConcurrentExecutions"
+      condition: "equals"
+      values: [0, "0"]
+    severity: "Medium"
+    stride: "Denial of Service"
+    description: >
+      ReservedConcurrentExecutions=0 impide toda invocación de la función.
+    mitigation: >
+      Asigna un valor mayor a 0 o elimina la propiedad.
+    references:
+      - "https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html"
+    tags: ["lambda", "availability", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: CLOUDTRAIL (AWS::CloudTrail::Trail)
+  # ============================================================
+
+  - id: TMAC-CFN-CW-001
+    name: "CloudTrail Deshabilitado"
+    resource_type: "AWS::CloudTrail::Trail"
+    check:
+      attribute: "IsLogging"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "High"
+    stride: "Repudiation"
+    description: >
+      El trail no está registrando eventos: las acciones en la cuenta no quedan auditadas.
+    mitigation: >
+      Establece IsLogging en true.
+    references:
+      - "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-user-guide.html"
+    tags: ["cloudtrail", "logging", "cfn"]
+
+  - id: TMAC-CFN-CW-002
+    name: "CloudTrail sin Validación de Integridad de Logs"
+    resource_type: "AWS::CloudTrail::Trail"
+    check:
+      attribute: "EnableLogFileValidation"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      Sin validación de integridad no es posible detectar si los logs fueron alterados.
+    mitigation: >
+      Establece EnableLogFileValidation en true.
+    references:
+      - "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html"
+    tags: ["cloudtrail", "integrity", "cfn"]
+
+  - id: TMAC-CFN-CW-003
+    name: "CloudTrail de una sola Región"
+    resource_type: "AWS::CloudTrail::Trail"
+    check:
+      attribute: "IsMultiRegionTrail"
+      condition: "not_equals"
+      values: [true, "true"]
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      El trail solo registra una región; la actividad en otras regiones no queda auditada.
+    mitigation: >
+      Establece IsMultiRegionTrail en true.
+    references:
+      - "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html"
+    tags: ["cloudtrail", "logging", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: API GATEWAY (AWS::ApiGateway::Method / Stage)
+  # ============================================================
+
+  - id: TMAC-CFN-APIGW-001
+    name: "Método de API Gateway sin Autorización"
+    resource_type: "AWS::ApiGateway::Method"
+    check:
+      attribute: "AuthorizationType"
+      condition: "equals"
+      values: ["NONE"]
+      # Los métodos OPTIONS (preflight CORS) son públicos por diseño.
+      and_check:
+        attribute: "HttpMethod"
+        condition: "not_equals"
+        values: ["OPTIONS"]
+    severity: "High"
+    stride: "Spoofing"
+    description: >
+      El método acepta peticiones sin autenticación.
+    mitigation: >
+      Usa AWS_IAM, COGNITO_USER_POOLS o un Lambda authorizer (AuthorizationType/AuthorizerId).
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html"
+    tags: ["apigateway", "authentication", "cfn"]
+
+  - id: TMAC-CFN-APIGW-002
+    name: "Stage de API Gateway sin Logging de Ejecución"
+    resource_type: "AWS::ApiGateway::Stage"
+    check:
+      attribute: "MethodSettings.LoggingLevel"
+      condition: "not_exists"
+    severity: "Medium"
+    stride: "Repudiation"
+    description: >
+      Ningún MethodSettings define LoggingLevel: las invocaciones no quedan registradas.
+    mitigation: >
+      Define MethodSettings con LoggingLevel: INFO (o ERROR) para "/*" y "*".
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html"
+    tags: ["apigateway", "logging", "cfn"]
+
+  - id: TMAC-CFN-APIGW-003
+    name: "Stage de API Gateway sin Certificado de Cliente"
+    resource_type: "AWS::ApiGateway::Stage"
+    check:
+      attribute: "ClientCertificateId"
+      condition: "not_exists"
+    severity: "Medium"
+    stride: "Information Disclosure"
+    description: >
+      El backend no puede verificar que las peticiones provienen de API Gateway.
+    mitigation: >
+      Asocia un AWS::ApiGateway::ClientCertificate al stage y valídalo en el backend.
+    references:
+      - "https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started-client-side-ssl-authentication.html"
+    tags: ["apigateway", "mtls", "cfn"]
+
+  # ============================================================
+  # SECCIÓN: ESPECÍFICAS DE CLOUDFORMATION (Requisito 24.5)
+  # ============================================================
+
+  - id: TMAC-CFN-STACK-001
+    name: "Nested Stack cargado por HTTP sin TLS"
+    resource_type: "AWS::CloudFormation::Stack"
+    check:
+      attribute: "TemplateURL"
+      condition: "regex"
+      values: ['(?i)^http://']
+    severity: "Medium"
+    stride: "Tampering"
+    description: >
+      El template anidado se descarga por HTTP plano; puede ser alterado en tránsito y
+      desplegar infraestructura arbitraria con los permisos del stack.
+    mitigation: >
+      Usa una URL https:// de un bucket S3 privado bajo tu control.
+    references:
+      - "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudformation-stack.html"
+    tags: ["cloudformation", "nested-stack", "integrity", "cfn"]

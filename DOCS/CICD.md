@@ -41,7 +41,7 @@ jobs:
           fetch-depth: 0        # required for delta mode
 
       - name: Install TMAC
-        run: pip install tmac
+        run: pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"  # pin a tag or SHA
 
       - uses: ./                # or: tmac-security/tmac-action@v1.6.0
         with:
@@ -97,7 +97,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install TMAC
-        run: pip install tmac
+        run: pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"  # pin a tag or SHA
 
       - name: Run TMAC scan
         run: |
@@ -156,7 +156,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install TMAC
-        run: pip install tmac
+        run: pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"  # pin a tag or SHA
 
       - name: Terraform Init & Plan
         run: |
@@ -223,7 +223,7 @@ tmac-security-scan:
   stage: test
   image: python:3.11-slim
   before_script:
-    - pip install tmac
+    - pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"  # pin a tag or SHA
   script:
     - |
       tmac ci \

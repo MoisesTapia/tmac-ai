@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- **GitLab CI template installed an unrelated package**: the PyPI name `tmac` belongs to a different project, and the template ran `pip install tmac` with the job's `CI_JOB_TOKEN` available. It now installs this repository's archive at `TMAC_REF`. The docs no longer recommend `pip install tmac`.
+- **HTML reports**: Jinja2 autoescape for every value (resource names, file paths and custom-rule text were rendered raw, and so was the embedded Mermaid diagram), and `references` links are restricted to `http(s)` with `rel="noopener noreferrer"`.
+- **Fail closed**: an unparseable IaC file or an invalid/unreadable rule no longer passes as a clean scan. `scan`, `cfn`, `plan` and `ci` write the report (with an *Incomplete scan* banner; SARIF `executionSuccessful: false`; a note in the PR/MR comment) and exit `3`. `--lenient` restores warn-only behaviour.
+- **Dependencies**: hash-locked `requirements*.txt` generated from `requirements*.in` with `uv pip compile`, audited with `pip-audit`; `python-hcl2` capped `<5` (v5+ changes its output format and silently produced 0 findings). The Docker image installs from the lockfile; third-party GitHub Actions are pinned to commit SHAs.
+
+### Added
+
+- **AWS CloudFormation — `tmac cfn`**: YAML/JSON templates (`.yaml`, `.yml`, `.json`, `.template`; other YAML/JSON is skipped). Intrinsic functions (`!Ref`, `!Sub`, `!GetAtt`, `Fn::…`) are normalized and never compared; exact LogicalId line numbers; `tmac:ignore` via comments or resource `Metadata` (works in JSON); size and YAML alias-bomb limits.
+- **43 CloudFormation rules** (`TMAC-CFN-*`): S3 (5), IAM (9), Security Groups (3), VPC (1), EC2 (4), RDS (5), DynamoDB (3), KMS (3), Lambda (3), CloudTrail (3), API Gateway (3), nested stacks (1).
+- **OpenTofu**: `.tofu` sources in `scan`, `ci` (changed-file set) and `diagram`; `x.tofu` overrides `x.tf`; `tofu show -json` plans in `plan`.
+- `tmac plan --source-dir` applies `tmac:ignore` comments from the `.tf`/`.tofu` sources; `tmac plan --config`.
+- Rule validation at load time: severity, STRIDE and condition restricted to valid values (case-insensitive), regexes compiled, values required except for `exists`/`not_exists`; one invalid rule no longer drops the rest of its file.
+- `Scanner(parser=...)`: format-agnostic scanner; parsers declare `file_patterns`, `can_parse()` and `parse_strict()`.
+- CI workflow (`ci.yml`): tests on Python 3.11–3.13 and Windows, a Python 3.10 runtime smoke test for `scan` and `cfn`, weekly `pip-audit`, required lint/type checks; Dependabot for GitHub Actions.
+
+### Changed
+
+- File discovery never walks `.git`, `.terraform`, `.terragrunt-cache`, `node_modules`, `.aws-sam`, virtualenvs or tool caches (vendored modules were reported as the project's own findings).
+- `ScanResult.files_failed` now counts files that actually failed to parse (it used to count every non-empty `.tf` without resources, e.g. `variables.tf`).
+- Rule engine: unresolved references count as present but never produce comparison findings; `not_contains` checks the whole collection. Terraform results are unchanged.
+- Code formatted with black/ruff (line length 100); `mypy --strict` clean.
+
+### Fixed
+
+- `--config` was ignored; the `report` section of `.tmac.yaml` (`format`, `fail_on`, `severity`) and `scan.dir` were not applied (precedence: flag > `.tmac.yaml` > default).
+- A missing `--dir` exited `2` instead of the documented `3`.
+- `tmac:ignore` matched by resource name across files and types (ignoring `aws_s3_bucket.main` also silenced `aws_security_group.main`).
+- `DeltaFinding.value_before`/`value_after` were empty for nested attributes.
+- `datetime.utcnow()` deprecation; version reported in SARIF/CLI now comes from `tmac.__version__`.
+
+---
+
 ## [1.6.0] — "Ixtla" — 2026-07-09
 
 ### Added

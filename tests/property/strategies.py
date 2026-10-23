@@ -40,6 +40,7 @@ _identifier = st.from_regex(r"[a-z][a-z_]{0,15}", fullmatch=True)
 # attributes_strategy — generates AWS-like resource attribute dicts
 # ---------------------------------------------------------------------------
 
+
 def attributes_strategy() -> st.SearchStrategy:
     """Generate dicts of AWS resource attributes suitable for rule evaluation."""
     return st.fixed_dictionaries(
@@ -60,6 +61,7 @@ def attributes_strategy() -> st.SearchStrategy:
 # ---------------------------------------------------------------------------
 # planned_change_strategy — generates valid PlannedChange instances
 # ---------------------------------------------------------------------------
+
 
 def _before_after_for_action(action: ChangeAction):
     """Return (before_strategy, after_strategy) consistent with the given action."""
@@ -98,6 +100,7 @@ def planned_change_strategy(draw) -> PlannedChange:
 # ---------------------------------------------------------------------------
 # delta_finding_strategy — generates valid DeltaFinding instances
 # ---------------------------------------------------------------------------
+
 
 @st.composite
 def delta_finding_strategy(draw) -> DeltaFinding:
@@ -142,6 +145,7 @@ def delta_finding_strategy(draw) -> DeltaFinding:
 # ---------------------------------------------------------------------------
 # rule_strategy — generates ThreatRule with valid CheckCondition
 # ---------------------------------------------------------------------------
+
 
 @st.composite
 def rule_strategy(draw) -> ThreatRule:
@@ -290,7 +294,9 @@ def comment_context_strategy(draw) -> CommentContext:
     # Compute the minimum body size: 0 rows with the maximum possible truncation
     # notice (using 10 as an upper bound for the count).  This is the absolute
     # minimum body the formatter can produce when it has to drop all rows.
-    from tmac.ci.comment import CommentContext as _CC, CommentFormatter as _CF
+    from tmac.ci.comment import CommentContext as _CC
+    from tmac.ci.comment import CommentFormatter as _CF
+
     _probe_ctx = _CC(
         fail_on=fail_on,
         artifact_ref=artifact_ref,
@@ -318,7 +324,7 @@ def comment_context_strategy(draw) -> CommentContext:
 # FakeHttpTransport — injectable fake for publisher tests (tmac-v1-6-pr-agent)
 # ---------------------------------------------------------------------------
 
-from tmac.ci.publisher import CIContext, HttpResponse, HttpTransport
+from tmac.ci.publisher import CIContext, HttpResponse
 
 
 class FakeHttpTransport:
@@ -445,6 +451,7 @@ def existing_comments_strategy(draw) -> list[dict]:
 # ---------------------------------------------------------------------------
 # ci_context_strategy — generates a valid CIContext for publisher tests
 # ---------------------------------------------------------------------------
+
 
 @st.composite
 def ci_context_strategy(draw) -> CIContext:

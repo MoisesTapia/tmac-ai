@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  AdminPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: admin
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "*"
+            Resource: "*"
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource: ["*"]
+  OpenRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: "*"}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: inline-admin
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: ["s3:GetObject", "*"]
+                Resource: arn:aws:s3:::bucket/*
+  CrossAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: "arn:aws:iam::111122223333:root"}
+            Action: sts:AssumeRole
+  ConsoleUser:
+    Type: AWS::IAM::User
+    Properties:
+      LoginProfile:
+        Password: "{{resolve:secretsmanager:console-user:SecretString:password}}"
+  ManagedAdmin:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: "*"
+            Resource: ["*"]

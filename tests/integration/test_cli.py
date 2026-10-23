@@ -7,14 +7,15 @@ Property 4: --no-color produces output without ANSI escape sequences
 
 **Validates: Requirements 2.6, 3.2, 3.4**
 """
+
 import re
 import tempfile
 import textwrap
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tmac.cli import cli
 
@@ -40,11 +41,14 @@ resource "aws_s3_bucket" "private_bucket" {
 }
 """
 
+
 # Truly empty directory (no .tf files) for zero-findings tests
-def _empty_dir_scan(tmp_path: Path, extra_args: list = None) -> object:
+def _empty_dir_scan(tmp_path: Path, extra_args: list[str] | None = None) -> object:
     """Invoke scan on an empty directory (no .tf files) → always exit 0."""
     runner = CliRunner()
-    args = ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")] + (extra_args or [])
+    args = ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")] + (
+        extra_args or []
+    )
     return runner.invoke(cli, args, catch_exceptions=False)
 
 
@@ -54,17 +58,22 @@ def _write_tf(directory: Path, name: str, content: str) -> Path:
     return f
 
 
-def _invoke_scan(tmp_path: Path, extra_args: list = None, tf_content: str = CLEAN_TF) -> object:
+def _invoke_scan(
+    tmp_path: Path, extra_args: list[str] | None = None, tf_content: str = CLEAN_TF
+) -> object:
     """Write a .tf file and invoke the scan command, returning the result."""
     _write_tf(tmp_path, "main.tf", tf_content)
     runner = CliRunner()
-    args = ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")] + (extra_args or [])
+    args = ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")] + (
+        extra_args or []
+    )
     return runner.invoke(cli, args, catch_exceptions=False)
 
 
 # ---------------------------------------------------------------------------
 # Basic exit code tests
 # ---------------------------------------------------------------------------
+
 
 class TestExitCodes:
     def test_exit_0_clean_directory(self, tmp_path):
@@ -98,8 +107,15 @@ resource "aws_security_group" "ssh_open" {
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--fail-on", "high",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--fail-on",
+                "high",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         assert result.exit_code == 2
@@ -110,8 +126,9 @@ resource "aws_security_group" "ssh_open" {
         # Use a path that click won't validate (no exists=True check bypassed)
         # We test via a subdir that doesn't exist
         bad_path = str(tmp_path / "nonexistent_subdir")
-        result = runner.invoke(cli, ["scan", "--dir", bad_path,
-                                     "--output", str(tmp_path / "report.html")])
+        result = runner.invoke(
+            cli, ["scan", "--dir", bad_path, "--output", str(tmp_path / "report.html")]
+        )
         # click exits 2 for bad path option (exists=True), or 3 for ScanError
         assert result.exit_code != 0
 
@@ -131,8 +148,7 @@ resource "aws_security_group" "ssh_open" {
             scan_dir.mkdir()
             result = runner.invoke(
                 cli,
-                ["scan", "--dir", str(scan_dir),
-                 "--output", str(iso_path / "report.html")],
+                ["scan", "--dir", str(scan_dir), "--output", str(iso_path / "report.html")],
             )
         assert result.exit_code == 3
 
@@ -141,6 +157,7 @@ resource "aws_security_group" "ssh_open" {
 # --exclude flag tests
 # ---------------------------------------------------------------------------
 
+
 class TestExcludeFlag:
     def test_exclude_omits_matching_file(self, tmp_path):
         """--exclude *.tf results in no files scanned (exit 0)."""
@@ -148,8 +165,15 @@ class TestExcludeFlag:
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--exclude", "*.tf",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--exclude",
+                "*.tf",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
@@ -161,8 +185,15 @@ class TestExcludeFlag:
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--exclude", "main.tf",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--exclude",
+                "main.tf",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
@@ -174,9 +205,17 @@ class TestExcludeFlag:
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path),
-             "--exclude", "a.tf", "--exclude", "b.tf",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--exclude",
+                "a.tf",
+                "--exclude",
+                "b.tf",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0
@@ -185,6 +224,7 @@ class TestExcludeFlag:
 # ---------------------------------------------------------------------------
 # --report json SARIF output tests
 # ---------------------------------------------------------------------------
+
 
 class TestReportJson:
     def test_report_json_generates_sarif_fields(self, tmp_path):
@@ -196,8 +236,7 @@ class TestReportJson:
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--report", "json",
-             "--output", str(out_file)],
+            ["scan", "--dir", str(tmp_path), "--report", "json", "--output", str(out_file)],
             catch_exceptions=False,
         )
         assert out_file.exists(), f"Report file not created. Output: {result.output}"
@@ -212,6 +251,7 @@ class TestReportJson:
 # --no-color flag tests
 # ---------------------------------------------------------------------------
 
+
 class TestNoColorFlag:
     def test_no_color_output_has_no_ansi(self, tmp_path):
         """--no-color produces stdout without ANSI escape sequences."""
@@ -219,19 +259,26 @@ class TestNoColorFlag:
         # Empty directory → no findings
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--no-color",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--no-color",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
-        assert not ANSI_PATTERN.search(result.output), (
-            f"ANSI sequences found in output: {result.output!r}"
-        )
+        assert not ANSI_PATTERN.search(
+            result.output
+        ), f"ANSI sequences found in output: {result.output!r}"
 
 
 # ---------------------------------------------------------------------------
 # Property 2: Exit code respects --fail-on threshold
 # **Validates: Requirements 2.6**
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100, deadline=None)
 @given(
@@ -252,8 +299,15 @@ def test_property_2_exit_code_respects_fail_on(threshold):
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--fail-on", threshold,
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--fail-on",
+                threshold,
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         threshold_val = SEVERITY_LEVELS[threshold]
@@ -285,8 +339,15 @@ def test_property_2_exit_0_when_no_findings_meet_threshold(threshold):
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--fail-on", threshold,
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--fail-on",
+                threshold,
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
@@ -299,6 +360,7 @@ def test_property_2_exit_0_when_no_findings_meet_threshold(threshold):
 # Property 3: --exclude omits files matching glob pattern
 # **Validates: Requirements 3.2**
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100, deadline=None)
 @given(
@@ -330,8 +392,9 @@ def test_property_3_exclude_omits_matching_files(n_excluded, n_clean):
 
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path)] + exclude_args +
-            ["--output", str(tmp_path / "report.html")],
+            ["scan", "--dir", str(tmp_path)]
+            + exclude_args
+            + ["--output", str(tmp_path / "report.html")],
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
@@ -344,6 +407,7 @@ def test_property_3_exclude_omits_matching_files(n_excluded, n_clean):
 # Property 4: --no-color produces output without ANSI escape sequences
 # **Validates: Requirements 3.4**
 # ---------------------------------------------------------------------------
+
 
 @settings(max_examples=100, deadline=None)
 @given(
@@ -367,11 +431,17 @@ def test_property_4_no_color_no_ansi_sequences(has_findings):
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["scan", "--dir", str(tmp_path), "--no-color",
-             "--output", str(tmp_path / "report.html")],
+            [
+                "scan",
+                "--dir",
+                str(tmp_path),
+                "--no-color",
+                "--output",
+                str(tmp_path / "report.html"),
+            ],
             catch_exceptions=False,
         )
 
-        assert not ANSI_PATTERN.search(result.output), (
-            f"ANSI sequences found in stdout with --no-color: {result.output!r}"
-        )
+        assert not ANSI_PATTERN.search(
+            result.output
+        ), f"ANSI sequences found in stdout with --no-color: {result.output!r}"

@@ -21,13 +21,17 @@ RUN groupadd --gid 1001 tmac && \
 
 WORKDIR /app
 
+# Install the locked runtime dependencies first (exact versions, SHA-256 verified)
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
+
 # Copy the project source (pyproject.toml + src/ are required by pip install .)
 COPY pyproject.toml README.md* ./
 COPY src/ ./src/
 
-# Install the package; this places the `tmac` console script on PATH via pyproject.toml
-# [tool.poetry.scripts] tmac = "tmac.cli:cli"
-RUN pip install --no-cache-dir .
+# Install the package itself without re-resolving dependencies; this places the `tmac`
+# console script on PATH via pyproject.toml [tool.poetry.scripts] tmac = "tmac.cli:cli"
+RUN pip install --no-cache-dir --no-deps .
 
 # Smoke-test: confirm the entrypoint is resolvable before shipping the image
 RUN tmac --version

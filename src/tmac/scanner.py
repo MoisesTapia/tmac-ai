@@ -1,35 +1,61 @@
 import fnmatch
 import logging
+import os
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Any
 
 from tmac.config import ConfigError, load_config
 from tmac.engine.matcher import Matcher
 from tmac.engine.rule_loader import RuleLoader
-from tmac.models.finding import ScanMetadata, ScanResult, ScanStatistics
+from tmac.engine.severity import filter_by_min_severity
+from tmac.models.finding import ScanIssue, ScanMetadata, ScanResult, ScanStatistics
+from tmac.parsers.base import BaseParser, ParseError
 from tmac.parsers.terraform import TerraformParser
 
 logger = logging.getLogger(__name__)
 
+# Never descended into: VCS metadata, downloaded dependencies/modules and tool caches.
+# (.terraform holds third-party module copies; scanning them reports findings the
+# project doesn't own.)
+DEFAULT_EXCLUDED_DIRS = frozenset(
+    {
+        ".git", ".hg", ".svn", ".terraform", ".terragrunt-cache", "node_modules",
+        ".venv", "venv", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache",
+        ".ruff_cache", ".aws-sam",
+    }
+)  # fmt: skip
+
 
 class ScanError(Exception):
     """Raised when the scan pipeline cannot proceed."""
-    pass
 
 
 class Scanner:
-    """Orchestrates the full TMAC scan pipeline (SRP: no presentation logic)."""
+    """Orchestrates the full TMAC scan pipeline (SRP: no presentation logic).
+
+    Format-agnostic: file discovery and parsing are delegated to ``parser``
+    (Terraform by default). Supporting a new IaC format means writing a
+    BaseParser subclass, not a new scanner.
+    """
+
+    def __init__(self, parser: BaseParser | None = None) -> None:
+        self.parser = parser or TerraformParser()
+        if not self.parser.file_patterns:
+            raise ValueError(f"{type(self.parser).__name__} declares no file_patterns")
 
     def run_scan(
         self,
         directory: str,
-        rules_dir: Optional[str] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        rules_dir: str | None = None,
+        exclude_patterns: list[str] | None = None,
         min_severity: str = "all",
         verbose: bool = False,
-        include_paths: Optional[List[str]] = None,
+        include_paths: list[str] | None = None,
+        config: dict[str, Any] | None = None,
     ) -> ScanResult:
+        """Run the scan. ``config`` is an already-loaded .tmac.yaml; when None, the
+        default ./.tmac.yaml is loaded."""
         start = time.time()
         exclude_patterns = exclude_patterns or []
 
@@ -39,92 +65,103 @@ class Scanner:
             raise ScanError(f"Directory not accessible: {directory}")
 
         # Load config (may raise ConfigError → caller converts to ScanError)
-        try:
-            cfg = load_config()
-        except ConfigError as e:
-            raise ScanError(str(e)) from e
+        if config is not None:
+            cfg = config
+        else:
+            try:
+                cfg = load_config()
+            except ConfigError as e:
+                raise ScanError(str(e)) from e
 
         cfg_exclude = cfg.get("scan", {}).get("exclude", [])
         all_excludes = list(exclude_patterns) + cfg_exclude
 
-        # Build the include set (resolved absolute paths) when include_paths is provided
-        include_set = {str(Path(p).resolve()) for p in include_paths} if include_paths is not None else None
+        # Restrict to include_paths (resolved absolute paths) when provided (CI delta mode)
+        include_set = (
+            {str(Path(p).resolve()) for p in include_paths} if include_paths is not None else None
+        )
 
-        # Discover .tf files, applying include restriction and exclude patterns
-        tf_files = [
-            f for f in scan_path.rglob("*.tf")
-            if (include_set is None or str(f.resolve()) in include_set)
-            and not _is_excluded(f, all_excludes)
-        ]
-        logger.debug("Discovered %d .tf files in %s", len(tf_files), directory)
+        files = self._discover_files(scan_path, all_excludes, include_set)
+        logger.debug(
+            "Discovered %d files (%s) in %s",
+            len(files),
+            ", ".join(self.parser.file_patterns),
+            directory,
+        )
 
-        # Parse resources
-        parser = TerraformParser()
+        # Parse resources (tmac:ignore suppressions travel on each ResourceModel).
+        # Unparseable files are recorded, not silently treated as empty.
         all_resources = []
-        combined_ignore_map: dict = {}
-        files_failed = 0
-
-        for tf_file in tf_files:
-            resources = parser.parse(str(tf_file))
-            # Detect parse failure: non-empty file that returned no resources
-            # (parser.parse returns [] on error per its implementation)
-            if not resources:
-                try:
-                    file_size = tf_file.stat().st_size
-                except OSError:
-                    file_size = 0
-                if file_size > 0:
-                    # Non-empty file that yielded nothing — treat as parse failure
-                    files_failed += 1
-            all_resources.extend(resources)
-            for res_name, rules_list in parser.get_ignore_map(str(tf_file)).items():
-                existing = combined_ignore_map.get(res_name, [])
-                merged = list(existing)
-                for rid in rules_list:
-                    if rid not in merged:
-                        merged.append(rid)
-                combined_ignore_map[res_name] = ["*"] if "*" in merged else merged
+        issues: list[ScanIssue] = []
+        for file in files:
+            try:
+                all_resources.extend(self.parser.parse_strict(str(file)))
+            except ParseError as e:
+                logger.warning("%s", e)
+                issues.append(ScanIssue(kind="parse", file_path=str(file), message=str(e)))
 
         # Load rules
         extra_dir = rules_dir or cfg.get("scan", {}).get("rules_dir")
         loader = RuleLoader()
         rules = loader.load_rules(extra_dir)
+        issues.extend(loader.issues)
         logger.debug("Loaded %d rules", len(rules))
 
         # Match
         matcher = Matcher()
-        findings = matcher.match(all_resources, rules, ignore_map=combined_ignore_map)
-
-        # Filter by min_severity
-        severity_levels = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
-        if min_severity != "all":
-            min_level = severity_levels.get(min_severity.lower(), 0)
-            findings = [f for f in findings if severity_levels.get(f.severity.lower(), 0) >= min_level]
-
-        stats = ScanStatistics(
-            total_resources=len(all_resources),
-            total_findings=len(findings),
-            critical=sum(1 for f in findings if f.severity.lower() == "critical"),
-            high=sum(1 for f in findings if f.severity.lower() == "high"),
-            medium=sum(1 for f in findings if f.severity.lower() == "medium"),
-            low=sum(1 for f in findings if f.severity.lower() == "low"),
-            info=sum(1 for f in findings if f.severity.lower() == "info"),
-        )
+        findings = filter_by_min_severity(matcher.match(all_resources, rules), min_severity)
 
         return ScanResult(
             metadata=ScanMetadata(
                 scanned_directory=str(directory),
                 execution_time_seconds=time.time() - start,
             ),
-            statistics=stats,
+            statistics=ScanStatistics.from_findings(findings, total_resources=len(all_resources)),
             findings=findings,
-            files_scanned=len(tf_files),
+            files_scanned=len(files),
             rules_loaded=len(rules),
-            files_failed=files_failed,
+            # Kept for v1.6 consumers (CI runner): number of unparseable files.
+            files_failed=sum(1 for i in issues if i.kind == "parse"),
+            issues=issues,
         )
 
+    def _discover_files(
+        self, scan_path: Path, excludes: list[str], include_set: set[str] | None = None
+    ) -> list[Path]:
+        """Files matching the parser's patterns, minus excludes, sorted.
 
-def _is_excluded(file_path: Path, patterns: List[str]) -> bool:
+        Directories in DEFAULT_EXCLUDED_DIRS are pruned while walking, so vendored
+        trees (node_modules, .terraform, virtualenvs) are never read. When
+        ``include_set`` is given, only those (resolved, absolute) paths are kept.
+        """
+        return discover_files(scan_path, self.parser, excludes, include_set)
+
+
+def discover_files(
+    scan_path: Path,
+    parser: BaseParser,
+    excludes: list[str],
+    include_set: set[str] | None = None,
+) -> list[Path]:
+    """Files under scan_path that ``parser`` handles, minus excludes, sorted.
+
+    Shared by Scanner and the diagram service so both see the same files.
+    """
+    found: list[Path] = []
+    for root, dirs, files in os.walk(scan_path):
+        dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDED_DIRS]
+        for name in files:
+            if not any(fnmatch.fnmatch(name, p) for p in parser.file_patterns):
+                continue
+            path = Path(root) / name
+            if include_set is not None and str(path.resolve()) not in include_set:
+                continue
+            if not _is_excluded(path, excludes) and parser.can_parse(str(path)):
+                found.append(path)
+    return sorted(found)
+
+
+def _is_excluded(file_path: Path, patterns: list[str]) -> bool:
     """Return True if any exclude pattern matches any part of the file path."""
     path_str = str(file_path)
     for pattern in patterns:

@@ -1,0 +1,6 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Nested:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: http://example.com/templates/network.yaml

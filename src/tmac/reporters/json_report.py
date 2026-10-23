@@ -1,7 +1,9 @@
 import json
-from tmac.reporters.base import BaseReporter
-from tmac.models.finding import ScanResult
+from typing import Any
+
 from tmac.delta.models import DeltaFinding
+from tmac.models.finding import ScanResult
+from tmac.reporters.base import BaseReporter
 
 SARIF_SEVERITY_MAP = {
     "critical": "error",
@@ -17,7 +19,7 @@ class JSONReporter(BaseReporter):
 
     def generate(self, result: ScanResult, diagram: str | None = None) -> str:
         # Build unique rules from findings
-        seen_rule_ids: set = set()
+        seen_rule_ids: set[str] = set()
         rules = []
         for finding in result.findings:
             if finding.rule_id not in seen_rule_ids:
@@ -35,16 +37,18 @@ class JSONReporter(BaseReporter):
         results = []
         for finding in result.findings:
             level = SARIF_SEVERITY_MAP.get(finding.severity.lower(), "warning")
-            result_entry: dict = {
+            result_entry: dict[str, Any] = {
                 "ruleId": finding.rule_id,
                 "level": level,
                 "message": {"text": finding.description},
-                "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {"uri": finding.file_path},
-                        "region": {"startLine": finding.line_number},
+                "locations": [
+                    {
+                        "physicalLocation": {
+                            "artifactLocation": {"uri": finding.file_path},
+                            "region": {"startLine": finding.line_number},
+                        }
                     }
-                }],
+                ],
             }
             if isinstance(finding, DeltaFinding):
                 result_entry["properties"] = {
@@ -57,17 +61,41 @@ class JSONReporter(BaseReporter):
         sarif = {
             "version": "2.1.0",
             "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": result.metadata.tool_name,
-                        "version": result.metadata.version,
-                        "informationUri": "https://github.com/tmac-security/tmac",
-                        "rules": rules,
-                    }
-                },
-                "results": results,
-            }],
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {
+                            "name": result.metadata.tool_name,
+                            "version": result.metadata.version,
+                            "informationUri": "https://github.com/tmac-security/tmac",
+                            "rules": rules,
+                        }
+                    },
+                    "results": results,
+                    # Unparseable files / invalid rules: SARIF consumers (e.g. GitHub code
+                    # scanning) see the run as unsuccessful instead of trusting a clean result.
+                    "invocations": [
+                        {
+                            "executionSuccessful": not result.issues,
+                            "toolExecutionNotifications": [
+                                {
+                                    "level": "error",
+                                    "descriptor": {"id": f"tmac/{issue.kind}-error"},
+                                    "message": {"text": issue.message},
+                                    "locations": [
+                                        {
+                                            "physicalLocation": {
+                                                "artifactLocation": {"uri": issue.file_path}
+                                            }
+                                        }
+                                    ],
+                                }
+                                for issue in result.issues
+                            ],
+                        }
+                    ],
+                }
+            ],
         }
 
         return json.dumps(sarif, indent=2)

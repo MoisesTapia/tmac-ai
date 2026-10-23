@@ -30,6 +30,9 @@ variables:
   TMAC_DELTA_ONLY: "true"
   # Publish a comment on the MR (true | false)
   TMAC_COMMENT: "true"
+  # TMAC version to install: a tag or commit SHA of MoisesTapia/tmac-ai.
+  # Pin it (e.g. "v1.6.0" or a full SHA) for reproducible, tamper-resistant pipelines.
+  TMAC_REF: "main"
 
 # ---------------------------------------------------------------------------
 # tmac job (R6.1 — at least one runnable job, no modification required)
@@ -37,9 +40,12 @@ variables:
 tmac:
   image: python:3.11-slim
 
-  # Install TMAC from PyPI (R8.1 / R8.2 guarantee `pip install tmac` works)
+  # Install TMAC from its own repository. NOTE: the PyPI name "tmac" belongs to an
+  # unrelated project, so `pip install tmac` would run someone else's code here.
+  # git is needed by `tmac ci` to compute the MR diff (delta-only mode).
   before_script:
-    - pip install --quiet tmac
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends git > /dev/null
+    - pip install --quiet "https://github.com/MoisesTapia/tmac-ai/archive/${TMAC_REF}.tar.gz"
 
   script:
     # Build the delta-only flag

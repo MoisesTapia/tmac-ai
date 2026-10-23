@@ -1,7 +1,7 @@
 """Delta data models for TMAC v1.1.0."""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -12,7 +12,8 @@ class ChangeAction(str, Enum):
     create = "create"
     update = "update"
     delete = "delete"
-    replace = "replace"
+    # Shadows str.replace (this enum subclasses str); kept for API/serialization compatibility.
+    replace = "replace"  # type: ignore[assignment]
 
 
 class PlannedChange(BaseModel):
@@ -20,15 +21,15 @@ class PlannedChange(BaseModel):
     resource_type: str
     resource_name: str
     action: ChangeAction
-    before: Optional[Dict[str, Any]] = None
-    after: Optional[Dict[str, Any]] = None
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
 
 
 class DeltaFinding(Finding):
     change_action: ChangeAction
     changed_attribute: str
-    value_before: Optional[Any] = None
-    value_after: Optional[Any] = None
+    value_before: Any | None = None
+    value_after: Any | None = None
 
 
 class DeltaScanResult(ScanResult):

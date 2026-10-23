@@ -6,25 +6,21 @@ Validates: Requirements 3.1–3.8, 6.1–6.6
 
 import logging
 import time
-from typing import Dict, List, Optional, Tuple
 
 from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, PlannedChange
 from tmac.engine.evaluator import Evaluator
+from tmac.engine.matcher import group_rules_by_type
 from tmac.engine.rule_loader import RuleLoader
-from tmac.models.finding import ScanMetadata, ScanStatistics
-from tmac.models.resource import ResourceModel
+from tmac.models.finding import Finding, ScanMetadata, ScanStatistics
+from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
 from tmac.parsers.tfplan import TfplanParser
 
 logger = logging.getLogger(__name__)
 
-# IgnoreMap: resource_address → ["*"] (global) or ["RULE-ID-1", ...]
-IgnoreMap = Dict[str, List[str]]
-
 
 class DeltaScanError(Exception):
     """Raised when the delta scan pipeline cannot proceed."""
-    pass
 
 
 class DeltaScanner:
@@ -45,12 +41,18 @@ class DeltaScanner:
     def run(
         self,
         plan_file: str,
-        rules_dir: Optional[str] = None,
-        ignore_map: Optional[IgnoreMap] = None,
+        rules_dir: str | None = None,
+        ignore_map: IgnoreMap | None = None,
         min_severity: str = "all",
         verbose: bool = False,
+        resource_ignores: ResourceIgnoreMap | None = None,
     ) -> DeltaScanResult:
         """Execute the full delta analysis pipeline.
+
+        Suppressions: ``ignore_map`` is keyed by plan address
+        (e.g. ``module.vpc.aws_subnet.private``); ``resource_ignores`` is keyed by
+        ``(resource_type, resource_name)``, as collected from tmac:ignore comments in
+        the .tf sources. Both accept ["*"] or a list of rule IDs.
 
         Raises:
             DeltaScanError: if the plan file is missing, invalid JSON, or lacks
@@ -58,6 +60,7 @@ class DeltaScanner:
         """
         start = time.time()
         ignore_map = ignore_map or {}
+        resource_ignores = resource_ignores or {}
 
         parser = TfplanParser()
         changes = parser.parse_plan(plan_file)
@@ -67,46 +70,51 @@ class DeltaScanner:
 
         rules = self._rule_loader.load_rules(rules_dir)
         logger.debug("Loaded %d rules", len(rules))
+        rules_by_type = group_rules_by_type(rules)
 
-        counts = {ChangeAction.create: 0, ChangeAction.update: 0,
-                  ChangeAction.delete: 0, ChangeAction.replace: 0}
-        all_findings: List[DeltaFinding] = []
+        counts = {
+            ChangeAction.create: 0,
+            ChangeAction.update: 0,
+            ChangeAction.delete: 0,
+            ChangeAction.replace: 0,
+        }
+        all_findings: list[Finding] = []
         total_resolved = 0
 
         for change in changes:
             counts[change.action] = counts.get(change.action, 0) + 1
 
-            # Global ignore check (address-based)
-            if "*" in ignore_map.get(change.address, []):
+            ignored = ignore_map.get(change.address, []) + resource_ignores.get(
+                (change.resource_type, change.resource_name), []
+            )
+            if "*" in ignored:
                 logger.debug("Ignoring resource %s (tmac:ignore *)", change.address)
                 continue
 
+            applicable = [
+                r for r in rules_by_type.get(change.resource_type, []) if r.id not in ignored
+            ]
             logger.debug(
                 "Evaluating %d rules against %s (%s)",
-                len(rules), change.address, change.action.value,
+                len(applicable),
+                change.address,
+                change.action.value,
             )
-            introduced, resolved = self._evaluate_change(change, rules)
+            introduced, resolved = self._evaluate_change(change, applicable)
             all_findings.extend(introduced)
             total_resolved += resolved
 
         logger.debug(
             "Parsed %d planned changes from %s (create=%d, update=%d, delete=%d, replace=%d)",
-            len(changes), plan_file,
+            len(changes),
+            plan_file,
             counts.get(ChangeAction.create, 0),
             counts.get(ChangeAction.update, 0),
             counts.get(ChangeAction.delete, 0),
             counts.get(ChangeAction.replace, 0),
         )
 
-        stats = ScanStatistics(
-            total_resources=len(changes),
-            total_findings=len(all_findings),
-            critical=sum(1 for f in all_findings if f.severity.lower() == "critical"),
-            high=sum(1 for f in all_findings if f.severity.lower() == "high"),
-            medium=sum(1 for f in all_findings if f.severity.lower() == "medium"),
-            low=sum(1 for f in all_findings if f.severity.lower() == "low"),
-            info=sum(1 for f in all_findings if f.severity.lower() == "info"),
-        )
+        stats = ScanStatistics.from_findings(all_findings, total_resources=len(changes))
 
         return DeltaScanResult(
             metadata=ScanMetadata(
@@ -120,9 +128,11 @@ class DeltaScanner:
             findings_introduced=len(all_findings),
             findings_resolved=total_resolved,
             resources_created=counts.get(ChangeAction.create, 0),
-            resources_updated=counts.get(ChangeAction.update, 0) + counts.get(ChangeAction.replace, 0),
+            resources_updated=counts.get(ChangeAction.update, 0)
+            + counts.get(ChangeAction.replace, 0),
             resources_deleted=counts.get(ChangeAction.delete, 0),
             plan_file=plan_file,
+            issues=list(self._rule_loader.issues),
         )
 
     # ------------------------------------------------------------------
@@ -145,9 +155,7 @@ class DeltaScanner:
             raise DeltaScanError(f"Cannot read plan file {plan_file}: {exc}") from exc
 
         if not isinstance(data, dict) or "resource_changes" not in data:
-            raise DeltaScanError(
-                f"Plan file {plan_file} does not contain 'resource_changes' field"
-            )
+            raise DeltaScanError(f"Plan file {plan_file} does not contain 'resource_changes' field")
 
     def _build_resource_model(
         self,
@@ -167,8 +175,8 @@ class DeltaScanner:
     def _evaluate_change(
         self,
         change: PlannedChange,
-        rules: List[ThreatRule],
-    ) -> Tuple[List[DeltaFinding], int]:
+        rules: list[ThreatRule],
+    ) -> tuple[list[DeltaFinding], int]:
         """Evaluate a PlannedChange against all rules according to its action.
 
         Returns:
@@ -181,7 +189,7 @@ class DeltaScanner:
                              in after but not before → introduced
                              in before but not after → resolved
         """
-        introduced: List[DeltaFinding] = []
+        introduced: list[DeltaFinding] = []
         resolved = 0
 
         # Filter rules applicable to this resource type
@@ -218,8 +226,10 @@ class DeltaScanner:
     ) -> DeltaFinding:
         """Construct a DeltaFinding from a matched rule and PlannedChange."""
         attribute = rule.check.attribute
-        value_before = (change.before or {}).get(attribute) if change.before else None
-        value_after = (change.after or {}).get(attribute) if change.after else None
+        # Resolve dotted paths (e.g. "ingress.cidr_blocks") the same way the evaluator does.
+        resolve = self._evaluator.resolve_attribute
+        value_before = resolve(attribute, change.before) if change.before else None
+        value_after = resolve(attribute, change.after) if change.after else None
 
         return DeltaFinding(
             rule_id=rule.id,

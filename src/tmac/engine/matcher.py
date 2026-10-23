@@ -1,11 +1,15 @@
-from typing import Dict, List, Optional
-from tmac.models.resource import ResourceModel
-from tmac.models.rule import ThreatRule
-from tmac.models.finding import Finding
 from tmac.engine.evaluator import Evaluator
+from tmac.models.finding import Finding
+from tmac.models.resource import IgnoreMap, ResourceModel
+from tmac.models.rule import ThreatRule
 
-# IgnoreMap: resource_name → ["*"] (global) or ["RULE-ID-1", ...] (per-rule)
-IgnoreMap = Dict[str, List[str]]
+
+def group_rules_by_type(rules: list[ThreatRule]) -> dict[str, list[ThreatRule]]:
+    """Index rules by resource_type so each resource only sees applicable rules."""
+    rules_by_type: dict[str, list[ThreatRule]] = {}
+    for rule in rules:
+        rules_by_type.setdefault(rule.resource_type, []).append(rule)
+    return rules_by_type
 
 
 class Matcher:
@@ -16,22 +20,18 @@ class Matcher:
 
     def match(
         self,
-        resources: List[ResourceModel],
-        rules: List[ThreatRule],
-        ignore_map: Optional[IgnoreMap] = None,
-    ) -> List[Finding]:
-        findings: List[Finding] = []
+        resources: list[ResourceModel],
+        rules: list[ThreatRule],
+        ignore_map: IgnoreMap | None = None,
+    ) -> list[Finding]:
+        findings: list[Finding] = []
         ignore_map = ignore_map or {}
-
-        # Group rules by resource type for optimization
-        rules_by_type: dict[str, List[ThreatRule]] = {}
-        for rule in rules:
-            if rule.resource_type not in rules_by_type:
-                rules_by_type[rule.resource_type] = []
-            rules_by_type[rule.resource_type].append(rule)
+        rules_by_type = group_rules_by_type(rules)
 
         for resource in resources:
-            ignored_rules = ignore_map.get(resource.name, [])
+            # Suppressions bound to the resource itself, plus any caller-supplied
+            # name-based ignore_map (legacy API).
+            ignored_rules = resource.ignored_rules + ignore_map.get(resource.name, [])
             # Global ignore — skip all rules for this resource
             if "*" in ignored_rules:
                 continue

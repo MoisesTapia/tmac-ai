@@ -242,7 +242,7 @@ For the complete workflow YAML and all available inputs, see [CICD.md — GitHub
     fetch-depth: 0
 
 - name: Install TMAC
-  run: pip install tmac
+  run: pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"  # pin a tag or SHA
 
 - uses: ./   # or: tmac-security/tmac-action@v1.6.0
   with:

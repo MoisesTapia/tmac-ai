@@ -7,11 +7,12 @@
 ![Version](https://img.shields.io/badge/version-1.6.0%20%22Ixtla%22-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-![Rules](https://img.shields.io/badge/rules-520%2B-orange)
+![Rules](https://img.shields.io/badge/rules-560%2B-orange)
 
 </div>
 
-TMAC automates threat modeling by identifying vulnerabilities in Terraform code **before deployment**. It scans the full infrastructure state, analyzes the risk delta of a plan, renders architecture diagrams, and now lives directly in your repository as a native CI/CD security agent — all offline, with no data sent to external APIs.
+TMAC automates threat modeling by identifying vulnerabilities in Terraform / OpenTofu code and AWS
+CloudFormation templates **before deployment**. It scans the full infrastructure state, analyzes the risk delta of a plan, renders architecture diagrams, and now lives directly in your repository as a native CI/CD security agent — all offline, with no data sent to external APIs.
 
 ## Table of Contents
 
@@ -26,29 +27,33 @@ TMAC automates threat modeling by identifying vulnerabilities in Terraform code 
 
 ## Key Features
 
-- **Terraform analysis (`tmac scan`)** — static scan of `.tf` files against **520+ STRIDE rules** covering **105 AWS resource types**.
+- **Terraform & OpenTofu analysis (`tmac scan`)** — static scan of `.tf` and `.tofu` files against **520+ STRIDE rules** covering **105 AWS resource types**.
+- **CloudFormation analysis (`tmac cfn`)** — YAML and JSON templates (intrinsic functions included) against **43 STRIDE rules** for 11 AWS services.
 - **Risk delta analysis (`tmac plan`)** — detects threats only in the resources a Terraform plan will create, modify, or destroy. Answers: *"what new risk does this PR introduce?"*
-- **Native CI/CD agent (`tmac ci`)** — analyzes only the `.tf` files changed in a push/PR, posts a narrative comment on the PR/MR, and uploads the report as an artifact.
+- **Native CI/CD agent (`tmac ci`)** — analyzes only the `.tf`/`.tofu` files changed in a push/PR, posts a narrative comment on the PR/MR, and uploads the report as an artifact.
 - **Architecture diagrams (`tmac diagram`)** — builds the dependency graph between resources and exports it to Mermaid, Graphviz (DOT), draw.io (XML), or image (PNG/SVG/PDF).
 - **YAML rule engine** — declarative, strongly-typed threat rules validated with Pydantic.
 - **STRIDE categorization** — Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege.
 - **Multiple report formats** — HTML, Markdown, and JSON/SARIF 2.1.0.
-- **Structured exit codes** — breaks the pipeline on critical threats.
+- **Structured exit codes, fail closed** — breaks the pipeline on critical threats, and on scans that could not read every file or rule.
 - **Offline by design** — no telemetry, no external API calls.
 
 ## Installation
 
 ```bash
-# From PyPI (recommended)
-pip install tmac
+# From the repository (pin a tag or commit SHA instead of main for CI)
+pip install "https://github.com/MoisesTapia/tmac-ai/archive/main.tar.gz"
 
-# From source
+# From source, with hash-verified dependencies
 git clone https://github.com/MoisesTapia/tmac-ai.git && cd tmac-ai
-pip install -e .
+pip install --require-hashes -r requirements.txt && pip install --no-deps -e .
 
-# Docker
-docker run --rm -v $(pwd)/infra:/scan tmac-security/tmac:latest scan --dir /scan
+# Docker (build the image from the repository Dockerfile)
+docker build -t tmac . && docker run --rm -v $(pwd)/infra:/scan tmac scan --dir /scan
 ```
+
+> **Note:** the PyPI package named `tmac` is an **unrelated project** — do not
+> `pip install tmac`. Install TMAC from this repository (pin a tag or commit SHA in CI).
 
 > Full installation options (Poetry, Docker, pre-commit) in [DOCS/INSTALLATION.md](DOCS/INSTALLATION.md).
 
@@ -57,6 +62,9 @@ docker run --rm -v $(pwd)/infra:/scan tmac-security/tmac:latest scan --dir /scan
 ```bash
 # Scan a Terraform directory
 tmac scan --dir ./infra
+
+# Scan AWS CloudFormation templates
+tmac cfn --dir ./templates
 
 # Analyze the risk delta of a plan
 terraform plan -out=plan.bin && terraform show -json plan.bin > plan.json

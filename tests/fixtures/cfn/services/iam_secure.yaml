@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  ReadPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: read
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: ["s3:*"]
+            Resource: arn:aws:s3:::bucket/*
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource: arn:aws:iam::111122223333:role/app
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: ["logs:CreateLogStream", "logs:PutLogEvents"]
+                Resource: "arn:aws:logs:*:*:*"
+  PartnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: "arn:aws:iam::111122223333:root"}
+            Action: sts:AssumeRole
+            Condition: {StringEquals: {"sts:ExternalId": "partner-secret"}}
+  SameAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"}
+            Action: sts:AssumeRole
+  ServiceUser:
+    Type: AWS::IAM::User
+  ScopedManaged:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: ["dynamodb:GetItem"]
+            Resource: !GetAtt Table.Arn

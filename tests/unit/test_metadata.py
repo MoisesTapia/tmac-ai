@@ -95,7 +95,7 @@ def test_render_json_is_valid_and_roundtrips():
 
 def test_security_config_loaded_from_yaml():
     # The external YAML adds types that were not in the defaults (e.g. dynamodb).
-    from tmac.graph.metadata import SECURITY_ATTRS, SATELLITE_RESOURCES
+    from tmac.graph.metadata import SATELLITE_RESOURCES, SECURITY_ATTRS
 
     assert "aws_dynamodb_table" in SECURITY_ATTRS
     assert "aws_flow_log" in SATELLITE_RESOURCES

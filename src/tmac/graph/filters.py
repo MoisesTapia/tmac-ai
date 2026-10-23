@@ -9,14 +9,14 @@ When a node is removed, each predecessor is reconnected to each successor
 (pass-through), so that ``A -> noise -> B`` becomes ``A -> B``.
 """
 
-from typing import Iterable, List, Set, Tuple
+from collections.abc import Iterable
 
 from tmac.graph.builder import GraphEdge, GraphNode, ResourceGraph
 
 # Resource types considered "noise" for an architecture diagram.
 # These are security/permission/wiring resources that do not contribute to the
 # view of components and flows. Editable as needed.
-DEFAULT_NOISE_TYPES: Set[str] = {
+DEFAULT_NOISE_TYPES: set[str] = {
     "aws_iam_role",
     "aws_iam_role_policy",
     "aws_iam_policy",
@@ -50,16 +50,16 @@ def filter_graph(
         return graph
 
     removed_ids = {n.id for n in graph.nodes if n.resource_type in exclude}
-    kept_nodes: List[GraphNode] = [n for n in graph.nodes if n.resource_type not in exclude]
+    kept_nodes: list[GraphNode] = [n for n in graph.nodes if n.resource_type not in exclude]
 
-    edges: List[GraphEdge] = list(graph.edges)
+    edges: list[GraphEdge] = list(graph.edges)
 
     if collapse:
         edges = _collapse_nodes(edges, removed_ids)
 
     kept_ids = {n.id for n in kept_nodes}
-    final_edges: List[GraphEdge] = []
-    seen: Set[Tuple[str, str, str]] = set()
+    final_edges: list[GraphEdge] = []
+    seen: set[tuple[str, str, str]] = set()
     for e in edges:
         if e.source in kept_ids and e.target in kept_ids and e.source != e.target:
             key = (e.source, e.target, e.attribute)
@@ -70,13 +70,13 @@ def filter_graph(
     return ResourceGraph(nodes=kept_nodes, edges=final_edges)
 
 
-def _collapse_nodes(edges: List[GraphEdge], removed_ids: Set[str]) -> List[GraphEdge]:
+def _collapse_nodes(edges: list[GraphEdge], removed_ids: set[str]) -> list[GraphEdge]:
     """Reconnect predecessors with successors for each removed node."""
     result = list(edges)
     for node_id in removed_ids:
         incoming = [e for e in result if e.target == node_id]
         outgoing = [e for e in result if e.source == node_id]
-        bridged: List[GraphEdge] = []
+        bridged: list[GraphEdge] = []
         for inc in incoming:
             for out in outgoing:
                 if inc.source != out.target:

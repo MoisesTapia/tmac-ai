@@ -6,21 +6,25 @@ authors = ["TMAC Security Team"]
 readme = "README.md"
 packages = [{include = "tmac", from = "src"}]
 
+# Floors match the versions audited in requirements.txt (pip-audit, 2026-10-22).
+# Exact pins for reproducible installs live in requirements.txt / requirements-dev.txt.
 [tool.poetry.dependencies]
 python = "^3.10"
-click = "^8.1.7"
-pydantic = "^2.6.0"
-python-hcl2 = "^4.3.2"
-Jinja2 = "^3.1.3"
-PyYAML = "^6.0.1"
+click = ">=8.5.0,<9"
+pydantic = ">=2.14.1,<3"
+# >= 5 changes the HCL output format and breaks rule matching.
+python-hcl2 = ">=4.3.5,<5"
+Jinja2 = ">=3.1.6,<4"
+PyYAML = ">=6.0.3,<7"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
-pytest-cov = "^4.1.0"
-black = "^24.2.0"
-ruff = "^0.2.2"
-mypy = "^1.8.0"
-hypothesis = "^6.100.0"
+pytest = ">=9.1.1,<10"
+pytest-cov = ">=7.1.0,<8"
+black = ">=26.10.1,<27"
+ruff = ">=0.17.2,<0.18"
+mypy = ">=2.4.0,<3"
+hypothesis = ">=6.170.8,<7"
+pip-audit = ">=2.10.1,<3"
 
 [tool.poetry.scripts]
 tmac = "tmac.cli:cli"
@@ -28,6 +32,14 @@ tmac = "tmac.cli:cli"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests run commands on purpose and assert on the return code themselves.
+"tests/**" = ["PLW1510"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
 
 [tool.mypy]
 python_version = "3.10"

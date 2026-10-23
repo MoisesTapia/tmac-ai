@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  Encrypt: {Type: String}
+Resources:
+  Web:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-12345678
+      MetadataOptions: {HttpTokens: required}
+      NetworkInterfaces:
+        - {DeviceIndex: "0", AssociatePublicIpAddress: false, SubnetId: !Ref PrivateSubnet}
+  Data:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: us-east-1a
+      Encrypted: true
+  ParameterizedData:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: us-east-1a
+      Encrypted: !Ref Encrypt
+  Template:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions: {HttpTokens: required}

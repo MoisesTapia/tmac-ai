@@ -42,8 +42,25 @@ tmac --version
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install --require-hashes -r requirements-dev.txt   # pinned, audited, hash-verified
+pip install -e . --no-deps
 ```
+
+### Dependencies and lockfiles
+
+- `requirements.in` / `requirements-dev.in`: direct dependencies with version ranges (edited by hand).
+- `requirements.txt` / `requirements-dev.txt`: **generated** lockfiles with the exact version and SHA-256 hash of every package. Never edit them by hand.
+
+To add or upgrade a dependency, edit the `.in` file, regenerate the lockfiles with [uv](https://docs.astral.sh/uv/) and audit them:
+
+```bash
+uv pip compile requirements.in --universal --generate-hashes --python-version 3.10 -o requirements.txt
+uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.11 -o requirements-dev.txt
+pip-audit --require-hashes --disable-pip -r requirements.txt
+pip-audit --require-hashes --disable-pip -r requirements-dev.txt
+```
+
+To move to newer versions within the ranges, add `--upgrade` (or `--upgrade-package <name>`) to `uv pip compile`. CI re-audits the lockfiles every week.
 
 ### Included development tools
 
@@ -113,6 +130,14 @@ black src/ tests/
 
 # Type checking with mypy
 mypy src/tmac/
+```
+
+All three are required in CI (*Lint & types* job): a PR fails if `ruff check src tests`, `black --check src tests` or `mypy src` report errors. Ruff and black use 100-character lines (`pyproject.toml`).
+
+Formatting-only commits are listed in `.git-blame-ignore-revs`; to make `git blame` skip them:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
 ---

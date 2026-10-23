@@ -13,6 +13,59 @@ TMAC includes **520 rules** covering **105 AWS resource types**, organized by se
 | Info | 213 |
 | **Total** | **520** |
 
+## CloudFormation rules (`tmac cfn`)
+
+43 rules in [`src/tmac/rules/cfn/threats.yaml`](../src/tmac/rules/cfn/threats.yaml)
+(prefix `TMAC-CFN-`), with a CloudFormation ↔ Terraform type mapping in its `metadata`. They apply
+only to `AWS::*` resource types, so they never affect `tmac scan`. Rule names and descriptions are
+in Spanish, as in the original catalog.
+
+| ID | Resource type | Name | Severity | STRIDE |
+| :--- | :--- | :--- | :--- | :--- |
+| `TMAC-CFN-S3-001` | `AWS::S3::Bucket` | S3 Bucket con Acceso Público (AccessControl) | Critical | Information Disclosure |
+| `TMAC-CFN-S3-002` | `AWS::S3::Bucket` | S3 Bucket sin Cifrado Explícito | High | Information Disclosure |
+| `TMAC-CFN-S3-003` | `AWS::S3::Bucket` | S3 Bucket sin Logging de Acceso | Medium | Repudiation |
+| `TMAC-CFN-S3-004` | `AWS::S3::Bucket` | S3 Bucket configurado como Sitio Web | Medium | Information Disclosure |
+| `TMAC-CFN-S3-005` | `AWS::S3::Bucket` | S3 Bucket sin Object Lock | High | Tampering |
+| `TMAC-CFN-IAM-001` | `AWS::IAM::Policy` | Política IAM con Resource '*' | High | Elevation of Privilege |
+| `TMAC-CFN-IAM-002` | `AWS::IAM::Policy` | Política IAM con Action '*' | Critical | Elevation of Privilege |
+| `TMAC-CFN-IAM-003` | `AWS::IAM::Role` | Rol IAM asumible por Cualquier Principal | Critical | Spoofing |
+| `TMAC-CFN-IAM-004` | `AWS::IAM::Role` | Rol IAM para Cuenta Externa sin sts:ExternalId | High | Spoofing |
+| `TMAC-CFN-IAM-005` | `AWS::IAM::Policy` | Política IAM con iam:PassRole sobre '*' | Critical | Elevation of Privilege |
+| `TMAC-CFN-IAM-006` | `AWS::IAM::User` | Usuario IAM con Acceso a Consola | Medium | Spoofing |
+| `TMAC-CFN-IAM-007` | `AWS::IAM::ManagedPolicy` | Política IAM Administrada con Action '*' | Critical | Elevation of Privilege |
+| `TMAC-CFN-IAM-008` | `AWS::IAM::ManagedPolicy` | Política IAM Administrada con Resource '*' | High | Elevation of Privilege |
+| `TMAC-CFN-IAM-009` | `AWS::IAM::Role` | Rol IAM con Política Inline Action '*' | Critical | Elevation of Privilege |
+| `TMAC-CFN-SG-001` | `AWS::EC2::SecurityGroup` | Security Group con SSH abierto a Internet | High | Tampering |
+| `TMAC-CFN-SG-002` | `AWS::EC2::SecurityGroup` | Security Group con RDP abierto a Internet | Critical | Tampering |
+| `TMAC-CFN-SG-003` | `AWS::EC2::SecurityGroup` | Security Group con Egress abierto a Internet | Medium | Information Disclosure |
+| `TMAC-CFN-VPC-001` | `AWS::EC2::VPC` | VPC sin Flow Logs (tag FlowLogs) | Medium | Repudiation |
+| `TMAC-CFN-EC2-001` | `AWS::EC2::Instance` | Instancia EC2 con IMDSv1 habilitado | Critical | Spoofing |
+| `TMAC-CFN-EC2-002` | `AWS::EC2::Volume` | Volumen EBS sin Cifrado | High | Information Disclosure |
+| `TMAC-CFN-EC2-003` | `AWS::EC2::Instance` | Instancia EC2 con IP Pública | High | Tampering |
+| `TMAC-CFN-EC2-004` | `AWS::EC2::LaunchTemplate` | Launch Template con IMDSv1 habilitado | Critical | Spoofing |
+| `TMAC-CFN-RDS-001` | `AWS::RDS::DBInstance` | Instancia RDS sin Cifrado en Reposo | Medium | Information Disclosure |
+| `TMAC-CFN-RDS-002` | `AWS::RDS::DBInstance` | Instancia RDS Accesible Públicamente | High | Information Disclosure |
+| `TMAC-CFN-RDS-003` | `AWS::RDS::DBInstance` | Instancia RDS sin Multi-AZ | High | Denial of Service |
+| `TMAC-CFN-RDS-004` | `AWS::RDS::DBInstance` | Instancia RDS sin Protección contra Borrado | High | Denial of Service |
+| `TMAC-CFN-RDS-005` | `AWS::RDS::DBInstance` | Instancia RDS sin Exportación de Logs a CloudWatch | Medium | Repudiation |
+| `TMAC-CFN-DDB-001` | `AWS::DynamoDB::Table` | Tabla DynamoDB sin Cifrado con KMS | High | Information Disclosure |
+| `TMAC-CFN-DDB-002` | `AWS::DynamoDB::Table` | Tabla DynamoDB sin Point-in-Time Recovery | Medium | Denial of Service |
+| `TMAC-CFN-DDB-003` | `AWS::DynamoDB::Table` | Tabla DynamoDB sin Protección contra Borrado | High | Denial of Service |
+| `TMAC-CFN-KMS-001` | `AWS::KMS::Key` | Clave KMS sin Rotación Automática | High | Information Disclosure |
+| `TMAC-CFN-KMS-002` | `AWS::KMS::Key` | Clave KMS Deshabilitada | Medium | Denial of Service |
+| `TMAC-CFN-KMS-003` | `AWS::KMS::Key` | Política de Clave KMS Abierta a Cualquier Principal | Critical | Information Disclosure |
+| `TMAC-CFN-LMD-001` | `AWS::Lambda::Function` | Lambda con Secretos en Variables de Entorno | High | Information Disclosure |
+| `TMAC-CFN-LMD-002` | `AWS::Lambda::Function` | Lambda sin Tracing Activo (X-Ray) | Low | Repudiation |
+| `TMAC-CFN-LMD-003` | `AWS::Lambda::Function` | Lambda con Concurrencia Reservada en Cero | Medium | Denial of Service |
+| `TMAC-CFN-CW-001` | `AWS::CloudTrail::Trail` | CloudTrail Deshabilitado | High | Repudiation |
+| `TMAC-CFN-CW-002` | `AWS::CloudTrail::Trail` | CloudTrail sin Validación de Integridad de Logs | Medium | Tampering |
+| `TMAC-CFN-CW-003` | `AWS::CloudTrail::Trail` | CloudTrail de una sola Región | Medium | Repudiation |
+| `TMAC-CFN-APIGW-001` | `AWS::ApiGateway::Method` | Método de API Gateway sin Autorización | High | Spoofing |
+| `TMAC-CFN-APIGW-002` | `AWS::ApiGateway::Stage` | Stage de API Gateway sin Logging de Ejecución | Medium | Repudiation |
+| `TMAC-CFN-APIGW-003` | `AWS::ApiGateway::Stage` | Stage de API Gateway sin Certificado de Cliente | Medium | Information Disclosure |
+| `TMAC-CFN-STACK-001` | `AWS::CloudFormation::Stack` | Nested Stack cargado por HTTP sin TLS | Medium | Tampering |
+
 ## Rules by service
 
 | Service | Rules | Resource types |

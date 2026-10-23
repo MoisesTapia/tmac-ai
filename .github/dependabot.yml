@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows and action.yml up to date.
+  # Python deps are locked with `uv pip compile` (see requirements*.in) and audited
+  # weekly by the CI `audit` job; regenerate the lockfiles to upgrade them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14

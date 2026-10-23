@@ -10,16 +10,14 @@ Validates: Requirements 2.5, 2.11
 
 from __future__ import annotations
 
-import pytest
-
 from tmac.ci.comment import MARKER, CommentContext, CommentFormatter
-from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult
+from tmac.delta.models import ChangeAction, DeltaFinding
 from tmac.models.finding import Finding, ScanMetadata, ScanResult, ScanStatistics
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_scan_result(findings) -> ScanResult:
     return ScanResult(
@@ -30,13 +28,13 @@ def _make_scan_result(findings) -> ScanResult:
 
 
 def _default_ctx(**kwargs) -> CommentContext:
-    defaults = dict(
-        fail_on="high",
-        artifact_ref="https://example.com/report",
-        max_length=65536,
-        introduced=0,
-        resolved=0,
-    )
+    defaults = {
+        "fail_on": "high",
+        "artifact_ref": "https://example.com/report",
+        "max_length": 65536,
+        "introduced": 0,
+        "resolved": 0,
+    }
     defaults.update(kwargs)
     return CommentContext(**defaults)
 
@@ -49,19 +47,19 @@ def _make_finding(
     resource_name: str = "example",
     change_action: ChangeAction | None = None,
 ) -> Finding:
-    base = dict(
-        rule_id=rule_id,
-        rule_name="Test Rule",
-        severity=severity,
-        stride="Tampering",
-        resource_type=resource_type,
-        resource_name=resource_name,
-        file_path=f"{resource_type}.{resource_name}",
-        line_number=1,
-        matched_attribute="acl",
-        description="A test finding.",
-        mitigation="Fix it.",
-    )
+    base = {
+        "rule_id": rule_id,
+        "rule_name": "Test Rule",
+        "severity": severity,
+        "stride": "Tampering",
+        "resource_type": resource_type,
+        "resource_name": resource_name,
+        "file_path": f"{resource_type}.{resource_name}",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "A test finding.",
+        "mitigation": "Fix it.",
+    }
     if change_action is not None:
         return DeltaFinding(
             **base,
@@ -76,6 +74,7 @@ def _make_finding(
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestHeadingsPresent:
     """Assert required column headings appear in the rendered output (R2.11)."""
@@ -122,9 +121,7 @@ class TestEmptyFindingSet:
         ctx = _default_ctx()
         rendered = CommentFormatter().format(result, ctx)
 
-        assert "✅ No findings" in rendered, (
-            "Expected '✅ No findings' block for empty finding set"
-        )
+        assert "✅ No findings" in rendered, "Expected '✅ No findings' block for empty finding set"
 
     def test_empty_findings_does_not_render_table_rows(self):
         """Empty result must not contain finding table rows (pipe-separated data rows)."""
@@ -136,9 +133,9 @@ class TestEmptyFindingSet:
         # should not appear when there are no findings
         lines = rendered.splitlines()
         finding_table_header = "| Severity | Resource | Rule | Action |"
-        assert finding_table_header not in lines, (
-            "Finding table header must not appear when no findings exist"
-        )
+        assert (
+            finding_table_header not in lines
+        ), "Finding table header must not appear when no findings exist"
 
     def test_empty_findings_approved_badge(self):
         """Empty result should yield APPROVED badge."""
