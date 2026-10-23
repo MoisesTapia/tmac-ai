@@ -42,8 +42,25 @@ tmac --version
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install --require-hashes -r requirements-dev.txt   # versiones fijadas, auditadas y verificadas por hash
+pip install -e . --no-deps
 ```
+
+### Dependencias y lockfiles
+
+- `requirements.in` / `requirements-dev.in`: dependencias directas con rangos (se editan a mano).
+- `requirements.txt` / `requirements-dev.txt`: lockfiles **generados** con versión exacta y hash SHA-256 de cada paquete. No se editan a mano.
+
+Para agregar o actualizar una dependencia, edita el `.in`, regenera los lockfiles con [uv](https://docs.astral.sh/uv/) y audítalos:
+
+```bash
+uv pip compile requirements.in --universal --generate-hashes --python-version 3.10 -o requirements.txt
+uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.11 -o requirements-dev.txt
+pip-audit --require-hashes --disable-pip -r requirements.txt
+pip-audit --require-hashes --disable-pip -r requirements-dev.txt
+```
+
+Para subir versiones dentro de los rangos, agrega `--upgrade` (o `--upgrade-package <nombre>`) al comando de `uv pip compile`. El CI vuelve a auditar los lockfiles cada semana.
 
 ### Herramientas de desarrollo incluidas
 
