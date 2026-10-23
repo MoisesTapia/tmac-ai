@@ -3,6 +3,7 @@ import yaml  # type: ignore
 from pathlib import Path
 from typing import List, Dict, Optional
 from pydantic import ValidationError
+from tmac.models.finding import ScanIssue
 from tmac.models.rule import ThreatRule
 
 logger = logging.getLogger(__name__)
@@ -12,9 +13,17 @@ REQUIRED_RULE_FIELDS = {"id", "name", "resource_type", "check", "severity", "str
 
 
 class RuleLoader:
-    """Loads and parses the threat rules from YAML."""
+    """Loads and parses the threat rules from YAML.
+
+    Problems (unreadable files, invalid rules) are logged, skipped, and recorded
+    in ``self.issues`` so callers can fail closed instead of scanning with fewer rules.
+    """
+
+    def __init__(self) -> None:
+        self.issues: List[ScanIssue] = []
 
     def load_rules(self, extra_rules_dir: Optional[str] = None) -> List[ThreatRule]:
+        self.issues = []
         rules: Dict[str, ThreatRule] = {}
 
         # Load built-in rules
@@ -23,6 +32,8 @@ class RuleLoader:
 
         if threats_file.exists():
             self._load_file(threats_file, rules)
+        else:
+            self._issue(threats_file, "Built-in rules file not found")
 
         # Optional custom rules
         if extra_rules_dir:
@@ -30,15 +41,19 @@ class RuleLoader:
             if extra_path.exists() and extra_path.is_dir():
                 for yaml_file in sorted(extra_path.glob("*.yaml")):
                     self._load_file(yaml_file, rules)
+            else:
+                self._issue(extra_path, "Rules directory not found")
 
         return list(rules.values())
+
+    def _issue(self, file_path: Path, message: str) -> None:
+        logger.warning("%s: %s", file_path, message)
+        self.issues.append(ScanIssue(kind="rules", file_path=str(file_path), message=message))
 
     def _validate_file(self, data: dict, file_path: Path) -> bool:
         missing = REQUIRED_FILE_FIELDS - set(data.keys())
         if missing:
-            logger.warning(
-                "File %s missing required fields: %s — skipping", file_path, missing
-            )
+            self._issue(file_path, f"File missing required fields: {sorted(missing)} — skipped")
             return False
         return True
 
@@ -46,9 +61,7 @@ class RuleLoader:
         missing = REQUIRED_RULE_FIELDS - set(rule_data.keys())
         if missing:
             rule_id = rule_data.get("id", "<unknown>")
-            logger.warning(
-                "Rule %s in %s missing fields: %s — skipping", rule_id, file_path, missing
-            )
+            self._issue(file_path, f"Rule {rule_id} missing fields: {sorted(missing)} — skipped")
             return False
         return True
 
@@ -58,7 +71,7 @@ class RuleLoader:
                 data = yaml.safe_load(f)
 
             if not data:
-                logger.warning("File %s is empty or invalid — skipping", file_path)
+                self._issue(file_path, "File is empty or invalid — skipped")
                 return
 
             if not self._validate_file(data, file_path):
@@ -71,14 +84,13 @@ class RuleLoader:
                 try:
                     rule = ThreatRule(**rule_data)
                 except ValidationError as e:
-                    logger.warning(
-                        "Rule %s in %s is invalid — skipping: %s",
-                        rule_data.get("id", "<unknown>"),
+                    self._issue(
                         file_path,
-                        "; ".join(err["msg"] for err in e.errors()),
+                        f"Rule {rule_data.get('id', '<unknown>')} is invalid — skipped: "
+                        + "; ".join(err["msg"] for err in e.errors()),
                     )
                     continue
                 # Overwrite if rule ID already exists
                 rules_dict[rule.id] = rule
         except Exception as e:
-            logger.warning("Failed to load rules from %s: %s", file_path, e)
+            self._issue(file_path, f"Failed to load rules: {e}")

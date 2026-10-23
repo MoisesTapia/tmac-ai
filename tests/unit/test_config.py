@@ -214,3 +214,23 @@ def test_property_18_unknown_keys_always_filtered(unknown_keys, include_valid):
             )
     finally:
         os.unlink(cfg_path)
+
+
+# ---------------------------------------------------------------------------
+# report.fail_on / report.severity validation
+# ---------------------------------------------------------------------------
+
+def test_report_fail_on_and_severity_are_normalized(tmp_path):
+    cfg = tmp_path / ".tmac.yaml"
+    cfg.write_text("report:\n  fail_on: HIGH\n  severity: Medium\n", encoding="utf-8")
+    assert load_config(str(cfg))["report"] == {"fail_on": "high", "severity": "medium"}
+
+
+def test_invalid_report_fail_on_and_severity_are_dropped(tmp_path, caplog):
+    import logging
+    cfg = tmp_path / ".tmac.yaml"
+    cfg.write_text("report:\n  fail_on: everything\n  severity: 3\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        result = load_config(str(cfg))
+    assert result["report"] == {}
+    assert "report.fail_on" in caplog.text and "report.severity" in caplog.text

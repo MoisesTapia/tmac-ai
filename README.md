@@ -49,14 +49,15 @@ Escanea el directorio actual y genera un reporte HTML (`tmac-report.html`).
 
 | Opción | Abreviación | Descripción | Por defecto |
 | :--- | :--- | :--- | :--- |
-| `--dir` | `-d` | Directorio a escanear con archivos `.tf`. | `.` |
+| `--dir` | `-d` | Directorio a escanear con archivos `.tf`. | `scan.dir` de `.tmac.yaml`, si no `.` |
 | `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | `html` |
 | `--output` | `-o` | Ruta del archivo de reporte. | `tmac-report.[fmt]` |
 | `--rules-dir` | | Directorio de reglas YAML adicionales. | (reglas internas) |
-| `--config` | | Ruta al archivo de configuración. | `.tmac.yaml` |
+| `--config` | | Ruta al archivo de configuración. Si se indica explícitamente y no existe → exit 3. | `.tmac.yaml` |
 | `--fail-on` | | Severidad mínima para exit code 1. | `critical` |
 | `--severity` | | Severidad mínima a incluir en el reporte. | `all` |
 | `--exclude` | `-e` | Patrón glob a excluir (repetible). | — |
+| `--lenient` | | No fallar con exit 3 si hay archivos que no se pudieron parsear o reglas inválidas (solo advierte). | `False` |
 | `--no-color` | | Deshabilita colores ANSI en la salida. | `False` |
 | `--verbose` | `-v` | Habilita logging de debug. | `False` |
 | `--quiet` | `-q` | Suprime la salida de terminal. | `False` |
@@ -102,7 +103,10 @@ tmac plan --plan-file plan.json
 | `--report` | `-r` | Formato del reporte: `html`, `json`, `md`. | No |
 | `--output` | `-o` | Ruta del archivo de reporte. | No |
 | `--rules-dir` | | Directorio de reglas YAML adicionales. | No |
+| `--config` | | Ruta al archivo de configuración (`report.format`, `report.fail_on`, `scan.rules_dir`). | No |
+| `--source-dir` | | Directorio con los `.tf` del plan: aplica sus comentarios `tmac:ignore` (ver abajo). | No |
 | `--fail-on` | | Severidad mínima para exit code 1: `critical`, `high`, `medium`, `low`, `info`. | No |
+| `--lenient` | | No fallar con exit 3 si hay reglas inválidas (solo advierte). | No |
 | `--quiet` | `-q` | Suprime la salida de terminal. | No |
 | `--no-color` | | Deshabilita colores ANSI en la salida. | No |
 | `--verbose` | `-v` | Habilita logging de debug (cambios parseados, recursos por acción, reglas evaluadas). | No |
@@ -130,7 +134,7 @@ tmac plan --plan-file plan.json --verbose
 | `0` | Sin `DeltaFinding` Critical o High (plan seguro). |
 | `1` | Se detectó al menos un `DeltaFinding` con severidad **Critical**. |
 | `2` | Se detectaron `DeltaFinding` **High** pero ninguno Critical. |
-| `3` | Error de ejecución: archivo no existe, JSON inválido, o `tfplan.json` sin `resource_changes`. |
+| `3` | Error de ejecución: archivo no existe, JSON inválido, `tfplan.json` sin `resource_changes`, o reglas inválidas (salvo `--lenient`). |
 
 ### Formato del reporte de delta
 
@@ -179,7 +183,9 @@ Esto lo hace ideal para pipelines de CI/CD donde el objetivo es **bloquear solo 
 | `0` | Escaneo completado sin hallazgos Critical o High (o por debajo del threshold `--fail-on`). |
 | `1` | Se detectaron hallazgos con severidad **Critical**. |
 | `2` | Se detectaron hallazgos **High** pero ninguno Critical. |
-| `3` | Error de ejecución: directorio inaccesible, configuración inválida, o error de parseo. |
+| `3` | Error de ejecución o **escaneo incompleto**: directorio inaccesible, configuración inválida, archivos `.tf` que no se pudieron parsear, o reglas inválidas. |
+
+TMAC falla cerrado: si un archivo no se puede parsear o una regla es inválida, el resultado podría omitir hallazgos, así que el comando termina con `3` aunque el reporte se genera igual (con un aviso de *escaneo incompleto*; en SARIF, `invocations[0].executionSuccessful = false`). Usa `--lenient` para solo advertir y usar el código según los hallazgos.
 
 ## Ignorar falsos positivos (`tmac:ignore`)
 
@@ -204,6 +210,14 @@ resource "aws_s3_bucket" "another_bucket" {
 resource "aws_s3_bucket" "yet_another" {
   bucket = "yet-another-bucket"
 }
+```
+
+Las supresiones aplican solo al recurso exacto (archivo + tipo + nombre).
+
+**Con `tmac plan`:** el `tfplan.json` no conserva comentarios, así que pasa el directorio con los `.tf` usando `--source-dir`. Las supresiones se asocian a los cambios del plan por tipo y nombre de recurso (`aws_s3_bucket.data`), sin importar el módulo:
+
+```bash
+tmac plan --plan-file plan.json --source-dir ./infra
 ```
 
 ## Estructura de reglas (`threats.yaml`)
@@ -247,14 +261,20 @@ rules:
 
 ```yaml
 scan:
+  dir: ./infra                 # directorio por defecto si no se pasa --dir
+  rules_dir: ./custom-rules    # reglas YAML adicionales
   exclude:
     - ".terraform"
     - "**/.terraform/**"
     - "modules/third-party/**"
 
 report:
-  format: html
+  format: html                 # html | json | md
+  fail_on: high                # critical | high | medium | low | info
+  severity: all                # all | critical | high | medium | low | info
 ```
+
+Precedencia: **flag del CLI > `.tmac.yaml` > valor por defecto**. Por defecto se lee `./.tmac.yaml`; usa `--config` para otra ruta. Las claves desconocidas o los valores inválidos se ignoran con un aviso.
 
 ## Integración CI/CD
 

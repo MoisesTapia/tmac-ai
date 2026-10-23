@@ -82,6 +82,32 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ## [Unreleased]
 
+### Security
+
+- Reporte HTML: escape automático (Jinja2 `autoescape`) de todos los valores — nombres de recurso, rutas y textos de reglas personalizadas se insertaban sin escapar (XSS). Los enlaces de `references` solo aceptan `http(s)` y usan `rel="noopener noreferrer"`.
+- Dependencias fijadas con hash SHA-256 (`requirements*.txt` generados desde `requirements*.in` con `uv pip compile`), auditadas con `pip-audit`. `python-hcl2` limitado a `<5` (v5+ cambia el formato de salida y producía 0 hallazgos sin error).
+- **Fail closed**: si un `.tf` no se puede parsear o una regla es inválida, `tmac scan` / `tmac plan` terminan con exit `3` (antes el archivo se trataba como vacío y el escaneo pasaba como limpio). El reporte se genera igual, con aviso de *escaneo incompleto* y `executionSuccessful: false` en SARIF.
+
+### Added
+
+- `--lenient` en `scan` y `plan`: solo advierte sobre escaneos incompletos.
+- `tmac plan --source-dir DIR`: aplica los comentarios `tmac:ignore` de los `.tf` a los cambios del plan (global y por regla).
+- `tmac plan --config`: aplica `report.format`, `report.fail_on` y `scan.rules_dir`.
+- Validación de reglas al cargarlas: `severity`, `stride` y `condition` restringidos a valores válidos (sin distinguir mayúsculas), `regex` compilado y valores obligatorios salvo `exists`/`not_exists`.
+- `Scanner(parser=...)`: escáner independiente del formato; los parsers declaran `file_patterns`, `can_parse()` y `parse_strict()`.
+- CI en GitHub Actions (tests 3.11–3.13 + Windows, smoke test 3.10, `pip-audit` semanal, lint informativo) y Dependabot para Actions.
+
+### Fixed
+
+- `--config` se ignoraba; ahora se usa, y si se indica explícitamente y no existe → exit `3`.
+- La sección `report` de `.tmac.yaml` (`format`, `fail_on`, `severity`) y `scan.dir` no se aplicaban. Precedencia: flag > `.tmac.yaml` > default. Valores inválidos de `fail_on`/`severity` se ignoran con aviso.
+- `--dir` inexistente devolvía exit `2` (error de uso de click) en lugar del `3` documentado.
+- `tmac:ignore` se aplicaba por nombre de recurso a todos los archivos y tipos (ignorar `aws_s3_bucket.main` silenciaba también `aws_security_group.main`).
+- Una regla inválida en un archivo YAML descartaba todas las reglas siguientes del archivo.
+- `value_before` / `value_after` de `DeltaFinding` salían vacíos para atributos anidados (`ingress.cidr_blocks`).
+- La versión reportada (CLI y SARIF) seguía en `1.0.0`; ahora sale de `tmac.__version__`.
+- `datetime.utcnow()` deprecado.
+
 ### Planned
 
 - v1.2.0: Soporte para AWS CloudFormation templates.

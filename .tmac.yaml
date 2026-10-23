@@ -1,5 +1,5 @@
 scan:
-  dir: ./infrastructure
+  dir: .
   exclude: [".terraform", "modules/deprecated"]
   rules_dir: null
 report:

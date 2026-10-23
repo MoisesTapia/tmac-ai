@@ -13,7 +13,7 @@ from tmac.engine.evaluator import Evaluator
 from tmac.engine.matcher import group_rules_by_type
 from tmac.engine.rule_loader import RuleLoader
 from tmac.models.finding import ScanMetadata, ScanStatistics
-from tmac.models.resource import IgnoreMap, ResourceModel
+from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
 from tmac.parsers.tfplan import TfplanParser
 
@@ -47,8 +47,14 @@ class DeltaScanner:
         ignore_map: Optional[IgnoreMap] = None,
         min_severity: str = "all",
         verbose: bool = False,
+        resource_ignores: Optional[ResourceIgnoreMap] = None,
     ) -> DeltaScanResult:
         """Execute the full delta analysis pipeline.
+
+        Suppressions: ``ignore_map`` is keyed by plan address
+        (e.g. ``module.vpc.aws_subnet.private``); ``resource_ignores`` is keyed by
+        ``(resource_type, resource_name)``, as collected from tmac:ignore comments in
+        the .tf sources. Both accept ["*"] or a list of rule IDs.
 
         Raises:
             DeltaScanError: if the plan file is missing, invalid JSON, or lacks
@@ -56,6 +62,7 @@ class DeltaScanner:
         """
         start = time.time()
         ignore_map = ignore_map or {}
+        resource_ignores = resource_ignores or {}
 
         parser = TfplanParser()
         changes = parser.parse_plan(plan_file)
@@ -75,12 +82,16 @@ class DeltaScanner:
         for change in changes:
             counts[change.action] = counts.get(change.action, 0) + 1
 
-            # Global ignore check (address-based)
-            if "*" in ignore_map.get(change.address, []):
+            ignored = ignore_map.get(change.address, []) + resource_ignores.get(
+                (change.resource_type, change.resource_name), []
+            )
+            if "*" in ignored:
                 logger.debug("Ignoring resource %s (tmac:ignore *)", change.address)
                 continue
 
-            applicable = rules_by_type.get(change.resource_type, [])
+            applicable = [
+                r for r in rules_by_type.get(change.resource_type, []) if r.id not in ignored
+            ]
             logger.debug(
                 "Evaluating %d rules against %s (%s)",
                 len(applicable), change.address, change.action.value,
@@ -115,6 +126,7 @@ class DeltaScanner:
             resources_updated=counts.get(ChangeAction.update, 0) + counts.get(ChangeAction.replace, 0),
             resources_deleted=counts.get(ChangeAction.delete, 0),
             plan_file=plan_file,
+            issues=list(self._rule_loader.issues),
         )
 
     # ------------------------------------------------------------------
@@ -210,8 +222,10 @@ class DeltaScanner:
     ) -> DeltaFinding:
         """Construct a DeltaFinding from a matched rule and PlannedChange."""
         attribute = rule.check.attribute
-        value_before = (change.before or {}).get(attribute) if change.before else None
-        value_after = (change.after or {}).get(attribute) if change.after else None
+        # Resolve dotted paths (e.g. "ingress.cidr_blocks") the same way the evaluator does.
+        resolve = self._evaluator.resolve_attribute
+        value_before = resolve(attribute, change.before) if change.before else None
+        value_after = resolve(attribute, change.after) if change.after else None
 
         return DeltaFinding(
             rule_id=rule.id,
