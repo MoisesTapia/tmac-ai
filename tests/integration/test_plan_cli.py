@@ -266,7 +266,8 @@ class TestAdditionalFlags:
         as v1.0.0 (before adding TfplanParser, DeltaScanner, delta/models.py).
 
         Verifies that:
-        - Total finding count is unchanged (120 findings from the baseline fixtures)
+        - Total finding count is unchanged (123 findings from the baseline fixtures,
+          including the CF/WAF rules added in v1.1.0)
         - The set of (rule_id, resource_name) pairs is identical to the v1.0.0 baseline
         - tmac scan --help does NOT expose the --plan-file flag
 
@@ -286,6 +287,8 @@ class TestAdditionalFlags:
             ("TMAC-AWS-AURORA-001", "my_aurora"),
             ("TMAC-AWS-BCH-001", "my_batch"),
             ("TMAC-AWS-BKP-001", "my_vault"),
+            ("TMAC-AWS-CF-001", "cdn"),
+            ("TMAC-AWS-CF-002", "cdn"),
             ("TMAC-AWS-CFG-001", "my_recorder"),
             ("TMAC-AWS-CW-001", "disabled_trail"),
             ("TMAC-AWS-CWL-001", "my_log_group"),
@@ -397,8 +400,9 @@ class TestAdditionalFlags:
             ("TMAC-AWS-TIME-001", "my_timestream"),
             ("TMAC-AWS-VPC-001", "main_vpc"),
             ("TMAC-AWS-VPC-002", "default"),
+            ("TMAC-AWS-WAF-001", "example"),
         }
-        EXPECTED_TOTAL = 120
+        EXPECTED_TOTAL = 123
 
         runner = CliRunner()
         out_file = tmp_path / "scan_report.html"
