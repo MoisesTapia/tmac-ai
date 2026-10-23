@@ -12,7 +12,8 @@ class ChangeAction(str, Enum):
     create = "create"
     update = "update"
     delete = "delete"
-    replace = "replace"
+    # Shadows str.replace (this enum subclasses str); kept for API/serialization compatibility.
+    replace = "replace"  # type: ignore[assignment]
 
 
 class PlannedChange(BaseModel):

@@ -68,7 +68,7 @@ def scan(
     fail_on: str | None,
     severity: str | None,
     quiet: bool,
-    exclude: tuple,
+    exclude: tuple[str, ...],
     lenient: bool,
     no_color: bool,
     verbose: bool,

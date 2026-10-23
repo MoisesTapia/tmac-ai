@@ -1,0 +1,5 @@
+# Mechanical formatting commits, skipped by `git blame`.
+# Enable locally: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: apply black and ruff safe autofixes
+66245d7df5719befe3b86c0d811fe368b3c1ae0d

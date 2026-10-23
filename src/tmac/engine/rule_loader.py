@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any
 
 import yaml  # type: ignore
 from pydantic import ValidationError
@@ -51,14 +52,14 @@ class RuleLoader:
         logger.warning("%s: %s", file_path, message)
         self.issues.append(ScanIssue(kind="rules", file_path=str(file_path), message=message))
 
-    def _validate_file(self, data: dict, file_path: Path) -> bool:
+    def _validate_file(self, data: dict[str, Any], file_path: Path) -> bool:
         missing = REQUIRED_FILE_FIELDS - set(data.keys())
         if missing:
             self._issue(file_path, f"File missing required fields: {sorted(missing)} — skipped")
             return False
         return True
 
-    def _validate_rule(self, rule_data: dict, file_path: Path) -> bool:
+    def _validate_rule(self, rule_data: dict[str, Any], file_path: Path) -> bool:
         missing = REQUIRED_RULE_FIELDS - set(rule_data.keys())
         if missing:
             rule_id = rule_data.get("id", "<unknown>")
@@ -93,5 +94,7 @@ class RuleLoader:
                     continue
                 # Overwrite if rule ID already exists
                 rules_dict[rule.id] = rule
-        except Exception as e:
+        # Any malformed rules file (bad YAML, wrong types, ...) must become a recorded
+        # issue rather than crash the scan, so the catch-all is intentional.
+        except Exception as e:  # noqa: BLE001
             self._issue(file_path, f"Failed to load rules: {e}")

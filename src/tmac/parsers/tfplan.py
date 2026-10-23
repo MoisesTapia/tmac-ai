@@ -6,6 +6,7 @@ Validates: Requirements 1.1–1.12, 6.5
 
 import json
 import logging
+from typing import Any
 
 from tmac.delta.models import ChangeAction, PlannedChange
 from tmac.models.resource import IgnoreMap, ResourceModel
@@ -63,7 +64,7 @@ class TfplanParser(BaseParser):
         except json.JSONDecodeError as exc:
             logger.warning("Failed to parse JSON in %s: %s", file_path, exc)
             return []
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             logger.warning("Failed to read plan file %s: %s", file_path, exc)
             return []
 
@@ -90,8 +91,8 @@ class TfplanParser(BaseParser):
 
             # Enforce before/after semantics per action
             if action == ChangeAction.create:
-                before: dict | None = None
-                after: dict | None = raw_after if isinstance(raw_after, dict) else {}
+                before: dict[str, Any] | None = None
+                after: dict[str, Any] | None = raw_after if isinstance(raw_after, dict) else {}
             elif action == ChangeAction.delete:
                 before = raw_before if isinstance(raw_before, dict) else {}
                 after = None
@@ -138,7 +139,7 @@ class TfplanParser(BaseParser):
         try:
             with open(file_path, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             logger.warning("Failed to read ignore map from %s: %s", file_path, exc)
             return {}
 

@@ -95,12 +95,9 @@ jobs:
         run: python -m pip_audit --require-hashes --disable-pip -r requirements-dev.txt
 
   lint:
-    # Report-only until the existing ruff/black/mypy backlog is cleaned up.
-    # TODO: remove continue-on-error once `ruff check`, `black --check` and `mypy` pass.
-    name: Lint & types (report-only)
+    name: Lint & types
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

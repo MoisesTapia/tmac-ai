@@ -15,41 +15,41 @@ from tmac.models.finding import Finding, ScanMetadata, ScanStatistics
 
 
 def _make_finding(**kwargs) -> Finding:
-    defaults = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="data",
-        file_path="main.tf",
-        line_number=1,
-        matched_attribute="acl",
-        description="Bucket is publicly accessible.",
-        mitigation="Set acl to private.",
-    )
+    defaults = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "data",
+        "file_path": "main.tf",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "Bucket is publicly accessible.",
+        "mitigation": "Set acl to private.",
+    }
     defaults.update(kwargs)
     return Finding(**defaults)
 
 
 def _make_delta_finding(**kwargs) -> DeltaFinding:
-    defaults = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="data",
-        file_path="main.tf",
-        line_number=1,
-        matched_attribute="acl",
-        description="Bucket is publicly accessible.",
-        mitigation="Set acl to private.",
-        change_action=ChangeAction.update,
-        changed_attribute="acl",
-        value_before="private",
-        value_after="public-read",
-    )
+    defaults = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "data",
+        "file_path": "main.tf",
+        "line_number": 1,
+        "matched_attribute": "acl",
+        "description": "Bucket is publicly accessible.",
+        "mitigation": "Set acl to private.",
+        "change_action": ChangeAction.update,
+        "changed_attribute": "acl",
+        "value_before": "private",
+        "value_after": "public-read",
+    }
     defaults.update(kwargs)
     return DeltaFinding(**defaults)
 

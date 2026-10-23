@@ -26,7 +26,9 @@ ANSI_PATTERN = re.compile(r"\x1b\[[\d;]*m")
 FIXTURES_PLANS = Path("tests/fixtures/plans")
 
 
-def _invoke_plan(plan_file: str, extra_args: list = None, output: str = None) -> object:
+def _invoke_plan(
+    plan_file: str, extra_args: list[str] | None = None, output: str | None = None
+) -> object:
     """Invoke `tmac plan` with the given plan file and optional extra args."""
     runner = CliRunner()
     out = output or str(Path(plan_file).with_suffix(".html"))

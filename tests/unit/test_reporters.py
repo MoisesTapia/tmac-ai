@@ -21,24 +21,24 @@ from tmac.reporters.markdown import MarkdownReporter
 
 
 def _make_finding(**kwargs) -> Finding:
-    defaults: dict[str, Any] = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="test_bucket",
-        file_path="test.tf",
-        line_number=5,
-        matched_attribute="acl",
-        description="Bucket is public",
-        mitigation="Set acl to private",
-    )
+    defaults: dict[str, Any] = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "test_bucket",
+        "file_path": "test.tf",
+        "line_number": 5,
+        "matched_attribute": "acl",
+        "description": "Bucket is public",
+        "mitigation": "Set acl to private",
+    }
     defaults.update(kwargs)
     return Finding(**defaults)
 
 
-def _make_scan_result(findings: list[Finding] = None, **kwargs) -> ScanResult:
+def _make_scan_result(findings: list[Finding] | None = None, **kwargs) -> ScanResult:
     if findings is None:
         findings = [_make_finding()]
     return ScanResult(
@@ -492,30 +492,30 @@ from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult
 
 
 def _make_delta_finding(**kwargs) -> DeltaFinding:
-    defaults: dict[str, Any] = dict(
-        rule_id="TMAC-AWS-S3-001",
-        rule_name="S3 Public ACL",
-        severity="Critical",
-        stride="Information Disclosure",
-        resource_type="aws_s3_bucket",
-        resource_name="test_bucket",
-        file_path="plan.json",
-        line_number=0,
-        matched_attribute="acl",
-        description="Bucket is public",
-        mitigation="Set acl to private",
-        change_action=ChangeAction.create,
-        changed_attribute="acl",
-        value_before=None,
-        value_after="public-read",
-    )
+    defaults: dict[str, Any] = {
+        "rule_id": "TMAC-AWS-S3-001",
+        "rule_name": "S3 Public ACL",
+        "severity": "Critical",
+        "stride": "Information Disclosure",
+        "resource_type": "aws_s3_bucket",
+        "resource_name": "test_bucket",
+        "file_path": "plan.json",
+        "line_number": 0,
+        "matched_attribute": "acl",
+        "description": "Bucket is public",
+        "mitigation": "Set acl to private",
+        "change_action": ChangeAction.create,
+        "changed_attribute": "acl",
+        "value_before": None,
+        "value_after": "public-read",
+    }
     defaults.update(kwargs)
     return DeltaFinding(**defaults)
 
 
 def _make_delta_scan_result(
-    findings: list[DeltaFinding] = None,
-    findings_introduced: int = None,
+    findings: list[DeltaFinding] | None = None,
+    findings_introduced: int | None = None,
     findings_resolved: int = 0,
     resources_created: int = 0,
     resources_updated: int = 0,

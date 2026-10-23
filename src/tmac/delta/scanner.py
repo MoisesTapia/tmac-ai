@@ -11,7 +11,7 @@ from tmac.delta.models import ChangeAction, DeltaFinding, DeltaScanResult, Plann
 from tmac.engine.evaluator import Evaluator
 from tmac.engine.matcher import group_rules_by_type
 from tmac.engine.rule_loader import RuleLoader
-from tmac.models.finding import ScanMetadata, ScanStatistics
+from tmac.models.finding import Finding, ScanMetadata, ScanStatistics
 from tmac.models.resource import IgnoreMap, ResourceIgnoreMap, ResourceModel
 from tmac.models.rule import ThreatRule
 from tmac.parsers.tfplan import TfplanParser
@@ -78,7 +78,7 @@ class DeltaScanner:
             ChangeAction.delete: 0,
             ChangeAction.replace: 0,
         }
-        all_findings: list[DeltaFinding] = []
+        all_findings: list[Finding] = []
         total_resolved = 0
 
         for change in changes:

@@ -43,7 +43,7 @@ resource "aws_s3_bucket" "private_bucket" {
 
 
 # Truly empty directory (no .tf files) for zero-findings tests
-def _empty_dir_scan(tmp_path: Path, extra_args: list = None) -> object:
+def _empty_dir_scan(tmp_path: Path, extra_args: list[str] | None = None) -> object:
     """Invoke scan on an empty directory (no .tf files) → always exit 0."""
     runner = CliRunner()
     args = ["scan", "--dir", str(tmp_path), "--output", str(tmp_path / "report.html")] + (
@@ -58,7 +58,9 @@ def _write_tf(directory: Path, name: str, content: str) -> Path:
     return f
 
 
-def _invoke_scan(tmp_path: Path, extra_args: list = None, tf_content: str = CLEAN_TF) -> object:
+def _invoke_scan(
+    tmp_path: Path, extra_args: list[str] | None = None, tf_content: str = CLEAN_TF
+) -> object:
     """Write a .tf file and invoke the scan command, returning the result."""
     _write_tf(tmp_path, "main.tf", tf_content)
     runner = CliRunner()
