@@ -2,6 +2,7 @@ import logging
 import yaml  # type: ignore
 from pathlib import Path
 from typing import List, Dict, Optional
+from pydantic import ValidationError
 from tmac.models.rule import ThreatRule
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,17 @@ class RuleLoader:
             for rule_data in data["rules"]:
                 if not self._validate_rule(rule_data, file_path):
                     continue
-                rule = ThreatRule(**rule_data)
+                # Validate per rule so one bad rule doesn't drop the rest of the file.
+                try:
+                    rule = ThreatRule(**rule_data)
+                except ValidationError as e:
+                    logger.warning(
+                        "Rule %s in %s is invalid — skipping: %s",
+                        rule_data.get("id", "<unknown>"),
+                        file_path,
+                        "; ".join(err["msg"] for err in e.errors()),
+                    )
+                    continue
                 # Overwrite if rule ID already exists
                 rules_dict[rule.id] = rule
         except Exception as e:
