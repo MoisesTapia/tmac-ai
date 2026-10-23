@@ -10,6 +10,18 @@ logger = logging.getLogger(__name__)
 
 # IgnoreMap: resource_name → ["*"] (global ignore) or ["RULE-ID-1", ...] (per-rule)
 IgnoreMap = Dict[str, List[str]]
+# Same, keyed by (resource_type, resource_name) — unique within a file.
+ResourceIgnoreMap = Dict[Tuple[str, str], List[str]]
+LineMap = Dict[Tuple[str, str], int]
+
+
+def merge_ignores(existing: List[str], new: List[str]) -> List[str]:
+    """Merge rule-ID lists without duplicates; any "*" collapses the result to global."""
+    merged = list(existing)
+    for rid in new:
+        if rid not in merged:
+            merged.append(rid)
+    return ["*"] if "*" in merged else merged
 
 
 class TerraformParser(BaseParser):
@@ -21,7 +33,7 @@ class TerraformParser(BaseParser):
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            line_map, ignore_map = self._prescan(content)
+            line_map, ignores = self._prescan_resources(content)
 
             parsed = hcl2.load(StringIO(content))  # type: ignore
 
@@ -29,14 +41,15 @@ class TerraformParser(BaseParser):
                 for block in parsed["resource"]:
                     for res_type, res_dict in block.items():
                         for res_name, res_attrs in res_dict.items():
-                            line_number = line_map.get((res_type, res_name), 0)
+                            key = (res_type, res_name)
                             resources.append(
                                 ResourceModel(
                                     resource_type=res_type,
                                     name=res_name,
                                     attributes=res_attrs,
                                     source_file=file_path,
-                                    line_number=line_number,
+                                    line_number=line_map.get(key, 0),
+                                    ignored_rules=ignores.get(key, []),
                                 )
                             )
             return resources
@@ -55,16 +68,33 @@ class TerraformParser(BaseParser):
             logger.warning("Failed to read ignore map from %s: %s", file_path, e)
             return {}
 
-    def _prescan(self, content: str) -> Tuple[Dict[Tuple[str, str], int], IgnoreMap]:
+    def _prescan(self, content: str) -> Tuple[LineMap, IgnoreMap]:
         """
-        Single-pass pre-scan of raw .tf content.
+        Pre-scan of raw .tf content with the ignore map keyed by resource name only.
+
+        Kept for backwards compatibility; resources of different types sharing a name
+        are merged here. parse() uses _prescan_resources() instead.
 
         Returns:
             line_map:   {(resource_type, resource_name): line_number}  (1-indexed)
             ignore_map: {resource_name: ["*"] | ["RULE-ID-1", ...]}
         """
-        line_map: Dict[Tuple[str, str], int] = {}
+        line_map, ignores = self._prescan_resources(content)
         ignore_map: IgnoreMap = {}
+        for (_, res_name), rule_ids in ignores.items():
+            ignore_map[res_name] = merge_ignores(ignore_map.get(res_name, []), rule_ids)
+        return line_map, ignore_map
+
+    def _prescan_resources(self, content: str) -> Tuple[LineMap, ResourceIgnoreMap]:
+        """
+        Single-pass pre-scan of raw .tf content.
+
+        Returns:
+            line_map: {(resource_type, resource_name): line_number}  (1-indexed)
+            ignores:  {(resource_type, resource_name): ["*"] | ["RULE-ID-1", ...]}
+        """
+        line_map: LineMap = {}
+        ignore_map: ResourceIgnoreMap = {}
 
         lines = content.splitlines()
 
@@ -104,16 +134,8 @@ class TerraformParser(BaseParser):
                             all_ignores.append(rid)
 
                 if all_ignores:
-                    existing = ignore_map.get(res_name, [])
-                    # Merge: if any entry is "*", collapse to global
-                    merged = list(existing)
-                    for rid in all_ignores:
-                        if rid not in merged:
-                            merged.append(rid)
-                    if "*" in merged:
-                        ignore_map[res_name] = ["*"]
-                    else:
-                        ignore_map[res_name] = merged
+                    key = (res_type, res_name)
+                    ignore_map[key] = merge_ignores(ignore_map.get(key, []), all_ignores)
 
                 # Reset pending after consuming (whether used or not)
                 pending_ignores = None

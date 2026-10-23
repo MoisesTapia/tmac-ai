@@ -31,7 +31,9 @@ class Matcher:
             rules_by_type[rule.resource_type].append(rule)
 
         for resource in resources:
-            ignored_rules = ignore_map.get(resource.name, [])
+            # Suppressions bound to the resource itself, plus any caller-supplied
+            # name-based ignore_map (legacy API).
+            ignored_rules = resource.ignored_rules + ignore_map.get(resource.name, [])
             # Global ignore — skip all rules for this resource
             if "*" in ignored_rules:
                 continue

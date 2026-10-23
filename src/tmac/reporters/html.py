@@ -1,15 +1,33 @@
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
+from urllib.parse import urlparse
 from tmac.reporters.base import BaseReporter
 from tmac.models.finding import ScanResult
 from tmac.delta.models import DeltaScanResult
 
+SAFE_URL_SCHEMES = {"http", "https"}
+
+
+def safe_url(value: object) -> str:
+    """Return the URL only if it uses http(s); otherwise '#' (blocks javascript:, data:, ...)."""
+    url = str(value).strip()
+    if urlparse(url).scheme.lower() in SAFE_URL_SCHEMES:
+        return url
+    return "#"
+
+
 class HTMLReporter(BaseReporter):
     """Generates a self-contained HTML report of findings."""
-    
+
     def generate(self, result: ScanResult) -> str:
         templates_dir = Path(__file__).parent.parent / "templates"
-        env = Environment(loader=FileSystemLoader(templates_dir))
+        # Findings carry attacker-controllable text (resource names, file paths,
+        # custom rule fields), so every value must be HTML-escaped.
+        env = Environment(
+            loader=FileSystemLoader(templates_dir),
+            autoescape=select_autoescape(enabled_extensions=("html", "html.j2")),
+        )
+        env.filters["safe_url"] = safe_url
 
         if isinstance(result, DeltaScanResult):
             template = env.get_template("report_delta.html.j2")

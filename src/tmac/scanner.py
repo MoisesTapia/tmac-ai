@@ -53,21 +53,12 @@ class Scanner:
         ]
         logger.debug("Discovered %d .tf files in %s", len(tf_files), directory)
 
-        # Parse resources
+        # Parse resources (tmac:ignore suppressions travel on each ResourceModel)
         parser = TerraformParser()
         all_resources = []
-        combined_ignore_map: dict = {}
 
         for tf_file in tf_files:
-            resources = parser.parse(str(tf_file))
-            all_resources.extend(resources)
-            for res_name, rules_list in parser.get_ignore_map(str(tf_file)).items():
-                existing = combined_ignore_map.get(res_name, [])
-                merged = list(existing)
-                for rid in rules_list:
-                    if rid not in merged:
-                        merged.append(rid)
-                combined_ignore_map[res_name] = ["*"] if "*" in merged else merged
+            all_resources.extend(parser.parse(str(tf_file)))
 
         # Load rules
         extra_dir = rules_dir or cfg.get("scan", {}).get("rules_dir")
@@ -77,7 +68,7 @@ class Scanner:
 
         # Match
         matcher = Matcher()
-        findings = matcher.match(all_resources, rules, ignore_map=combined_ignore_map)
+        findings = matcher.match(all_resources, rules)
 
         # Filter by min_severity
         severity_levels = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
