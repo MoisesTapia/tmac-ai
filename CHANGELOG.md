@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **PR/MR comments escape scanned values**: resource names and file paths come from the code under review and were inserted raw into the comment's Markdown table, so a crafted name could add cells or fake text (e.g. an "APPROVED" badge).
 - **GitLab CI template installed an unrelated package**: the PyPI name `tmac` belongs to a different project, and the template ran `pip install tmac` with the job's `CI_JOB_TOKEN` available. It now installs this repository's archive at `TMAC_REF`. The docs no longer recommend `pip install tmac`.
 - **HTML reports**: Jinja2 autoescape for every value (resource names, file paths and custom-rule text were rendered raw, and so was the embedded Mermaid diagram), and `references` links are restricted to `http(s)` with `rel="noopener noreferrer"`.
 - **Fail closed**: an unparseable IaC file or an invalid/unreadable rule no longer passes as a clean scan. `scan`, `cfn`, `plan` and `ci` write the report (with an *Incomplete scan* banner; SARIF `executionSuccessful: false`; a note in the PR/MR comment) and exit `3`. `--lenient` restores warn-only behaviour.
@@ -18,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **+552 Terraform rules** from the v1.6.0 branch, which never reached `main` after PR #1 was squash-merged: 1,072 built-in Terraform rules over 268 resource types (Bedrock, IoT, SageMaker, WAFv2, …), plus richer `security_attrs.yaml` diagram metadata (181 attributes, 95 satellites).
+- **Collapsible PR/MR comments**: findings grouped by severity in `<details>` blocks, with a File column linking to the line in the PR head; the Action column is kept for plan results. The report artifact is always written locally, even without a CI token.
+- **`not_regex`** condition operator.
+- `scripts/generate_rules_doc.py` generates `DOCS/RULES.md` from the rule YAML; a test fails when the catalog is stale.
 - **AWS CloudFormation — `tmac cfn`**: YAML/JSON templates (`.yaml`, `.yml`, `.json`, `.template`; other YAML/JSON is skipped). Intrinsic functions (`!Ref`, `!Sub`, `!GetAtt`, `Fn::…`) are normalized and never compared; exact LogicalId line numbers; `tmac:ignore` via comments or resource `Metadata` (works in JSON); size and YAML alias-bomb limits.
 - **43 CloudFormation rules** (`TMAC-CFN-*`): S3 (5), IAM (9), Security Groups (3), VPC (1), EC2 (4), RDS (5), DynamoDB (3), KMS (3), Lambda (3), CloudTrail (3), API Gateway (3), nested stacks (1).
 - **OpenTofu**: `.tofu` sources in `scan`, `ci` (changed-file set) and `diagram`; `x.tofu` overrides `x.tf`; `tofu show -json` plans in `plan`.
@@ -35,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Attribute paths through nested blocks** (block inside block, e.g. `rule.apply_server_side_encryption_by_default.sse_algorithm`) resolved to nothing: `not_exists` rules fired on resources that declare the attribute and `equals` rules never fired (6 false positives and 1 missed finding on the bundled examples).
+- `TMAC-AWS-CB-003` flagged CodeBuild variables stored in Secrets Manager; it now flags `PLAINTEXT` ones only.
+- `TMAC-AWS-SHIELD-004`, `SHIELD-006` and `SECHUB-008` are not shipped: they need cross-resource correlation (they would flag every other Shield protection / Security Hub subscription) and never fired before (they used the then-missing `not_regex`).
 - `--config` was ignored; the `report` section of `.tmac.yaml` (`format`, `fail_on`, `severity`) and `scan.dir` were not applied (precedence: flag > `.tmac.yaml` > default).
 - A missing `--dir` exited `2` instead of the documented `3`.
 - `tmac:ignore` matched by resource name across files and types (ignoring `aws_s3_bucket.main` also silenced `aws_security_group.main`).

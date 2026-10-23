@@ -51,6 +51,7 @@ rules:
 | `contains` | The attribute contains the value (string or list). |
 | `not_contains` | The attribute does not contain the value. |
 | `regex` | The attribute matches the regular expression. |
+| `not_regex` | The attribute is present and does not match the regular expression. |
 | `exists` | The attribute exists in the resource. |
 | `not_exists` | The attribute does not exist in the resource. |
 
